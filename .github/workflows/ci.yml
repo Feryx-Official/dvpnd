@@ -29,7 +29,11 @@ jobs:
 
   integration:
     name: Integration suite
-    runs-on: ubuntu-latest
+    # Not ubuntu-latest: Ubuntu 26.04 ships an AppArmor profile for
+    # /usr/bin/wg-quick that attaches to the privileged tunnels container and
+    # only lets it run coreutils' readlink, while the Alpine image's is
+    # BusyBox, so wg-quick exits 126 there.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
