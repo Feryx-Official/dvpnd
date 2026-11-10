@@ -17,8 +17,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
-	wgtypes "github.com/proofoftrinity/dvpnd/v9/services/wireguard/types"
-	"github.com/proofoftrinity/dvpnd/v9/utils"
+	wgtypes "github.com/Feryx-Official/dvpnd/v9/services/wireguard/types"
+	"github.com/Feryx-Official/dvpnd/v9/utils"
 )
 
 var (

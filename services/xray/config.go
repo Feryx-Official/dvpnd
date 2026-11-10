@@ -5,7 +5,7 @@ package xray
 import (
 	"strings"
 
-	"github.com/proofoftrinity/dvpnd/v9/services/common"
+	"github.com/Feryx-Official/dvpnd/v9/services/common"
 )
 
 // configTemplate is the xray server configuration the node writes at start.

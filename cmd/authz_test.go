@@ -10,7 +10,7 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	"github.com/proofoftrinity/dvpnd/v9/types"
+	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
 // Rules: [CH-6].

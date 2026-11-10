@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	"github.com/proofoftrinity/dvpnd/v9/types"
+	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
 // OpenDatabase opens the session database at path and migrates its table. It

@@ -5,7 +5,7 @@ package services
 import (
 	"testing"
 
-	"github.com/proofoftrinity/dvpnd/v9/types"
+	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
 // Every registry entry must agree with the service it constructs, and the

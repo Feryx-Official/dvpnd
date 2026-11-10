@@ -13,7 +13,7 @@
 #
 # Run it as root:
 #
-#   curl -fsSL https://raw.githubusercontent.com/proofoftrinity/dvpnd/main/scripts/install.sh \
+#   curl -fsSL https://raw.githubusercontent.com/Feryx-Official/dvpnd/main/scripts/install.sh \
 #     -o install.sh && sudo bash install.sh --moniker "My node"
 #
 # Every step is skipped when its result already exists, so the script can be
@@ -22,8 +22,8 @@
 
 set -Eeuo pipefail
 
-REPO_URL="https://github.com/proofoftrinity/dvpnd.git"
-REPO_API="https://api.github.com/repos/proofoftrinity/dvpnd/releases/latest"
+REPO_URL="https://github.com/Feryx-Official/dvpnd.git"
+REPO_API="https://api.github.com/repos/Feryx-Official/dvpnd/releases/latest"
 
 # Release tags are signed with the maintainer's SSH key; the installer builds
 # a tag only when its signature checks out against this key. It is the same

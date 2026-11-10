@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/proofoftrinity/dvpnd/v9/services/common"
+	"github.com/Feryx-Official/dvpnd/v9/services/common"
 )
 
 // startRig builds a service with both tiers, on interfaces awgtest0 and

@@ -29,21 +29,24 @@ const (
 	upstreamModule = "github.com/sentinel-official/dvpn-node"
 	forkModule     = "github.com/" + accountName + "/dvpnd/v9"
 	// accountName is the GitHub account that owns the repository.
-	accountName = "proofoftrinity"
+	accountName = "Feryx-Official"
 )
 
-// formerAccountNames are the names the account had before; anyone can register
-// one once it is given up.
-var formerAccountNames = []string{"trinitystake"}
+// formerNames are where the repository lived before, in lower case: an account
+// name anyone can register once it is given up, and the path a transfer left
+// behind, which stops forwarding once a repository is created there.
+var formerNames = []string{"trinitystake", "proofoftrinity/dvpnd"}
 
-// formerNameAllowed lists the lines that may still name a former account,
+// formerNameAllowed lists the lines that may still name a former home,
 // keyed by file and line (spaces collapsed), each with its reason: they record
 // the past and point nobody anywhere.
 var formerNameAllowed = map[string]string{
 	"docs/provenance/fork-verification.txt: PASS fork-point tag signature verifies (trinitystake <114076168+trinitystake@users.noreply.github.com>)": "a dated record of a provenance run; the fork-point tag was signed under that name",
-	"README.md: `github.com/trinitystake/dvpnd/v9`, so the command above works from 9.4.1 on.":                                                       "the module path the releases before the rename declare",
+	"README.md: then: `github.com/proofoftrinity/dvpnd/v9` from 9.4.1, `github.com/trinitystake/dvpnd/v9`":                                           "the module paths the releases before the move declare",
 	`invariants/canaries.json: "replace": "REPO_URL=\"https://github.com/trinitystake/dvpnd.git\"",`:                                                 "the canary puts the old name back to prove this test catches it",
-	"docs/operator.md: signatures name the old account: to check one of them, write `trinitystake` for":                                              "the identity that signed the images built before the rename",
+	`invariants/canaries.json: "replace": "REPO_URL=\"https://github.com/proofoftrinity/dvpnd.git\"",`:                                               "the canary puts the old path back to prove this test catches it",
+	"docs/operator.md: them from `ghcr.io/proofoftrinity/dvpnd`, and to check one, write `proofoftrinity` for":                                       "where the images built before the move are published",
+	"docs/operator.md: `Feryx-Official` in the identity and the `--repo` value (`trinitystake` for 9.4.0, signed":                                    "the identity that signed the images built before the rename",
 }
 
 // Rules: [LIC-1].
@@ -247,7 +250,7 @@ func TestNoFormerAccountName(t *testing.T) {
 			continue
 		}
 		for i, line := range strings.Split(string(b), "\n") {
-			for _, name := range formerAccountNames {
+			for _, name := range formerNames {
 				if !strings.Contains(strings.ToLower(line), name) {
 					continue
 				}
@@ -256,7 +259,7 @@ func TestNoFormerAccountName(t *testing.T) {
 					seen[key] = true
 					continue
 				}
-				t.Errorf("%s:%d names the former account %s; use %s, since anyone can register a name once it is given up", f, i+1, name, accountName)
+				t.Errorf("%s:%d names %s, a former home of the repository; use the account %s, since a former home serves whatever is put there next", f, i+1, name, accountName)
 			}
 		}
 	}

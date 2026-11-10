@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/proofoftrinity/dvpnd/v9/libs/geoip/types"
+	"github.com/Feryx-Official/dvpnd/v9/libs/geoip/types"
 )
 
 // recorder captures log lines so tests can assert on what the operator would see.

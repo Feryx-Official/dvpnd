@@ -30,7 +30,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/proofoftrinity/dvpnd/v9/services/common"
+	"github.com/Feryx-Official/dvpnd/v9/services/common"
 )
 
 // Ports the targets and the host's own services listen on.

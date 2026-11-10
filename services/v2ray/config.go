@@ -6,7 +6,7 @@ package v2ray
 import (
 	"strings"
 
-	v2raytypes "github.com/proofoftrinity/dvpnd/v9/services/v2ray/types"
+	v2raytypes "github.com/Feryx-Official/dvpnd/v9/services/v2ray/types"
 )
 
 // configTemplate is the v2ray server configuration the node writes at start.

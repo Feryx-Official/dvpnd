@@ -7,7 +7,7 @@ import (
 	v1base "github.com/sentinel-official/sentinelhub/v12/types/v1"
 	"gorm.io/gorm"
 
-	"github.com/proofoftrinity/dvpnd/v9/types"
+	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
 // chainSessionView is the part of a chain session ReconcileSessions needs; the

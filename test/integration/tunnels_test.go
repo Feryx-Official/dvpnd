@@ -18,14 +18,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/proofoftrinity/dvpnd/v9/services/amneziawg"
-	awgtypes "github.com/proofoftrinity/dvpnd/v9/services/amneziawg/types"
-	"github.com/proofoftrinity/dvpnd/v9/services/common"
-	"github.com/proofoftrinity/dvpnd/v9/services/openvpn"
-	ovpntypes "github.com/proofoftrinity/dvpnd/v9/services/openvpn/types"
-	"github.com/proofoftrinity/dvpnd/v9/services/wireguard"
-	wgtypes "github.com/proofoftrinity/dvpnd/v9/services/wireguard/types"
-	"github.com/proofoftrinity/dvpnd/v9/types"
+	"github.com/Feryx-Official/dvpnd/v9/services/amneziawg"
+	awgtypes "github.com/Feryx-Official/dvpnd/v9/services/amneziawg/types"
+	"github.com/Feryx-Official/dvpnd/v9/services/common"
+	"github.com/Feryx-Official/dvpnd/v9/services/openvpn"
+	ovpntypes "github.com/Feryx-Official/dvpnd/v9/services/openvpn/types"
+	"github.com/Feryx-Official/dvpnd/v9/services/wireguard"
+	wgtypes "github.com/Feryx-Official/dvpnd/v9/services/wireguard/types"
+	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
 // The client's network namespace and the veth pair that joins it to the

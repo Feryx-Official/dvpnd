@@ -23,8 +23,10 @@ unlicensed code (`NOTICE`, `CONTRIBUTING.md`). IDs as in `test/README.md`.
   copyleft, network copyleft, source-available and unknown licences are refused, and so is
   a package with no licence file. The static test reads the licences from the module cache;
   the CI licence gate checks them again with go-licenses.
-- **[LIC-8] Every link, module path and image name uses the account's current name.**
-  The account that owns the repository was renamed. GitHub redirects a former name only
-  until someone else registers it; from then on a link to it serves a stranger's code, and
-  the install command runs that code as root. A former name stays only on lines that record
-  the past, each listed in the test with its reason.
+- **[LIC-8] Every link, module path and image name uses the repository's current home.**
+  The repository has moved twice: its account was renamed, then it was transferred to
+  `Feryx-Official/dvpnd`; the test lists both former homes. GitHub forwards a former home
+  only until someone registers the old account name or creates a repository at the old
+  path; from then on a link to it serves that code, and the install command runs it as
+  root. A former home stays only on lines that record the past, each listed in the test
+  with its reason.

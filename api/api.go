@@ -6,9 +6,9 @@ package api
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/proofoftrinity/dvpnd/v9/api/session"
-	"github.com/proofoftrinity/dvpnd/v9/api/status"
-	"github.com/proofoftrinity/dvpnd/v9/context"
+	"github.com/Feryx-Official/dvpnd/v9/api/session"
+	"github.com/Feryx-Official/dvpnd/v9/api/status"
+	"github.com/Feryx-Official/dvpnd/v9/context"
 )
 
 func RegisterRoutes(ctx *context.Context, r gin.IRouter) {

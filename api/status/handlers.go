@@ -9,8 +9,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/version"
 	"github.com/gin-gonic/gin"
 
-	"github.com/proofoftrinity/dvpnd/v9/context"
-	"github.com/proofoftrinity/dvpnd/v9/types"
+	"github.com/Feryx-Official/dvpnd/v9/context"
+	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
 // HandlerGetRoot serves GET /, the document current client apps and node

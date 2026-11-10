@@ -18,9 +18,9 @@ import (
 	"github.com/xtls/xray-core/proxy/vless"
 	"google.golang.org/grpc"
 
-	"github.com/proofoftrinity/dvpnd/v9/services/common"
-	xraytypes "github.com/proofoftrinity/dvpnd/v9/services/xray/types"
-	"github.com/proofoftrinity/dvpnd/v9/types"
+	"github.com/Feryx-Official/dvpnd/v9/services/common"
+	xraytypes "github.com/Feryx-Official/dvpnd/v9/services/xray/types"
+	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
 // fakeAPI stands in for xray's gRPC control API: it records the users added

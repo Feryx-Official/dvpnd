@@ -8,7 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	wgtypes "github.com/proofoftrinity/dvpnd/v9/services/wireguard/types"
+	wgtypes "github.com/Feryx-Official/dvpnd/v9/services/wireguard/types"
 )
 
 // Each tier hands its peers addresses from tunnel networks of its own. Nodes

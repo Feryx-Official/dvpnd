@@ -18,9 +18,9 @@ import (
 	v1base "github.com/sentinel-official/sentinelhub/v12/types/v1"
 	"github.com/spf13/viper"
 
-	"github.com/proofoftrinity/dvpnd/v9/libs/geoip"
+	"github.com/Feryx-Official/dvpnd/v9/libs/geoip"
 
-	"github.com/proofoftrinity/dvpnd/v9/utils"
+	"github.com/Feryx-Official/dvpnd/v9/utils"
 )
 
 const (

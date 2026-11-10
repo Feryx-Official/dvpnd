@@ -6,7 +6,7 @@ import (
 	"encoding/binary"
 	"testing"
 
-	xraytypes "github.com/proofoftrinity/dvpnd/v9/services/xray/types"
+	xraytypes "github.com/Feryx-Official/dvpnd/v9/services/xray/types"
 )
 
 // TestInfoCarriesThePort: the legacy endpoint hands Info() to old clients,

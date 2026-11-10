@@ -1,4 +1,4 @@
-module github.com/proofoftrinity/dvpnd/v9
+module github.com/Feryx-Official/dvpnd/v9
 
 go 1.26.0
 

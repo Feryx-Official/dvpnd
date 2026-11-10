@@ -8,8 +8,8 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
-	"github.com/proofoftrinity/dvpnd/v9/api/session"
-	"github.com/proofoftrinity/dvpnd/v9/types"
+	"github.com/Feryx-Official/dvpnd/v9/api/session"
+	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
 // allowBrowsers lets client apps that run in a browser call the node: any

@@ -12,8 +12,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/proofoftrinity/dvpnd/v9/context"
-	"github.com/proofoftrinity/dvpnd/v9/types"
+	"github.com/Feryx-Official/dvpnd/v9/context"
+	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
 // requireTLS refuses a handshake that arrives over plain HTTP. The node's port

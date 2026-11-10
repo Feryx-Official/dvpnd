@@ -6,7 +6,7 @@ package status
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/proofoftrinity/dvpnd/v9/context"
+	"github.com/Feryx-Official/dvpnd/v9/context"
 )
 
 func RegisterRoutes(ctx *context.Context, r gin.IRouter) {

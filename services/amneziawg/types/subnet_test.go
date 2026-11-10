@@ -11,7 +11,7 @@ import (
 
 	"github.com/spf13/viper"
 
-	wgtypes "github.com/proofoftrinity/dvpnd/v9/services/wireguard/types"
+	wgtypes "github.com/Feryx-Official/dvpnd/v9/services/wireguard/types"
 )
 
 func public(t *testing.T, private string) []byte {

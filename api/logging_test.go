@@ -13,7 +13,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/version"
 	"github.com/gin-gonic/gin"
 
-	"github.com/proofoftrinity/dvpnd/v9/context"
+	"github.com/Feryx-Official/dvpnd/v9/context"
 )
 
 // Rules: [HS-12], [PV-1].

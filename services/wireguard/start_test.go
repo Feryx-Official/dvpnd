@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/proofoftrinity/dvpnd/v9/services/common"
-	wgtypes "github.com/proofoftrinity/dvpnd/v9/services/wireguard/types"
+	"github.com/Feryx-Official/dvpnd/v9/services/common"
+	wgtypes "github.com/Feryx-Official/dvpnd/v9/services/wireguard/types"
 )
 
 // startRig builds a service whose wg-quick is a script that logs its calls

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	v2raytypes "github.com/proofoftrinity/dvpnd/v9/services/v2ray/types"
+	v2raytypes "github.com/Feryx-Official/dvpnd/v9/services/v2ray/types"
 )
 
 // initV2Ray runs Init on a configuration with the given VMess port and

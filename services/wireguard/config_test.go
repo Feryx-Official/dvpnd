@@ -8,7 +8,7 @@ import (
 	"testing"
 	"text/template"
 
-	wgtypes "github.com/proofoftrinity/dvpnd/v9/services/wireguard/types"
+	wgtypes "github.com/Feryx-Official/dvpnd/v9/services/wireguard/types"
 )
 
 func renderConfig(t *testing.T, cfg *wgtypes.Config) string {

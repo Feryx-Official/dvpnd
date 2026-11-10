@@ -17,7 +17,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	v2raytypes "github.com/proofoftrinity/dvpnd/v9/services/v2ray/types"
+	v2raytypes "github.com/Feryx-Official/dvpnd/v9/services/v2ray/types"
 )
 
 // fakeAPI stands in for v2ray's gRPC control API: it records the users on

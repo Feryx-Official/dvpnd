@@ -6,7 +6,7 @@ import (
 	"encoding/binary"
 	"testing"
 
-	ovpntypes "github.com/proofoftrinity/dvpnd/v9/services/openvpn/types"
+	ovpntypes "github.com/Feryx-Official/dvpnd/v9/services/openvpn/types"
 )
 
 // TestInfoCarriesThePort: the legacy endpoint hands Info() to old clients,

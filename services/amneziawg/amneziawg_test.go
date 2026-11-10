@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	awgtypes "github.com/proofoftrinity/dvpnd/v9/services/amneziawg/types"
-	wgtypes "github.com/proofoftrinity/dvpnd/v9/services/wireguard/types"
+	awgtypes "github.com/Feryx-Official/dvpnd/v9/services/amneziawg/types"
+	wgtypes "github.com/Feryx-Official/dvpnd/v9/services/wireguard/types"
 )
 
 // fakeAwg stands in for the awg tool on PATH: it records every call and

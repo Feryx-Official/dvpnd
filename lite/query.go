@@ -20,7 +20,7 @@ import (
 	v2subscriptiontypes "github.com/sentinel-official/sentinelhub/v12/x/subscription/types/v2"
 	subscriptiontypes "github.com/sentinel-official/sentinelhub/v12/x/subscription/types/v3"
 
-	"github.com/proofoftrinity/dvpnd/v9/types"
+	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
 // query runs fn against each configured RPC remote until one succeeds. fn

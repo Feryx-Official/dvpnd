@@ -26,10 +26,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/proofoftrinity/dvpnd/v9/services/common"
-	v2raytypes "github.com/proofoftrinity/dvpnd/v9/services/v2ray/types"
-	"github.com/proofoftrinity/dvpnd/v9/types"
-	"github.com/proofoftrinity/dvpnd/v9/utils"
+	"github.com/Feryx-Official/dvpnd/v9/services/common"
+	v2raytypes "github.com/Feryx-Official/dvpnd/v9/services/v2ray/types"
+	"github.com/Feryx-Official/dvpnd/v9/types"
+	"github.com/Feryx-Official/dvpnd/v9/utils"
 )
 
 const (

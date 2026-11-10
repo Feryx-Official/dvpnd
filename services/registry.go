@@ -12,19 +12,19 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/proofoftrinity/dvpnd/v9/services/amneziawg"
-	awgtypes "github.com/proofoftrinity/dvpnd/v9/services/amneziawg/types"
-	"github.com/proofoftrinity/dvpnd/v9/services/hysteria"
-	hysteriatypes "github.com/proofoftrinity/dvpnd/v9/services/hysteria/types"
-	"github.com/proofoftrinity/dvpnd/v9/services/openvpn"
-	ovpntypes "github.com/proofoftrinity/dvpnd/v9/services/openvpn/types"
-	"github.com/proofoftrinity/dvpnd/v9/services/v2ray"
-	v2raytypes "github.com/proofoftrinity/dvpnd/v9/services/v2ray/types"
-	"github.com/proofoftrinity/dvpnd/v9/services/wireguard"
-	wgtypes "github.com/proofoftrinity/dvpnd/v9/services/wireguard/types"
-	"github.com/proofoftrinity/dvpnd/v9/services/xray"
-	xraytypes "github.com/proofoftrinity/dvpnd/v9/services/xray/types"
-	"github.com/proofoftrinity/dvpnd/v9/types"
+	"github.com/Feryx-Official/dvpnd/v9/services/amneziawg"
+	awgtypes "github.com/Feryx-Official/dvpnd/v9/services/amneziawg/types"
+	"github.com/Feryx-Official/dvpnd/v9/services/hysteria"
+	hysteriatypes "github.com/Feryx-Official/dvpnd/v9/services/hysteria/types"
+	"github.com/Feryx-Official/dvpnd/v9/services/openvpn"
+	ovpntypes "github.com/Feryx-Official/dvpnd/v9/services/openvpn/types"
+	"github.com/Feryx-Official/dvpnd/v9/services/v2ray"
+	v2raytypes "github.com/Feryx-Official/dvpnd/v9/services/v2ray/types"
+	"github.com/Feryx-Official/dvpnd/v9/services/wireguard"
+	wgtypes "github.com/Feryx-Official/dvpnd/v9/services/wireguard/types"
+	"github.com/Feryx-Official/dvpnd/v9/services/xray"
+	xraytypes "github.com/Feryx-Official/dvpnd/v9/services/xray/types"
+	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
 // Protocol is one registered VPN protocol.

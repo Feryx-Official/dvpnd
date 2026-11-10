@@ -19,9 +19,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/proofoftrinity/dvpnd/v9/services/amneziawg"
-	awgtypes "github.com/proofoftrinity/dvpnd/v9/services/amneziawg/types"
-	wgtypes "github.com/proofoftrinity/dvpnd/v9/services/wireguard/types"
+	"github.com/Feryx-Official/dvpnd/v9/services/amneziawg"
+	awgtypes "github.com/Feryx-Official/dvpnd/v9/services/amneziawg/types"
+	wgtypes "github.com/Feryx-Official/dvpnd/v9/services/wireguard/types"
 )
 
 func main() {

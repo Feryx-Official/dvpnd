@@ -15,8 +15,8 @@ import (
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 
-	"github.com/proofoftrinity/dvpnd/v9/context"
-	"github.com/proofoftrinity/dvpnd/v9/types"
+	"github.com/Feryx-Official/dvpnd/v9/context"
+	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
 // peerService holds peers under their session key with the counters the

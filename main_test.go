@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/proofoftrinity/dvpnd/v9/services"
+	"github.com/Feryx-Official/dvpnd/v9/services"
 )
 
 // mainArgs carries the arguments of a dvpnd run from a test to the child it

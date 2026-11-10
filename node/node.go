@@ -9,9 +9,9 @@ import (
 	sessiontypes "github.com/sentinel-official/sentinelhub/v12/x/session/types/v3"
 	subscriptiontypes "github.com/sentinel-official/sentinelhub/v12/x/subscription/types/v3"
 
-	"github.com/proofoftrinity/dvpnd/v9/context"
-	"github.com/proofoftrinity/dvpnd/v9/types"
-	"github.com/proofoftrinity/dvpnd/v9/utils"
+	"github.com/Feryx-Official/dvpnd/v9/context"
+	"github.com/Feryx-Official/dvpnd/v9/types"
+	"github.com/Feryx-Official/dvpnd/v9/utils"
 )
 
 // chain is what the jobs ask of the chain and send to it; tests replace it.

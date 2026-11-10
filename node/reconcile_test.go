@@ -16,8 +16,8 @@ import (
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 
-	"github.com/proofoftrinity/dvpnd/v9/context"
-	"github.com/proofoftrinity/dvpnd/v9/types"
+	"github.com/Feryx-Official/dvpnd/v9/context"
+	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
 type fakeSession struct {

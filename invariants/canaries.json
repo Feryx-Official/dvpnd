@@ -625,8 +625,18 @@
     {
       "name": "[LIC-8] the installer clones from the former account name",
       "file": "scripts/install.sh",
-      "find": "REPO_URL=\"https://github.com/proofoftrinity/dvpnd.git\"",
+      "find": "REPO_URL=\"https://github.com/Feryx-Official/dvpnd.git\"",
       "replace": "REPO_URL=\"https://github.com/trinitystake/dvpnd.git\"",
+      "run": [
+        "go test -count=1 -run '^TestNoFormerAccountName$' ./test/static/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[LIC-8] the installer clones from the path the repository was transferred from",
+      "file": "scripts/install.sh",
+      "find": "REPO_URL=\"https://github.com/Feryx-Official/dvpnd.git\"",
+      "replace": "REPO_URL=\"https://github.com/proofoftrinity/dvpnd.git\"",
       "run": [
         "go test -count=1 -run '^TestNoFormerAccountName$' ./test/static/"
       ],

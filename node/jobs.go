@@ -13,7 +13,7 @@ import (
 	v1base "github.com/sentinel-official/sentinelhub/v12/types/v1"
 	subscriptiontypes "github.com/sentinel-official/sentinelhub/v12/x/subscription/types/v3"
 
-	"github.com/proofoftrinity/dvpnd/v9/types"
+	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
 // runJob runs a job's pass at once and then at every tick, for the life of

@@ -12,9 +12,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/proofoftrinity/dvpnd/v9/services/common"
-	wgtypes "github.com/proofoftrinity/dvpnd/v9/services/wireguard/types"
-	"github.com/proofoftrinity/dvpnd/v9/types"
+	"github.com/Feryx-Official/dvpnd/v9/services/common"
+	wgtypes "github.com/Feryx-Official/dvpnd/v9/services/wireguard/types"
+	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
 // Name is the service_type string clients expect.

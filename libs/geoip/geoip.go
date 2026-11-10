@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/proofoftrinity/dvpnd/v9/libs/geoip/types"
+	"github.com/Feryx-Official/dvpnd/v9/libs/geoip/types"
 )
 
 // Provider names accepted in the [geoip] config section.

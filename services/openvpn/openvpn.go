@@ -24,10 +24,10 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/proofoftrinity/dvpnd/v9/services/common"
-	ovpntypes "github.com/proofoftrinity/dvpnd/v9/services/openvpn/types"
-	"github.com/proofoftrinity/dvpnd/v9/services/wireguard"
-	"github.com/proofoftrinity/dvpnd/v9/types"
+	"github.com/Feryx-Official/dvpnd/v9/services/common"
+	ovpntypes "github.com/Feryx-Official/dvpnd/v9/services/openvpn/types"
+	"github.com/Feryx-Official/dvpnd/v9/services/wireguard"
+	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
 const (

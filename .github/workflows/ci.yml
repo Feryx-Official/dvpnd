@@ -82,7 +82,7 @@ jobs:
       - name: go-licenses
         run: |
           go run github.com/google/go-licenses@v1.6.0 check ./... \
-            --ignore github.com/proofoftrinity/dvpnd/v9 \
+            --ignore github.com/Feryx-Official/dvpnd/v9 \
             --disallowed_types=forbidden,restricted,unknown
       - name: SPDX headers present
         run: |

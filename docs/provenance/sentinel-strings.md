@@ -1,7 +1,7 @@
 # "Sentinel" string inventory
 
 **Status (2026-09-06):** Buckets A and D applied under the name `dvpnd` (module
-`github.com/proofoftrinity/dvpnd/v9`). What remains in the tree is bucket B (attribution), bucket C
+`github.com/Feryx-Official/dvpnd/v9`). What remains in the tree is bucket B (attribution), bucket C
 (protocol identifiers and the Apache-2.0 `hub` dependency) and the legacy-home hint text.
 Re-check with the grep below; every hit must fall in one of those.
 

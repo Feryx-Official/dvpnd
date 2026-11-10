@@ -8,8 +8,8 @@ import (
 	cmtlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/gin-gonic/gin"
 
-	"github.com/proofoftrinity/dvpnd/v9/context"
-	"github.com/proofoftrinity/dvpnd/v9/types"
+	"github.com/Feryx-Official/dvpnd/v9/context"
+	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
 // TestLegacyEndpointOffByDefault: the replayable legacy endpoint exists only
