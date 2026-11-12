@@ -61,7 +61,11 @@ not yet.
   fake `dvpnd`, and its downloads, each in a directory of its own and checked
   against a checksum the script pins; and the Docker runner's `setup`,
   `start`, `stop`, `remove`, `attach` and `update`, which run against fake
-  tools, its flags held to the operator guide's `docker run` commands;
+  tools, its flags held to the operator guide's `docker run` commands; the
+  systemd unit's umask and task cap; and every Dockerfile's base images
+  pinned by digest, in a directory Dependabot watches, one Alpine release
+  across a Dockerfile's stages, and the image's protocol pins the same as the
+  installer's;
 - the same SPDX and `sentinel-go-sdk` checks as shell steps, and
   `docs/provenance/verify-fork.sh`, which also asks apache.org,
   proxy.golang.org and Software Heritage when it can reach them (an

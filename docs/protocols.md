@@ -294,8 +294,12 @@ of loopback is root already.
 
 ## Packaging policy
 
-One image. Each protocol's binary is added when the protocol lands, pinned to a release and
-checked against a sha256, like the hnsd commit check in the Dockerfile. Server versions
+One image. A protocol binary the project builds or downloads (xray, Hysteria, amneziawg-go
+and the AmneziaWG tools, hnsd) is pinned to a release and checked against a sha256 or a full
+commit hash, and the installer pins the same versions. V2Ray and OpenVPN come from the
+packages of the image's Alpine release, signed by Alpine and not pinned to a version, as
+`apt` gives them on a host. Base images are pinned by digest, both Dockerfile stages are one
+Alpine release, and Dependabot is set to move the pins of every Dockerfile in the tree. Server versions
 follow the versions the maintainer's client bundles, so a node and a client are tested
 against the same code. On a host the operator installs the same binary; §6 of the operator
 guide lists each one.

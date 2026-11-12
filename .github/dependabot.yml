@@ -1,7 +1,9 @@
 version: 2
 updates:
+  # Every directory holding a Dockerfile: the node image, the AmneziaWG client
+  # check and the integration suite's systemd host.
   - package-ecosystem: docker
-    directory: /
+    directories: ["/", "/tools/awgcheck/client", "/test/integration"]
     schedule:
       interval: weekly
     groups:

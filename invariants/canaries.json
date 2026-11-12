@@ -1352,6 +1352,46 @@
         "go test -count=1 -run '^TestUnitLimitsWhatItsDaemonsMake$' ./test/static/"
       ],
       "expect": "want one cap"
+    },
+    {
+      "name": "[RT-30] the image pins another xray than the installer",
+      "file": "Dockerfile",
+      "find": "ARG XRAY_VERSION=v26.3.27",
+      "replace": "ARG XRAY_VERSION=v26.3.28",
+      "run": [
+        "go test -count=1 -run '^TestImageAndInstallerPinTheSameDaemons$' ./test/static/"
+      ],
+      "expect": "Dockerfile pins XRAY_VERSION="
+    },
+    {
+      "name": "[RT-30] the image checks hnsd's commit by a prefix",
+      "file": "Dockerfile",
+      "find": "grep -qx a5c7c287e848f46d3e97f16b698e2027c8dc96c3",
+      "replace": "grep -q ^a5c7c287e848",
+      "run": [
+        "go test -count=1 -run '^TestImageAndInstallerPinTheSameDaemons$' ./test/static/"
+      ],
+      "expect": "not a full commit hash"
+    },
+    {
+      "name": "[RT-30] the image builds hnsd on another Alpine release than it runs it on",
+      "file": "Dockerfile",
+      "find": "FROM golang:1.27.4-alpine3.24@",
+      "replace": "FROM golang:1.27.4-alpine3.23@",
+      "run": [
+        "go test -count=1 -run '^TestBaseImagesArePinned$' ./test/static/"
+      ],
+      "expect": "want one"
+    },
+    {
+      "name": "[RT-30] a Dockerfile builds on whatever its tag points at",
+      "file": "test/integration/systemd.Dockerfile",
+      "find": "FROM debian:trixie@sha256:9c6e381421d0f48d1b8133e573f33c185ee16cbf505eda9c4a8a4791b25ea8a6",
+      "replace": "FROM debian:trixie",
+      "run": [
+        "go test -count=1 -run '^TestBaseImagesArePinned$' ./test/static/"
+      ],
+      "expect": "not pinned by digest"
     }
   ]
 }

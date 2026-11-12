@@ -1,9 +1,13 @@
 # Base images are pinned by digest (Dependabot moves the pins), so a tag
-# re-pointed upstream cannot change what is built.
-FROM golang:1.27-alpine3.23@sha256:7a93747afee80359e81dbe39c8a65037b147cada0262bf86f5b96dd06842b368 AS build
+# re-pointed upstream cannot change what is built. Both stages are the same
+# Alpine release, since hnsd is built against the libraries the image runs
+# it with, and the Go toolchain is the one go.mod names and the installer
+# installs.
+FROM golang:1.27.4-alpine3.24@sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf AS build
 
 # Proxy binaries the node drives, pinned to the releases the client apps are
-# tested against and checked against the sha256 the project publishes.
+# tested against and checked against the sha256 the project publishes. The
+# installer pins the same (scripts/install.sh); a test holds the two together.
 ARG XRAY_VERSION=v26.3.27
 ARG XRAY_SHA256=23cd9af937744d97776ee35ecad4972cf4b2109d1e0fe6be9930467608f7c8ae
 ARG HYSTERIA_VERSION=app/v2.10.0
@@ -32,7 +36,7 @@ RUN --mount=target=/go/pkg/mod,type=cache \
     apk add autoconf automake bash file g++ gcc git libtool linux-headers make musl-dev unbound-dev && \
     cd /root/dvpnd/ && make --jobs=$(nproc) install && \
     git clone --branch=v2.0.0 --depth=1 https://github.com/handshake-org/hnsd.git /root/hnsd && \
-    git -C /root/hnsd rev-parse HEAD | grep -q ^a5c7c287e848 && \
+    git -C /root/hnsd rev-parse HEAD | grep -qx a5c7c287e848f46d3e97f16b698e2027c8dc96c3 && \
     cd /root/hnsd/ && bash autogen.sh && sh configure && make --jobs=$(nproc) && \
     git clone --quiet --branch=${AWG_GO_TAG} --depth=1 https://github.com/amnezia-vpn/amneziawg-go.git /root/amneziawg-go && \
     git -C /root/amneziawg-go rev-parse HEAD | grep -q ^${AWG_GO_COMMIT} && \
@@ -51,6 +55,8 @@ COPY --from=build /tmp/hysteria /usr/local/bin/hysteria
 COPY --from=build /root/amneziawg-go/amneziawg-go /usr/bin/amneziawg-go
 COPY --from=build /root/awg-install/usr/bin/awg /root/awg-install/usr/bin/awg-quick /usr/bin/
 
+# The rest comes from the packages of this Alpine release, signed by Alpine and
+# not pinned to a version: v2ray, OpenVPN, iptables, wireguard-tools.
 # dvpnd-proxy is the account the node runs the proxy daemons as, and that
 # OpenVPN drops to (services/common/runtime.go).
 RUN apk add --no-cache iptables openvpn unbound-libs v2ray wireguard-tools && \

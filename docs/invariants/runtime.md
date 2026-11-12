@@ -143,3 +143,11 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
   `TasksMax=4096`: with systemd's default umask, 0022, a file a daemon wrote without
   setting its mode was readable by every account on the host, and nothing bounded the tasks
   a daemon could start. Read from inside the unit in the systemd test stage.
+- **[RT-30] The node image and the installer run the same pinned daemons, from base images
+  pinned by digest.** xray, Hysteria and AmneziaWG are pinned to the same release in the
+  `Dockerfile` and `scripts/install.sh`, each checked against a sha256 or a full commit
+  hash; every Dockerfile in the tree builds on base images pinned by digest, in a directory
+  Dependabot watches, and on one Alpine release across its stages. The versions were
+  written twice by hand, hnsd's commit was checked by a 12-character prefix, hnsd was built
+  on one Alpine release and run on another, and two Dockerfiles took whatever their tag
+  pointed at.
