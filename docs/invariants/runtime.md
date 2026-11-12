@@ -110,3 +110,16 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
   a new port, or a new WireGuard key, at every start, while clients held the old one. Only
   V2Ray's `[api]` port, a loopback port that files from before the section lack (RT-9), is
   still drawn. XRAY's control port must differ from its VLESS port.
+- **[RT-24] The installer opens every port sshd listens on before it turns ufw on.** The
+  ports come from `sshd -T`, which reads the drop-in files and ListenAddress as sshd does.
+  The installer read the main file's first `Port` line only: a port set in
+  `/etc/ssh/sshd_config.d`, as cloud images do, was missed, ufw opened 22, and enabling it
+  shut the operator out.
+- **[RT-25] The installer writes the node's configuration and protocol file whole or not at
+  all.** It writes them in a scratch home and moves each into place once every setting is
+  in. A setting that failed after `config init` left a partial file, and the next run kept
+  it as the node's configuration.
+- **[RT-26] The installer downloads into a directory of its own and checks each download
+  against a checksum the script pins.** It runs as root: a fixed path under `/tmp` can be
+  created first by any local user, and the Go checksum, fetched from the site that served
+  the tarball, proved the download intact but not authentic.

@@ -54,9 +54,12 @@ not yet.
   tests cover every caller (the installer's wrapper runs against a fake
   `apt-get` that reports the lock taken), the installer's `safe.directory`
   entry added only by `trust_source`, which runs twice against a git
-  configuration of the test's own and must leave one entry, and the
+  configuration of the test's own and must leave one entry, the
   installer's `verify_tag` and `fetch_source`, which run against repositories
-  and signing keys of the test's own;
+  and signing keys of the test's own, its `ssh_ports`, `write_config`,
+  `write_protocol` and `create_key`, which run against a fake `sshd` and a
+  fake `dvpnd`, and its downloads, each in a directory of its own and checked
+  against a checksum the script pins;
 - the same SPDX and `sentinel-go-sdk` checks as shell steps, and
   `docs/provenance/verify-fork.sh`, which also asks apache.org,
   proxy.golang.org and Software Heritage when it can reach them (an

@@ -1222,6 +1222,56 @@
         "go test -count=1 -run '^(TestConfigPathsReadBackAsThemselves)$' ./services/openvpn/"
       ],
       "expect": "--- FAIL"
+    },
+    {
+      "name": "[PV-12] the installer prints the mnemonic into a log",
+      "file": "scripts/install.sh",
+      "find": "  if [[ -t 2 ]]; then\n    dv keys add \"${KEY_NAME}\"\n",
+      "replace": "  if true; then\n    dv keys add \"${KEY_NAME}\"\n",
+      "run": [
+        "go test -count=1 -run '^TestInstallerShowsTheMnemonicOnATerminalOnly$' ./test/static/"
+      ],
+      "expect": "printed the mnemonic to output that is not a terminal"
+    },
+    {
+      "name": "[RT-24] the installer reads the SSH port from the files only",
+      "file": "scripts/install.sh",
+      "find": "  ports=$(sshd -T 2>/dev/null |",
+      "replace": "  ports=$(false |",
+      "run": [
+        "go test -count=1 -run '^TestInstallerOpensTheSSHPortsSSHDListensOn$' ./test/static/"
+      ],
+      "expect": "ufw would shut out the operator"
+    },
+    {
+      "name": "[RT-25] the installer writes the configuration in place",
+      "file": "scripts/install.sh",
+      "find": "dvs() {\n  \"${DVPND}\" --home \"${STAGE}\" \"$@\"\n}",
+      "replace": "dvs() {\n  \"${DVPND}\" --home \"${NODE_HOME}\" \"$@\"\n}",
+      "run": [
+        "go test -count=1 -run '^TestInstallerWritesTheConfigurationWholeOrNotAtAll$' ./test/static/"
+      ],
+      "expect": "left a partial"
+    },
+    {
+      "name": "[RT-26] the installer builds amneziawg-go in a fixed path under /tmp",
+      "file": "scripts/install.sh",
+      "find": "https://github.com/amnezia-vpn/amneziawg-go.git \"${WORK}/amneziawg-go\"",
+      "replace": "https://github.com/amnezia-vpn/amneziawg-go.git /tmp/amneziawg-go",
+      "run": [
+        "go test -count=1 -run '^TestInstallerDownloadsOnlyWhatItPins$' ./test/static/"
+      ],
+      "expect": "uses a fixed path under /tmp as root"
+    },
+    {
+      "name": "[RT-26] the installer takes the Go checksum from the download site",
+      "file": "scripts/install.sh",
+      "find": "  x86_64) ARCH=\"amd64\"; GO_SHA256=\"${GO_SHA256_AMD64}\" ;;",
+      "replace": "  x86_64) ARCH=\"amd64\"; GO_SHA256=$(curl -fsSL \"https://go.dev/dl/?mode=json\" | jq -r '.[0].files[0].sha256') ;;",
+      "run": [
+        "go test -count=1 -run '^TestInstallerDownloadsOnlyWhatItPins$' ./test/static/"
+      ],
+      "expect": "which is not a sha256 pinned in the script"
     }
   ]
 }

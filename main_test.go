@@ -86,12 +86,13 @@ var setValue = map[string]string{
 	"vless.security": "tls", // tls or reality only
 }
 
-// installerSet matches a config set in the installer: the protocol named, or
-// the node type in a case arm, or none for the node's own file; then the key.
+// installerSet matches a config set in the installer, on the node's home (dv)
+// or the scratch home it writes the files in (dvs): the protocol named, or the
+// node type in a case arm, or none for the node's own file; then the key.
 // runnerSet matches one in the Docker runner, through its <protocol>_config_set
 // functions or config_set for the node's own file.
 var (
-	installerSet = regexp.MustCompile(`\bdv (?:("\$\{NODE_TYPE\}"|[a-z0-9]+) )?config set ([a-z0-9_.]+) `)
+	installerSet = regexp.MustCompile(`\bdvs? (?:("\$\{NODE_TYPE\}"|[a-z0-9]+) )?config set ([a-z0-9_.]+) `)
 	caseArm      = regexp.MustCompile(`^\s*([a-z0-9|]+)\)`)
 	runnerSet    = regexp.MustCompile(`^\s*(?:([a-z0-9]+)_)?config_set "([a-z0-9_.]+)"`)
 )

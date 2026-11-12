@@ -16,6 +16,8 @@
 #   curl -fsSL https://raw.githubusercontent.com/Feryx-Official/dvpnd/main/scripts/install.sh \
 #     -o install.sh && sudo bash install.sh --moniker "My node"
 #
+# or from a release tag you checked yourself (docs/operator.md, section 0).
+#
 # Every step is skipped when its result already exists, so the script can be
 # re-run. It never overwrites an existing configuration, key or certificate
 # unless told to with --force.
@@ -41,6 +43,14 @@ AWG_GO_COMMIT="b5928efb6ca19f0153958460c3d141f04abc5c2e"
 AWG_TOOLS_TAG="v3.1.20260812"
 AWG_TOOLS_COMMIT="ee0f0a9aa34ff0a0da4b3433b9512781cfe02843"
 
+# Go, installed when the host has none recent enough: the toolchain go.mod
+# names and the Docker image builds with. The checksums are the ones go.dev
+# publishes, pinned here: fetched next to the tarball, they proved it intact,
+# not that it was Go's.
+GO_VERSION="1.27.4"
+GO_SHA256_AMD64="7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840"
+GO_SHA256_ARM64="3392582988a273a87ab5043ee1b2c9c17a2c3c00580bf9326c47a2e0aaaeac92"
+
 # Defaults, all overridable with flags.
 NODE_TYPE="wireguard"
 TYPE_GIVEN=0
@@ -62,6 +72,8 @@ YES=0
 FIREWALL=1
 START=1
 BUILD_DIR="/usr/local/src/dvpnd"
+DVPND="/usr/local/bin/dvpnd"
+SSHD_CONFIG="/etc/ssh/sshd_config"
 
 usage() {
   cat <<EOF
@@ -154,10 +166,16 @@ fi
 command -v apt-get >/dev/null || die "this installer supports Debian and Ubuntu (apt-get not found)"
 
 case "$(uname -m)" in
-  x86_64) ARCH="amd64" ;;
-  aarch64) ARCH="arm64" ;;
+  x86_64) ARCH="amd64"; GO_SHA256="${GO_SHA256_AMD64}" ;;
+  aarch64) ARCH="arm64"; GO_SHA256="${GO_SHA256_ARM64}" ;;
   *) die "unsupported CPU architecture: $(uname -m) (x86_64 or aarch64 only)" ;;
 esac
+
+# Downloads and builds go to a directory of this run's own: a fixed path under
+# /tmp could be put there first by any local user, and this runs as root. The
+# scratch home the configuration is written in goes too.
+WORK=$(mktemp -d)
+trap 'rm -rf "${WORK}" "${NODE_HOME}/.install"' EXIT
 
 ask() {
   # ask VAR "prompt" "default"
@@ -278,15 +296,14 @@ if [[ "${go_ok}" -eq 0 && -x /usr/local/go/bin/go ]]; then
   fi
 fi
 if [[ "${go_ok}" -eq 0 ]]; then
-  log "Installing Go ${go_required} (the distribution's package is too old or missing)"
-  tarball="go${go_required}.linux-${ARCH}.tar.gz"
-  sha=$(curl -fsSL "https://go.dev/dl/?mode=json&include=all" |
-    jq -r --arg f "${tarball}" '.[].files[] | select(.filename == $f) | .sha256' | head -1)
-  [[ -n "${sha}" ]] || die "go.dev does not publish ${tarball}"
-  curl -fsSL -o "/tmp/${tarball}" "https://go.dev/dl/${tarball}"
-  echo "${sha}  /tmp/${tarball}" | sha256sum -c - >/dev/null
-  rm -rf /usr/local/go && tar -C /usr/local -xzf "/tmp/${tarball}" && rm -f "/tmp/${tarball}"
+  log "Installing Go ${GO_VERSION} (the distribution's package is too old or missing)"
+  tarball="go${GO_VERSION}.linux-${ARCH}.tar.gz"
+  curl -fsSL -o "${WORK}/${tarball}" "https://go.dev/dl/${tarball}"
+  echo "${GO_SHA256}  ${WORK}/${tarball}" | sha256sum -c - >/dev/null
+  rm -rf /usr/local/go && tar -C /usr/local -xzf "${WORK}/${tarball}"
 fi
+# A release whose go.mod names a newer toolchain than this one gets it from the
+# Go module proxy, checked against Go's checksum database.
 export PATH="/usr/local/go/bin:${PATH}"
 export GOTOOLCHAIN="${GOTOOLCHAIN:-auto}"
 export GOFLAGS="${GOFLAGS:-}"
@@ -326,11 +343,11 @@ case "${NODE_TYPE}" in
     if ! need_binary xray; then
       [[ "${ARCH}" == "amd64" ]] || die "no pinned xray build for ${ARCH}: install xray ${XRAY_VERSION} on PATH yourself and re-run"
       log "Installing xray ${XRAY_VERSION}"
-      curl -fsSL -o /tmp/xray.zip "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/Xray-linux-64.zip"
-      echo "${XRAY_SHA256}  /tmp/xray.zip" | sha256sum -c - >/dev/null
+      curl -fsSL -o "${WORK}/xray.zip" "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/Xray-linux-64.zip"
+      echo "${XRAY_SHA256}  ${WORK}/xray.zip" | sha256sum -c - >/dev/null
       apt_get install -y -qq unzip >/dev/null
-      rm -rf /tmp/xray && unzip -q /tmp/xray.zip xray -d /tmp/xray
-      install -m 0755 /tmp/xray/xray /usr/local/bin/xray && rm -rf /tmp/xray /tmp/xray.zip
+      unzip -q "${WORK}/xray.zip" xray -d "${WORK}/xray"
+      install -m 0755 "${WORK}/xray/xray" /usr/local/bin/xray
     fi
     xray version | head -1
     ;;
@@ -338,29 +355,25 @@ case "${NODE_TYPE}" in
     if ! need_binary hysteria; then
       [[ "${ARCH}" == "amd64" ]] || die "no pinned hysteria build for ${ARCH}: install hysteria ${HYSTERIA_VERSION} on PATH yourself and re-run"
       log "Installing hysteria ${HYSTERIA_VERSION}"
-      curl -fsSL -o /tmp/hysteria "https://github.com/apernet/hysteria/releases/download/${HYSTERIA_VERSION}/hysteria-linux-amd64"
-      echo "${HYSTERIA_SHA256}  /tmp/hysteria" | sha256sum -c - >/dev/null
-      install -m 0755 /tmp/hysteria /usr/local/bin/hysteria && rm -f /tmp/hysteria
+      curl -fsSL -o "${WORK}/hysteria" "https://github.com/apernet/hysteria/releases/download/${HYSTERIA_VERSION}/hysteria-linux-amd64"
+      echo "${HYSTERIA_SHA256}  ${WORK}/hysteria" | sha256sum -c - >/dev/null
+      install -m 0755 "${WORK}/hysteria" /usr/local/bin/hysteria
     fi
     hysteria version | head -1
     ;;
   amneziawg)
     if ! need_binary awg || ! need_binary awg-quick; then
       log "Building amneziawg-tools ${AWG_TOOLS_TAG}"
-      rm -rf /tmp/amneziawg-tools
-      git clone --quiet --branch "${AWG_TOOLS_TAG}" --depth 1 https://github.com/amnezia-vpn/amneziawg-tools.git /tmp/amneziawg-tools
-      git -C /tmp/amneziawg-tools rev-parse HEAD | grep -q "^${AWG_TOOLS_COMMIT}" || die "amneziawg-tools tag does not match the pinned commit"
-      make -C /tmp/amneziawg-tools/src --jobs="$(nproc)" >/dev/null
-      make -C /tmp/amneziawg-tools/src PREFIX=/usr WITH_WGQUICK=yes WITH_BASHCOMPLETION=no WITH_SYSTEMDUNITS=no install >/dev/null
-      rm -rf /tmp/amneziawg-tools
+      git clone --quiet --branch "${AWG_TOOLS_TAG}" --depth 1 https://github.com/amnezia-vpn/amneziawg-tools.git "${WORK}/amneziawg-tools"
+      git -C "${WORK}/amneziawg-tools" rev-parse HEAD | grep -q "^${AWG_TOOLS_COMMIT}" || die "amneziawg-tools tag does not match the pinned commit"
+      make -C "${WORK}/amneziawg-tools/src" --jobs="$(nproc)" >/dev/null
+      make -C "${WORK}/amneziawg-tools/src" PREFIX=/usr WITH_WGQUICK=yes WITH_BASHCOMPLETION=no WITH_SYSTEMDUNITS=no install >/dev/null
     fi
     if ! modinfo amneziawg >/dev/null 2>&1 && ! need_binary amneziawg-go; then
       log "Building amneziawg-go ${AWG_GO_TAG} (userspace data plane; the kernel module is optional and faster)"
-      rm -rf /tmp/amneziawg-go
-      git clone --quiet --branch "${AWG_GO_TAG}" --depth 1 https://github.com/amnezia-vpn/amneziawg-go.git /tmp/amneziawg-go
-      git -C /tmp/amneziawg-go rev-parse HEAD | grep -q "^${AWG_GO_COMMIT}" || die "amneziawg-go tag does not match the pinned commit"
-      ( cd /tmp/amneziawg-go && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /usr/bin/amneziawg-go . )
-      rm -rf /tmp/amneziawg-go
+      git clone --quiet --branch "${AWG_GO_TAG}" --depth 1 https://github.com/amnezia-vpn/amneziawg-go.git "${WORK}/amneziawg-go"
+      git -C "${WORK}/amneziawg-go" rev-parse HEAD | grep -q "^${AWG_GO_COMMIT}" || die "amneziawg-go tag does not match the pinned commit"
+      ( cd "${WORK}/amneziawg-go" && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /usr/bin/amneziawg-go . )
     fi
     awg --version
     ;;
@@ -393,7 +406,38 @@ echo "IPv6 internet reachable: ${IPV6_OK}"
 
 mkdir -p "${NODE_HOME}"
 chmod 700 "${NODE_HOME}"
-dv() { /usr/local/bin/dvpnd --home "${NODE_HOME}" "$@"; }
+dv() {
+  "${DVPND}" --home "${NODE_HOME}" "$@"
+}
+
+# The configuration and the protocol file are written in a scratch home inside
+# the node's (dvs), and moved into place once every setting is in: a setting
+# that fails stops the installer with the node's files as they were. Written in
+# place, a file cut short was what the next run kept.
+new_stage() {
+  STAGE="${NODE_HOME}/.install"
+  rm -rf "${STAGE}"
+  mkdir -m 0700 "${STAGE}"
+}
+dvs() {
+  "${DVPND}" --home "${STAGE}" "$@"
+}
+
+write_config() {
+  new_stage
+  dvs config init >/dev/null
+  dvs config set keyring.backend test >/dev/null
+  dvs config set keyring.from "${KEY_NAME}" >/dev/null
+  dvs config set handshake.enable false >/dev/null
+  dvs config set node.type "${NODE_TYPE}" >/dev/null
+  dvs config set node.moniker "${MONIKER}" >/dev/null
+  dvs config set node.gigabyte_prices "${GIGABYTE_PRICES}" >/dev/null
+  dvs config set node.hourly_prices "${HOURLY_PRICES}" >/dev/null
+  dvs config set node.listen_on "0.0.0.0:${API_PORT}" >/dev/null
+  dvs config set node.remote_url "https://${PUBLIC_IP}:${API_PORT}" >/dev/null
+  mv "${STAGE}/config.toml" "${NODE_HOME}/config.toml"
+  rm -rf "${STAGE}"
+}
 
 if [[ -f "${NODE_HOME}/config.toml" && "${FORCE}" -eq 0 ]]; then
   log "Keeping the existing ${NODE_HOME}/config.toml (pass --force to rewrite it)"
@@ -401,16 +445,7 @@ else
   log "Writing ${NODE_HOME}/config.toml"
   [[ -n "${MONIKER}" ]] || ask MONIKER "Public name of the node (4-32 characters)"
   [[ ${#MONIKER} -ge 4 && ${#MONIKER} -le 32 ]] || die "the moniker must be 4 to 32 characters"
-  if [[ "${FORCE}" -eq 1 ]]; then dv config init --force >/dev/null; else dv config init >/dev/null; fi
-  dv config set keyring.backend test >/dev/null
-  dv config set keyring.from "${KEY_NAME}" >/dev/null
-  dv config set handshake.enable false >/dev/null
-  dv config set node.type "${NODE_TYPE}" >/dev/null
-  dv config set node.moniker "${MONIKER}" >/dev/null
-  dv config set node.gigabyte_prices "${GIGABYTE_PRICES}" >/dev/null
-  dv config set node.hourly_prices "${HOURLY_PRICES}" >/dev/null
-  dv config set node.listen_on "0.0.0.0:${API_PORT}" >/dev/null
-  dv config set node.remote_url "https://${PUBLIC_IP}:${API_PORT}" >/dev/null
+  write_config
 fi
 # A granter switches an existing node to a hot key too (a migration).
 if [[ -n "${GRANTER}" ]]; then
@@ -419,57 +454,69 @@ if [[ -n "${GRANTER}" ]]; then
   dv config set keyring.granter "${GRANTER}" >/dev/null
 fi
 
+# proto_file prints the protocol file's name in the node's home.
 proto_file() {
   case "${NODE_TYPE}" in
-    hysteria2) echo "${NODE_HOME}/hysteria.toml" ;;
-    *) echo "${NODE_HOME}/${NODE_TYPE}.toml" ;;
+    hysteria2) echo "hysteria.toml" ;;
+    *) echo "${NODE_TYPE}.toml" ;;
   esac
 }
 
-if [[ -f "$(proto_file)" && "${FORCE}" -eq 0 ]]; then
-  log "Keeping the existing $(proto_file) (pass --force to rewrite it)"
-else
-  log "Writing $(proto_file)"
-  [[ -n "${LISTEN_PORT}" ]] || LISTEN_PORT=$(random_port)
-  if [[ "${FORCE}" -eq 1 ]]; then dv "${NODE_TYPE}" config init --force >/dev/null; else dv "${NODE_TYPE}" config init >/dev/null; fi
+write_protocol() {
+  new_stage
+  dvs "${NODE_TYPE}" config init >/dev/null
   case "${NODE_TYPE}" in
     wireguard|amneziawg|openvpn)
-      dv "${NODE_TYPE}" config set listen_port "${LISTEN_PORT}" >/dev/null
-      dv "${NODE_TYPE}" config set enable_ipv6 "${IPV6_OK}" >/dev/null
+      dvs "${NODE_TYPE}" config set listen_port "${LISTEN_PORT}" >/dev/null
+      dvs "${NODE_TYPE}" config set enable_ipv6 "${IPV6_OK}" >/dev/null
       ;;
-    v2ray) dv v2ray config set vmess.listen_port "${LISTEN_PORT}" >/dev/null ;;
-    xray) dv xray config set vless.listen_port "${LISTEN_PORT}" >/dev/null ;;
-    hysteria2) dv hysteria2 config set server.listen_port "${LISTEN_PORT}" >/dev/null ;;
+    v2ray) dvs v2ray config set vmess.listen_port "${LISTEN_PORT}" >/dev/null ;;
+    xray) dvs xray config set vless.listen_port "${LISTEN_PORT}" >/dev/null ;;
+    hysteria2) dvs hysteria2 config set server.listen_port "${LISTEN_PORT}" >/dev/null ;;
   esac
+  if [[ "${NODE_TYPE}" == "amneziawg" ]]; then
+    dvs amneziawg config set v3.listen_port "${V3_LISTEN_PORT}" >/dev/null
+  fi
+  if [[ "${NODE_TYPE}" == "openvpn" ]]; then
+    dvs openvpn config set proto "${OPENVPN_PROTO}" >/dev/null
+  fi
+  mv "${STAGE}/$(proto_file)" "${NODE_HOME}/$(proto_file)"
+  rm -rf "${STAGE}"
+}
+
+PROTO_FILE="${NODE_HOME}/$(proto_file)"
+if [[ -f "${PROTO_FILE}" && "${FORCE}" -eq 0 ]]; then
+  log "Keeping the existing ${PROTO_FILE} (pass --force to rewrite it)"
+else
+  log "Writing ${PROTO_FILE}"
+  [[ -n "${LISTEN_PORT}" ]] || LISTEN_PORT=$(random_port)
   if [[ "${NODE_TYPE}" == "amneziawg" ]]; then
     [[ -n "${V3_LISTEN_PORT}" ]] || V3_LISTEN_PORT=$(random_port)
     [[ "${V3_LISTEN_PORT}" != "${LISTEN_PORT}" ]] || V3_LISTEN_PORT=$((LISTEN_PORT + 1))
-    dv amneziawg config set v3.listen_port "${V3_LISTEN_PORT}" >/dev/null
   fi
-  if [[ "${NODE_TYPE}" == "openvpn" ]]; then
-    dv openvpn config set proto "${OPENVPN_PROTO}" >/dev/null
-  fi
+  write_protocol
 fi
 
 # Read back what is actually in the files, whether written now or kept.
 API_PORT=$(awk -F '[=":]' '{ gsub(/ /, "") } /^\[node\]/ { f = 1 } f && /^listen_on/ { print $4; exit }' "${NODE_HOME}/config.toml")
 NODE_TYPE=$(awk -F '[="]' '{ gsub(/ /, "") } /^\[node\]/ { f = 1 } f && /^type/ { print $3; exit }' "${NODE_HOME}/config.toml")
+PROTO_FILE="${NODE_HOME}/$(proto_file)"
 case "${NODE_TYPE}" in
   wireguard|amneziawg|openvpn)
-    LISTEN_PORT=$(awk -F '=' '{ gsub(/ /, "") } /^listen_port/ { print $2; exit }' "$(proto_file)") ;;
-  v2ray) LISTEN_PORT=$(awk -F '=' '{ gsub(/ /, "") } /^\[vmess\]/ { f = 1 } f && /^listen_port/ { print $2; exit }' "$(proto_file)") ;;
-  xray) LISTEN_PORT=$(awk -F '=' '{ gsub(/ /, "") } /^\[vless\]/ { f = 1 } f && /^listen_port/ { print $2; exit }' "$(proto_file)") ;;
-  hysteria2) LISTEN_PORT=$(awk -F '=' '{ gsub(/ /, "") } /^\[server\]/ { f = 1 } f && /^listen_port/ { print $2; exit }' "$(proto_file)") ;;
+    LISTEN_PORT=$(awk -F '=' '{ gsub(/ /, "") } /^listen_port/ { print $2; exit }' "${PROTO_FILE}") ;;
+  v2ray) LISTEN_PORT=$(awk -F '=' '{ gsub(/ /, "") } /^\[vmess\]/ { f = 1 } f && /^listen_port/ { print $2; exit }' "${PROTO_FILE}") ;;
+  xray) LISTEN_PORT=$(awk -F '=' '{ gsub(/ /, "") } /^\[vless\]/ { f = 1 } f && /^listen_port/ { print $2; exit }' "${PROTO_FILE}") ;;
+  hysteria2) LISTEN_PORT=$(awk -F '=' '{ gsub(/ /, "") } /^\[server\]/ { f = 1 } f && /^listen_port/ { print $2; exit }' "${PROTO_FILE}") ;;
 esac
 LISTEN_PROTO="udp"
 case "${NODE_TYPE}" in
   v2ray|xray) LISTEN_PROTO="tcp" ;;
-  openvpn) LISTEN_PROTO=$(awk -F '[="]' '{ gsub(/ /, "") } /^proto/ { print $3; exit }' "$(proto_file)") ;;
+  openvpn) LISTEN_PROTO=$(awk -F '[="]' '{ gsub(/ /, "") } /^proto/ { print $3; exit }' "${PROTO_FILE}") ;;
 esac
 V3_ENABLED=false
 if [[ "${NODE_TYPE}" == "amneziawg" ]]; then
-  V3_ENABLED=$(awk -F '=' '{ gsub(/ /, "") } /^\[v3\]/ { s = 1 } s && /^enabled/ { print $2; exit }' "$(proto_file)")
-  V3_LISTEN_PORT=$(awk -F '=' '{ gsub(/ /, "") } /^\[v3\]/ { s = 1 } s && /^listen_port/ { print $2; exit }' "$(proto_file)")
+  V3_ENABLED=$(awk -F '=' '{ gsub(/ /, "") } /^\[v3\]/ { s = 1 } s && /^enabled/ { print $2; exit }' "${PROTO_FILE}")
+  V3_LISTEN_PORT=$(awk -F '=' '{ gsub(/ /, "") } /^\[v3\]/ { s = 1 } s && /^listen_port/ { print $2; exit }' "${PROTO_FILE}")
 fi
 
 # ---------------------------------------------------------------- key
@@ -478,6 +525,35 @@ fi
 key_exists() {
   dv keys show "${KEY_NAME}" 2>/dev/null |
     awk -v k="${KEY_NAME}" 'NR == 2 && $1 == k { found = 1 } END { exit !found }'
+}
+
+# create_key creates the operator key. Its mnemonic, the wallet's only backup,
+# is printed on a terminal only: run under cloud-init, through tee or from a CI
+# job, the output goes to a log, which would keep it. There the mnemonic goes
+# to a file only root can read, for the operator to copy and delete.
+create_key() {
+  log "Creating the operator key"
+  if [[ -t 2 ]]; then
+    dv keys add "${KEY_NAME}"
+    echo
+    echo "The mnemonic above is the only backup of the node's wallet. Write it down now;"
+    echo "it is not shown again. The key itself is stored unencrypted under ${NODE_HOME}/keyring-test"
+    echo "so that the node can sign transactions unattended: keep only working funds on it."
+    if [[ "${YES}" -eq 0 ]]; then
+      read -r -p "Press Enter once the mnemonic is saved... " _
+    fi
+    return
+  fi
+  local backup="${NODE_HOME}/${KEY_NAME}-mnemonic.txt"
+  [[ ! -e "${backup}" ]] || die "${backup} exists: copy the mnemonic in it somewhere safe, delete the file, and run the installer again"
+  ( umask 077 && dv keys add "${KEY_NAME}" 2>"${backup}" ) || die "could not create the key '${KEY_NAME}' (see ${backup})"
+  echo
+  echo "This output is not a terminal, so the mnemonic, the only backup of the node's"
+  echo "wallet, is not shown: it is in ${backup}, readable by root only."
+  echo "Copy it somewhere safe, off this server, then delete the file:"
+  echo "  shred -u ${backup}"
+  echo "The key itself is stored unencrypted under ${NODE_HOME}/keyring-test so that the node"
+  echo "can sign transactions unattended: keep only working funds on it."
 }
 
 if key_exists; then
@@ -492,15 +568,7 @@ else
     log "Importing the operator key: paste the mnemonic when asked"
     dv keys add "${KEY_NAME}" --recover
   else
-    log "Creating the operator key"
-    dv keys add "${KEY_NAME}"
-    echo
-    echo "The mnemonic above is the only backup of the node's wallet. Write it down now;"
-    echo "it is not shown again. The key itself is stored unencrypted under ${NODE_HOME}/keyring-test"
-    echo "so that the node can sign transactions unattended: keep only working funds on it."
-    if [[ "${YES}" -eq 0 ]]; then
-      read -r -p "Press Enter once the mnemonic is saved... " _
-    fi
+    create_key
   fi
 fi
 
@@ -517,11 +585,27 @@ chmod 600 "${NODE_HOME}/tls.key"
 
 # ---------------------------------------------------------------- firewall
 
+# ssh_ports prints the TCP ports sshd listens on, one per line: as sshd reads
+# its own configuration, drop-in files included; else from the files; else 22.
+# Read from the main file's first Port line, a port set in sshd_config.d or by
+# ListenAddress was missed, and enabling ufw shut the operator out.
+ssh_ports() {
+  local ports
+  ports=$(sshd -T 2>/dev/null | awk '$1 == "listenaddress" { n = split($2, a, ":"); print a[n] }' | sort -un) || true
+  if [[ -z "${ports}" ]]; then
+    ports=$(cat "${SSHD_CONFIG}" "${SSHD_CONFIG}.d"/*.conf 2>/dev/null |
+      awk 'tolower($1) == "port" { print $2 }
+           tolower($1) == "listenaddress" && $2 ~ /:[0-9]+$/ { n = split($2, a, ":"); print a[n] }' | sort -un) || true
+  fi
+  printf '%s\n' "${ports:-22}"
+}
+
 if [[ "${FIREWALL}" -eq 1 ]]; then
   log "Opening the firewall (ufw)"
   apt_get install -y -qq ufw >/dev/null
-  ssh_port=$(awk 'tolower($1) == "port" { print $2; exit }' /etc/ssh/sshd_config 2>/dev/null || true)
-  ufw allow "${ssh_port:-22}/tcp" >/dev/null
+  while read -r port; do
+    ufw allow "${port}/tcp" >/dev/null
+  done < <(ssh_ports)
   ufw allow "${API_PORT}/tcp" >/dev/null
   ufw allow "${LISTEN_PORT}/${LISTEN_PROTO}" >/dev/null
   [[ "${V3_ENABLED}" == "true" && -n "${V3_LISTEN_PORT}" ]] && ufw allow "${V3_LISTEN_PORT}/udp" >/dev/null
@@ -651,7 +735,7 @@ $((step + 1)). Check that the node answers from outside your network, for exampl
    Client apps show the node a few minutes after it is reachable.
 
 Change prices, moniker or ports in ${NODE_HOME}/config.toml and
-$(proto_file), then 'sudo systemctl restart dvpnd'.
+${PROTO_FILE}, then 'sudo systemctl restart dvpnd'.
 Upgrade by re-running this script; it rebuilds the latest release and keeps
 your configuration and key.
 ================================================================================

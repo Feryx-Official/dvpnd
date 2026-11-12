@@ -43,3 +43,8 @@ passwords) must not pile up on the node either. IDs as in `test/README.md`.
 - **[PV-11] The GeoIP token is sent over HTTPS only.** A `url` override for a provider the
   token goes to (ipinfo, ip2location) must be `https` when a token is set; over `http` it
   would cross the network readable by anyone on the path.
+- **[PV-12] The installer shows the operator key's mnemonic on a terminal only.** The
+  mnemonic is the wallet's only backup. Run under cloud-init, through `tee` or from a CI
+  job, the installer printed it into a log; when its output is not a terminal the mnemonic
+  goes to a file in the node's home that only root can read, named in the output, for the
+  operator to copy and delete.

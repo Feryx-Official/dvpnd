@@ -349,3 +349,293 @@ func TestInstallerFetchesFromTheCurrentHome(t *testing.T) {
 		}
 	}
 }
+
+// installerFunction returns the source of the function name defines in the
+// installer, failing the test when it has none.
+func installerFunction(t *testing.T, name string) string {
+	t.Helper()
+	const file = "scripts/install.sh"
+	lines := strings.Split(string(read(t, file)), "\n")
+	start, end := shellFunction(lines, name)
+	if start < 0 {
+		t.Fatalf("%s defines no %s() { ... } function", file, name)
+	}
+
+	return strings.Join(lines[start:end+1], "\n")
+}
+
+// fakeSSHD answers sshd -T with the contents of $SSHD_T, and fails as an sshd
+// that cannot read its configuration does when there is none.
+const fakeSSHD = `#!/bin/sh
+[ "$1" = -T ] && [ -f "$SSHD_T" ] && exec cat "$SSHD_T"
+echo "sshd: no hostkeys available -- exiting." >&2
+exit 1
+`
+
+// TestInstallerOpensTheSSHPortsSSHDListensOn holds the installer to the ports
+// sshd listens on, as sshd reads its own configuration, before it turns ufw
+// on. Read from the main file's first Port line, a port set in
+// /etc/ssh/sshd_config.d or by ListenAddress was missed: ufw opened 22 only,
+// and enabling it shut the operator out. ssh_ports runs here against a fake
+// sshd and configuration files of the test's own.
+//
+// Rules: [RT-24].
+func TestInstallerOpensTheSSHPortsSSHDListensOn(t *testing.T) {
+	sshPorts := installerFunction(t, "ssh_ports")
+	for _, c := range []struct {
+		what         string
+		sshdT        string // what sshd -T prints; empty for an sshd that fails
+		main, dropIn string
+		want         string
+	}{
+		{"a port set in a drop-in file", "port 2222\nlistenaddress [::]:2222\nlistenaddress 0.0.0.0:2222\n",
+			"Include /etc/ssh/sshd_config.d/*.conf\n#Port 22\n", "Port 2222\n", "2222"},
+		{"a ListenAddress with a port of its own", "port 2222\nlistenaddress 0.0.0.0:2200\n",
+			"Port 2222\nListenAddress 0.0.0.0:2200\n", "", "2200"},
+		{"two ports", "port 22\nport 2222\nlistenaddress [::]:22\nlistenaddress [::]:2222\nlistenaddress 0.0.0.0:22\nlistenaddress 0.0.0.0:2222\n",
+			"Port 22\nPort 2222\n", "", "22 2222"},
+		{"an sshd that cannot tell, the port in a drop-in file", "",
+			"Include /etc/ssh/sshd_config.d/*.conf\n#Port 22\n", "Port 2022\n", "2022"},
+		{"an sshd that cannot tell, no port anywhere", "", "", "", "22"},
+	} {
+		dir := t.TempDir()
+		bin := filepath.Join(dir, "bin")
+		if err := os.MkdirAll(filepath.Join(dir, "sshd_config.d"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Mkdir(bin, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		write := func(name, content string, mode os.FileMode) {
+			if err := os.WriteFile(filepath.Join(dir, name), []byte(content), mode); err != nil {
+				t.Fatal(err)
+			}
+		}
+		write("bin/sshd", fakeSSHD, 0o755)
+		write("sshd_config", c.main, 0o644)
+		write("sshd_config.d/50-port.conf", c.dropIn, 0o644)
+		if c.sshdT != "" {
+			write("sshd-T", c.sshdT, 0o644)
+		}
+
+		cmd := exec.Command("bash", "-c", "set -Eeuo pipefail\n"+sshPorts+"\nssh_ports\n")
+		cmd.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+			"SSHD_T="+filepath.Join(dir, "sshd-T"), "SSHD_CONFIG="+filepath.Join(dir, "sshd_config"))
+		out, err := cmd.Output()
+		if err != nil {
+			t.Errorf("%s: ssh_ports: %v", c.what, err)
+			continue
+		}
+		if got := strings.Join(strings.Fields(string(out)), " "); got != c.want {
+			t.Errorf("%s: ssh_ports gives %q, want %q: ufw would shut out the operator", c.what, got, c.want)
+		}
+	}
+}
+
+// fakeDvpnd stands for the dvpnd binary's config commands: init writes the
+// file, set adds a line, and a set to the value "fail" fails, as a key the
+// binary does not have does (RT-13).
+const fakeDvpnd = `#!/bin/sh
+home=$2; shift 2
+file=config.toml
+[ "$1" = config ] || { file=$1.toml; shift; }
+case "$2" in
+  init) echo "# written by init" >"$home/$file" ;;
+  set) [ "$4" = fail ] && { echo "Error: invalid key $3" >&2; exit 1; }; echo "$3 = $4" >>"$home/$file" ;;
+esac
+`
+
+// TestInstallerWritesTheConfigurationWholeOrNotAtAll holds the installer to
+// writing config.toml and the protocol file whole: a command that failed
+// after config init left a partial file, which the next run kept as the
+// node's configuration. write_config and write_protocol run here against a
+// fake dvpnd.
+//
+// Rules: [RT-25].
+func TestInstallerWritesTheConfigurationWholeOrNotAtAll(t *testing.T) {
+	var functions string
+	for _, name := range []string{"dvs", "new_stage", "proto_file", "write_config", "write_protocol"} {
+		functions += installerFunction(t, name) + "\n"
+	}
+	bin := filepath.Join(t.TempDir(), "dvpnd")
+	if err := os.WriteFile(bin, []byte(fakeDvpnd), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	run := func(home, call string, env ...string) error {
+		cmd := exec.Command("bash", "-c", "set -Eeuo pipefail\n"+functions+"\n"+call+"\n")
+		cmd.Env = append(os.Environ(), "DVPND="+bin, "NODE_HOME="+home, "KEY_NAME=operator", "MONIKER=My node",
+			"NODE_TYPE=openvpn", "HOURLY_PRICES=97500000udvpn", "API_PORT=8585", "PUBLIC_IP=203.0.113.1",
+			"LISTEN_PORT=51820", "V3_LISTEN_PORT=", "IPV6_OK=false", "FORCE=0", "GIGABYTE_PRICES=40000000udvpn",
+			"OPENVPN_PROTO=udp")
+		cmd.Env = append(cmd.Env, env...)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Logf("%s: %v\n%s", call, err, out)
+		}
+
+		return err
+	}
+	content := func(path string) string {
+		b, err := os.ReadFile(path)
+		if os.IsNotExist(err) {
+			return ""
+		} else if err != nil {
+			t.Fatal(err)
+		}
+
+		return string(b)
+	}
+
+	for _, c := range []struct {
+		call, file, failing, good, last string
+	}{
+		{"write_config", "config.toml", "GIGABYTE_PRICES", "40000000udvpn", "node.remote_url = https://203.0.113.1:8585"},
+		{"write_protocol", "openvpn.toml", "OPENVPN_PROTO", "udp", "proto = udp"},
+	} {
+		home := t.TempDir()
+		path := filepath.Join(home, c.file)
+		if err := run(home, c.call, c.failing+"=fail"); err == nil {
+			t.Errorf("%s reported success with a setting that failed", c.call)
+		}
+		if got := content(path); got != "" {
+			t.Errorf("%s left a partial %s after a setting failed, which the next run keeps:\n%s", c.call, c.file, got)
+		}
+		if err := run(home, c.call); err != nil {
+			t.Errorf("%s failed with every setting good", c.call)
+		}
+		written := content(path)
+		if !strings.Contains(written, c.last) {
+			t.Errorf("the next %s wrote %s without its last setting %q:\n%s", c.call, c.file, c.last, written)
+		}
+		if entries, _ := os.ReadDir(home); len(entries) != 1 {
+			var names []string
+			for _, e := range entries {
+				names = append(names, e.Name())
+			}
+			t.Errorf("%s left %v in the node's home, want only %s", c.call, names, c.file)
+		}
+
+		// A forced rewrite that fails keeps the file the node has.
+		if err := run(home, c.call, "FORCE=1", c.failing+"=fail"); err == nil {
+			t.Errorf("%s --force reported success with a setting that failed", c.call)
+		}
+		if got := content(path); got != written {
+			t.Errorf("%s --force with a setting that failed replaced %s:\n%s", c.call, c.file, got)
+		}
+	}
+}
+
+// TestInstallerShowsTheMnemonicOnATerminalOnly holds the installer to showing
+// the new operator key's mnemonic, the wallet's only backup, on a terminal
+// only. Run under cloud-init, through tee or from a CI job, it printed the
+// mnemonic into a log; there it goes to a file only root can read, named in
+// the output. create_key runs here against a fake dvpnd, with its output
+// going to a pipe.
+//
+// Rules: [PV-12].
+func TestInstallerShowsTheMnemonicOnATerminalOnly(t *testing.T) {
+	const mnemonic = "abandon ability able about above absent absorb abstract absurd abuse access accident"
+	createKey := installerFunction(t, "dv") + "\n" + installerFunction(t, "create_key")
+	home := t.TempDir()
+	bin := filepath.Join(t.TempDir(), "dvpnd")
+	fake := "#!/bin/sh\necho '- name: operator'\necho '**Important** write this mnemonic phrase in a safe place' >&2\necho '" +
+		mnemonic + "' >&2\n"
+	if err := os.WriteFile(bin, []byte(fake), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("bash", "-c", "set -Eeuo pipefail\n"+`log() { printf '\n==> %s\n' "$*"; }`+"\n"+
+		`die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }`+"\n"+createKey+"\ncreate_key\n")
+	cmd.Env = append(os.Environ(), "DVPND="+bin, "NODE_HOME="+home, "KEY_NAME=operator", "YES=1")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("create_key: %v\n%s", err, out)
+	}
+	if strings.Contains(string(out), mnemonic) {
+		t.Errorf("create_key printed the mnemonic to output that is not a terminal, where a log keeps it:\n%s", out)
+	}
+
+	var saved string
+	entries, _ := os.ReadDir(home)
+	for _, e := range entries {
+		path := filepath.Join(home, e.Name())
+		b, err := os.ReadFile(path)
+		if err != nil || !strings.Contains(string(b), mnemonic) {
+			continue
+		}
+		saved = path
+		if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0o600 {
+			t.Errorf("%s holds the mnemonic with mode %v, want 0600", path, info.Mode().Perm())
+		}
+	}
+	if saved == "" {
+		t.Fatalf("create_key kept the mnemonic nowhere: the wallet has no backup\n%s", out)
+	}
+	if !strings.Contains(string(out), saved) {
+		t.Errorf("create_key did not say where the mnemonic is (%s):\n%s", saved, out)
+	}
+}
+
+// assignment matches a shell variable set to a value, alone or in a case
+// branch.
+var assignment = regexp.MustCompile(`(?:^|[\s;)])([A-Za-z_][A-Za-z0-9_]*)=("[^"]*"|[^\s;]*)`)
+
+// TestInstallerDownloadsOnlyWhatItPins holds the installer, which runs as
+// root, to downloads it can trust: each one goes to a directory of its own
+// (a fixed path under /tmp can be put there first by any local user), and
+// each checksum is one the script pins (the Go checksum came from the same
+// site as the tarball, so it proved the download intact, not authentic).
+//
+// Rules: [RT-26].
+func TestInstallerDownloadsOnlyWhatItPins(t *testing.T) {
+	const file = "scripts/install.sh"
+	lines := strings.Split(string(read(t, file)), "\n")
+	values := map[string][]string{}
+	for _, line := range lines {
+		code, _, _ := strings.Cut(line, "#")
+		for _, m := range assignment.FindAllStringSubmatch(code, -1) {
+			values[m[1]] = append(values[m[1]], strings.Trim(m[2], `"`))
+		}
+	}
+	pinned := regexp.MustCompile(`^[0-9a-f]{64}$`)
+	reference := regexp.MustCompile(`^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$`)
+	var isPinned func(name string, depth int) bool
+	isPinned = func(name string, depth int) bool {
+		if depth > 3 || len(values[name]) == 0 {
+			return false
+		}
+		for _, v := range values[name] {
+			if m := reference.FindStringSubmatch(v); m != nil {
+				if !isPinned(m[1], depth+1) {
+					return false
+				}
+			} else if !pinned.MatchString(v) {
+				return false
+			}
+		}
+
+		return true
+	}
+
+	checked := regexp.MustCompile(`echo "\$\{([A-Za-z_][A-Za-z0-9_]*)\}\s+[^"]*" \| sha256sum -c`)
+	checks := 0
+	for i, line := range lines {
+		code, _, _ := strings.Cut(line, "#")
+		if strings.Contains(code, "/tmp/") || strings.Contains(code, "/tmp ") {
+			t.Errorf("%s:%d uses a fixed path under /tmp as root: %s", file, i+1, strings.TrimSpace(line))
+		}
+		if !strings.Contains(code, "sha256sum") {
+			continue
+		}
+		checks++
+		m := checked.FindStringSubmatch(code)
+		if m == nil {
+			t.Errorf("%s:%d checks a download against something other than a variable: %s", file, i+1, strings.TrimSpace(line))
+		} else if !isPinned(m[1], 0) {
+			t.Errorf("%s:%d checks a download against %s, which is not a sha256 pinned in the script: %s",
+				file, i+1, m[1], strings.TrimSpace(line))
+		}
+	}
+	if checks < 3 {
+		t.Fatalf("%s checks %d downloads, want the Go tarball, xray and hysteria at least", file, checks)
+	}
+}

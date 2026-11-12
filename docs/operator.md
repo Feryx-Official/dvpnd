@@ -52,6 +52,26 @@ certificate unless given `--force`, so re-running it is the upgrade path. On a m
 forward. The sections below are what it does, for doing it by hand or understanding the
 result.
 
+The script above comes from the `main` branch, and the signature check lives inside it. To
+run only what a signed release holds, check the tag yourself and run the installer from it
+(git 2.34 or newer; the key is the one the script pins, fingerprint
+`SHA256:HGWvk00cwVqxKXxfkwRIk/jUr3RiXz3WztzvWXKspq0`):
+
+```sh
+git clone https://github.com/Feryx-Official/dvpnd.git && cd dvpnd
+tag=$(git tag --list 'v*' --sort=-v:refname | head -1)
+echo '114076168+proofoftrinity@users.noreply.github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFqdfC3zNhLfD0Hl5H2bvlCvtBtOBhz0VSiietVWvMch' >allowed_signers
+git -c gpg.ssh.allowedSignersFile=allowed_signers verify-tag "$tag" && git checkout --quiet "$tag"
+sudo bash scripts/install.sh --source "$PWD" --moniker "My node"
+```
+
+`verify-tag` must print `Good "git" signature` with that fingerprint. When the installer's
+output is not a terminal (cloud-init, `| tee`, a CI job), it does not print a new key's
+mnemonic, which a log would keep: it writes it to `/root/.dvpnd/operator-mnemonic.txt`,
+readable by root only. Copy it off the server, then delete the file (`shred -u`).
+Turning ufw on, it opens every port `sshd -T` reports, so an SSH port set in
+`/etc/ssh/sshd_config.d` stays reachable.
+
 ## 1. Build
 
 Build on the host (cgo is needed for sqlite, so cross-compiling is awkward; there is no
