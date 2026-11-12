@@ -31,11 +31,15 @@ func (p *IPv4Pool) Get() (ip IPv4, err error) {
 	defer p.mutex.Unlock()
 
 	if len(p.available) == 0 {
-		for p.current[3] == 0 || p.current[3] == 255 {
+		// The network and broadcast addresses are no host's. An address
+		// ending in .0 or .255 inside a network larger than a /24 is a
+		// host's, but is left out as it always was.
+		network, last := bounds(p.Net)
+		for p.current[3] == 0 || p.current[3] == 255 || p.current == network || p.current == last {
 			p.current = p.current.Next()
 		}
 		if !p.Net.Contains(p.current.IP()) {
-			return ip, errors.New("ipv4 pool is pull")
+			return ip, errors.New("ipv4 pool is full")
 		}
 
 		ip, p.current = p.current, p.current.Next()
@@ -45,6 +49,20 @@ func (p *IPv4Pool) Get() (ip IPv4, err error) {
 
 	p.reserved[ip] = true
 	return ip, nil
+}
+
+// bounds are the network address of n and its broadcast address.
+func bounds(n *net.IPNet) (network, last IPv4) {
+	ip, mask := n.IP.To4(), n.Mask
+	if len(mask) == net.IPv6len {
+		mask = mask[net.IPv6len-net.IPv4len:]
+	}
+	for i := range network {
+		network[i] = ip[i] & mask[i]
+		last[i] = ip[i] | ^mask[i]
+	}
+
+	return network, last
 }
 
 func (p *IPv4Pool) Release(ip IPv4) {
@@ -89,7 +107,7 @@ func (p *IPv6Pool) Get() (ip IPv6, err error) {
 
 	if len(p.available) == 0 {
 		if !p.Net.Contains(p.current.IP()) {
-			return ip, errors.New("ipv6 pool is pull")
+			return ip, errors.New("ipv6 pool is full")
 		}
 
 		ip, p.current = p.current, p.current.Next()

@@ -347,10 +347,26 @@ func (s *WireGuard) Stop() error {
 	return err
 }
 
+// AddPeer adds the peer with tunnel addresses of its own and returns them.
+// A peer that is there already keeps the addresses it has.
 func (s *WireGuard) AddPeer(data []byte) (result []byte, err error) {
 	identity := base64.StdEncoding.EncodeToString(data)
+	if peer := s.peers.Get(identity); !peer.Empty() {
+		return append(peer.IPv4.Bytes(), peer.IPv6.Bytes()...), nil
+	}
 
-	v4, v6, err := s.pool.Get()
+	// With IPv6 off the peer gets only an IPv4 tunnel address: the v6 slot in the
+	// result stays zero, which tells the handshake to hand the client just the
+	// IPv4 address, so it routes nothing over IPv6 through the tunnel.
+	var (
+		v4 wgtypes.IPv4
+		v6 wgtypes.IPv6
+	)
+	if s.config.EnableIPv6 {
+		v4, v6, err = s.pool.Get()
+	} else {
+		v4, err = s.pool.V4.Get()
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -361,15 +377,9 @@ func (s *WireGuard) AddPeer(data []byte) (result []byte, err error) {
 		}
 	}()
 
-	// With IPv6 off the peer gets only an IPv4 tunnel address: the v6 slot in the
-	// result stays zero, which tells the handshake to hand the client just the
-	// IPv4 address, so it routes nothing over IPv6 through the tunnel.
 	allowedIPs := fmt.Sprintf("%s/32", v4.IP())
 	if s.config.EnableIPv6 {
 		allowedIPs += fmt.Sprintf(",%s/128", v6.IP())
-	} else {
-		s.pool.V6.Release(v6)
-		v6 = wgtypes.IPv6{}
 	}
 
 	err = common.RunTool(common.ToolTimeout, s.variant.Tool, strings.Split(

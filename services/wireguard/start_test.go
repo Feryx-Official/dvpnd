@@ -3,6 +3,8 @@
 package wireguard
 
 import (
+	"bytes"
+	"net"
 	"os"
 	"path/filepath"
 	"slices"
@@ -332,5 +334,42 @@ func TestAForeignInterfaceIsNotTakenDown(t *testing.T) {
 		if down != own {
 			t.Errorf("own interface %v: taken down %v\n%s", own, down, strings.Join(calls(), "\n"))
 		}
+	}
+}
+
+// TestAPeerAddedTwiceKeepsItsAddresses: adding a peer that is already there
+// hands back the addresses it holds; it took new ones before, which the
+// interface then routed to it while the old ones stayed taken for good.
+//
+// Rules: [CT-9].
+func TestAPeerAddedTwiceKeepsItsAddresses(t *testing.T) {
+	s, _ := startRig(t, "wgtest5", false)
+	tool := filepath.Join(t.TempDir(), "wg")
+	if err := os.WriteFile(tool, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s.variant.Tool = tool
+
+	key := make([]byte, 32)
+	first, err := s.AddPeer(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := s.AddPeer(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(first, again) || s.PeerCount() != 1 {
+		t.Fatalf("addresses %x, then %x; %d peers", first, again, s.PeerCount())
+	}
+
+	if err := s.RemovePeer(key); err != nil {
+		t.Fatal(err)
+	}
+	if v4, err := s.pool.V4.Get(); err != nil || !bytes.Equal(v4.Bytes(), first[:4]) {
+		t.Fatalf("after the removal the pool hands out %v, %v; want %v", v4.IP(), err, net.IP(first[:4]))
+	}
+	if v4, err := s.pool.V4.Get(); err != nil || v4.IP().String() != "10.8.0.3" {
+		t.Fatalf("an address was left taken: next is %v, %v", v4.IP(), err)
 	}
 }

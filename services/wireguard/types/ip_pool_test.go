@@ -4,6 +4,7 @@ package types
 
 import (
 	"net"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -138,5 +139,50 @@ func TestPoolReleasesIPv4WhenIPv6IsFull(t *testing.T) {
 	}
 	if ip, err := v4.Get(); err != nil || !ip.IP().Equal(net.ParseIP("10.8.0.4")) {
 		t.Fatalf("the IPv4 address of the failed pair was not released: next is %v, %v", ip.IP(), err)
+	}
+}
+
+// TestIPv4PoolKeepsOffTheBroadcastAddress: in a subnet of any size the
+// operator may set (AmneziaWG takes /16 to /28) no peer gets the network or
+// the broadcast address, and a full pool says so.
+//
+// Rules: [CT-9].
+func TestIPv4PoolKeepsOffTheBroadcastAddress(t *testing.T) {
+	for _, tc := range []struct {
+		cidr string
+		want int
+	}{
+		{"10.20.30.18/28", 13}, // .18 to .30
+		{"10.20.30.66/26", 61}, // .66 to .126
+		{"10.20.30.2/23", 507}, // .30.2 to .31.254, without .30.255 and .31.0
+	} {
+		pool, err := NewIPv4PoolFromCIDR(tc.cidr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ones, _ := pool.Net.Mask.Size()
+		network := pool.Net.IP.To4()
+		last := make(net.IP, 4)
+		for i := range last {
+			last[i] = network[i] | ^net.CIDRMask(ones, 32)[i]
+		}
+
+		n := 0
+		for {
+			ip, err := pool.Get()
+			if err != nil {
+				if !strings.Contains(err.Error(), "full") {
+					t.Errorf("%s: %v", tc.cidr, err)
+				}
+				break
+			}
+			if a := ip.IP(); a.Equal(network) || a.Equal(last) || !pool.Net.Contains(a) {
+				t.Fatalf("%s: handed out %s", tc.cidr, a)
+			}
+			n++
+		}
+		if n != tc.want {
+			t.Errorf("%s handed out %d addresses, want %d", tc.cidr, n, tc.want)
+		}
 	}
 }

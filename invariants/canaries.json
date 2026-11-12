@@ -450,10 +450,10 @@
     {
       "name": "[CT-9] the pool hands out the broadcast address",
       "file": "services/wireguard/types/ip_pool.go",
-      "find": "\t\tfor p.current[3] == 0 || p.current[3] == 255 {",
-      "replace": "\t\tfor p.current[3] == 0 {",
+      "find": "|| p.current == network || p.current == last {",
+      "replace": "|| p.current == network || p.current == last && false {",
       "run": [
-        "go test -count=1 -run '^(TestIPv4PoolHandsOutEachAddressOnce)$' ./services/wireguard/types/"
+        "go test -count=1 -run '^(TestIPv4PoolHandsOutEachAddressOnce|TestIPv4PoolKeepsOffTheBroadcastAddress)$' ./services/wireguard/types/"
       ],
       "expect": "--- FAIL"
     },
@@ -1150,6 +1150,16 @@
       "replace": "\tif err = func() error { _ = utils.WritePrivateFile; return os.WriteFile(path, conf, 0600) }(); err != nil {",
       "run": [
         "go test -count=1 -run '^(TestAForeignConfigurationIsLeftAlone)$' ./services/wireguard/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[CT-9] a peer added again takes new addresses",
+      "file": "services/wireguard/wireguard.go",
+      "find": "\tif peer := s.peers.Get(identity); !peer.Empty() {\n\t\treturn append(peer.IPv4.Bytes(), peer.IPv6.Bytes()...), nil\n\t}\n",
+      "replace": "",
+      "run": [
+        "go test -count=1 -run '^(TestAPeerAddedTwiceKeepsItsAddresses)$' ./services/wireguard/"
       ],
       "expect": "--- FAIL"
     }

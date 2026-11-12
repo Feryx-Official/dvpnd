@@ -32,7 +32,9 @@ leaves users unable to connect, or shows them a wrong fact. IDs as in `test/READ
   operator's `ipv4_subnet`/`ipv6_subnet` wins.
 - **[CT-9] No two peers hold the same tunnel address, and the node's own address is
   never handed out.** Two clients on one address would see each other's traffic. A full
-  pool refuses rather than wrapping around.
+  pool refuses rather than wrapping around. Nor is a network or broadcast address handed
+  out, whatever the subnet's size: a custom AmneziaWG subnet smaller than a /24 handed out
+  its broadcast address. A peer added again keeps the addresses it holds.
 - **[CT-10] The XRAY control messages the node encodes by hand decode with xray-core's
   own generated code.** xray-core and v2ray-core can't be linked into one binary, so the
   four messages are written with protowire.

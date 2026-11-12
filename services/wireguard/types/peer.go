@@ -39,6 +39,8 @@ func (p *Peers) Get(key string) Peer {
 	return v
 }
 
+// Put adds the peer unless one with its identity is there already, which
+// it keeps.
 func (p *Peers) Put(v Peer) {
 	p.Lock()
 	defer p.Unlock()
