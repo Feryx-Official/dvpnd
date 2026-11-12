@@ -10,7 +10,8 @@ import (
 // The FORWARD rules accept traffic leaving the tunnel and the replies coming
 // back into it. The second rule matters on a host whose FORWARD policy is DROP
 // (ufw, or a host where Docker is or was running): without it every reply to a
-// peer is dropped and TCP through the tunnel hangs.
+// peer is dropped and TCP through the tunnel hangs. Every call waits for the
+// xtables lock, as the node's own do (services/common/host.go).
 //
 // nolint:lll
 var (
@@ -22,7 +23,7 @@ PrivateKey = {{ .PrivateKey }}
 {{- range .Extra }}
 {{ . }}
 {{- end }}
-PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; iptables -t nat -A POSTROUTING -o {{ .Uplink }} -j MASQUERADE; ip6tables -A FORWARD -i %i -j ACCEPT; ip6tables -A FORWARD -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; ip6tables -t nat -A POSTROUTING -o {{ .Uplink }} -j MASQUERADE;
-PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; iptables -t nat -D POSTROUTING -o {{ .Uplink }} -j MASQUERADE; ip6tables -D FORWARD -i %i -j ACCEPT; ip6tables -D FORWARD -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; ip6tables -t nat -D POSTROUTING -o {{ .Uplink }} -j MASQUERADE;
+PostUp = iptables -w 5 -A FORWARD -i %i -j ACCEPT; iptables -w 5 -A FORWARD -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; iptables -w 5 -t nat -A POSTROUTING -o {{ .Uplink }} -j MASQUERADE; ip6tables -w 5 -A FORWARD -i %i -j ACCEPT; ip6tables -w 5 -A FORWARD -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; ip6tables -w 5 -t nat -A POSTROUTING -o {{ .Uplink }} -j MASQUERADE;
+PostDown = iptables -w 5 -D FORWARD -i %i -j ACCEPT; iptables -w 5 -D FORWARD -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; iptables -w 5 -t nat -D POSTROUTING -o {{ .Uplink }} -j MASQUERADE; ip6tables -w 5 -D FORWARD -i %i -j ACCEPT; ip6tables -w 5 -D FORWARD -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; ip6tables -w 5 -t nat -D POSTROUTING -o {{ .Uplink }} -j MASQUERADE;
     `)
 )

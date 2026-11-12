@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Feryx-Official/dvpnd/v9/services/common"
 	wgtypes "github.com/Feryx-Official/dvpnd/v9/services/wireguard/types"
@@ -169,5 +170,43 @@ func TestDetectedUplinkIsChecked(t *testing.T) {
 	if err := s.Init(dir); err == nil {
 		raw, _ := os.ReadFile(filepath.Join(dir, cfg.Interface+".conf"))
 		t.Fatalf("Init took the uplink %q:\n%s", cfg.Uplink, raw)
+	}
+}
+
+// TestAHungToolIsKilled: AddPeer and RemovePeer run under the admission
+// lock and Peers in the usage pass; a wg that never returns is killed after
+// the bound and the call fails, instead of holding every handshake. A hung
+// wg-quick fails the start the same way.
+//
+// Rules: [RT-18].
+func TestAHungToolIsKilled(t *testing.T) {
+	s, _ := startRig(t, "wgtest2", false)
+	hung := filepath.Join(t.TempDir(), "hung")
+	if err := os.WriteFile(hung, []byte("#!/bin/sh\nexec sleep 10\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s.variant.Tool, s.variant.Quick = hung, hung
+
+	savedTool, savedQuick := common.ToolTimeout, quickTimeout
+	common.ToolTimeout, quickTimeout = 200*time.Millisecond, 200*time.Millisecond
+	t.Cleanup(func() { common.ToolTimeout, quickTimeout = savedTool, savedQuick })
+
+	key := make([]byte, 32)
+	for name, call := range map[string]func() error{
+		"AddPeer":    func() error { _, err := s.AddPeer(key); return err },
+		"RemovePeer": func() error { return s.RemovePeer(key) },
+		"Peers":      func() error { _, err := s.Peers(); return err },
+		"Up":         s.Up,
+	} {
+		done := make(chan error, 1)
+		go func() { done <- call() }()
+		select {
+		case err := <-done:
+			if err == nil {
+				t.Errorf("%s succeeded with a tool that never returned", name)
+			}
+		case <-time.After(5 * time.Second):
+			t.Errorf("%s still waits on a tool that never returns", name)
+		}
 	}
 }

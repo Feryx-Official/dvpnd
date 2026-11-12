@@ -78,9 +78,9 @@ func TestConfigTemplateForwardRules(t *testing.T) {
 
 	for _, tool := range []string{"iptables", "ip6tables"} {
 		want := []string{
-			tool + " -A FORWARD -i %i -j ACCEPT;",
-			tool + " -A FORWARD -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT;",
-			tool + " -t nat -A POSTROUTING -o eth0 -j MASQUERADE;",
+			tool + " -w 5 -A FORWARD -i %i -j ACCEPT;",
+			tool + " -w 5 -A FORWARD -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT;",
+			tool + " -w 5 -t nat -A POSTROUTING -o eth0 -j MASQUERADE;",
 		}
 		for _, rule := range want {
 			if !strings.Contains(lines["PostUp"], rule) {

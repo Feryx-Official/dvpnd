@@ -73,3 +73,10 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
   wg-quick runs PostUp through `eval` as root, and WireGuard and AmneziaWG wrote the uplink
   into it unchecked: a `;` in the setting, or in the detected name, split it into a second
   command.
+- **[RT-18] Every tool the node runs on the host finishes within a bound, and iptables
+  waits for the xtables lock.** iptables, ip, wg and awg get 15 seconds, wg-quick and
+  awg-quick two minutes; a tool still running then gets SIGTERM, and SIGKILL after five
+  seconds more. AddPeer runs wg under the admission lock, so a wg that hung held every
+  handshake. iptables exits at once when another program (Docker, ufw, firewalld) holds
+  the lock unless told to wait, and the node drops a failed removal without a word; every
+  call, the ones in wg-quick's PostUp too, waits up to five seconds.

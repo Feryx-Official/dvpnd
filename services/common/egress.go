@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -213,9 +212,10 @@ func (c chains) down() {
 // RunQuiet executes one rule command whose failure is an answer the caller
 // handles, not a fault: a chain or a jump that is not there (yet, or any
 // more). Its output is discarded so the tool's complaint does not reach the
-// node's log; a variable so tests can record it.
+// node's log; it runs within ToolTimeout, and is a variable so tests can
+// record it.
 var RunQuiet = func(name string, args ...string) error {
-	return exec.Command(name, args...).Run()
+	return runTool(ToolTimeout, nil, nil, name, args...)
 }
 
 func run(tool string, args ...string) error {

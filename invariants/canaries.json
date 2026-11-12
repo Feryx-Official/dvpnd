@@ -1062,6 +1062,26 @@
         "go test -count=1 -run '^(TestDetectedUplinkIsChecked)$' ./services/wireguard/"
       ],
       "expect": "--- FAIL"
+    },
+    {
+      "name": "[RT-18] iptables does not wait for the xtables lock",
+      "file": "services/common/host.go",
+      "find": "\t\targs = append([]string{\"-w\", xtablesWait}, args...)\n",
+      "replace": "",
+      "run": [
+        "go test -count=1 -run '^(TestIptablesWaitsForTheLock)$' ./services/common/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[RT-18] a host tool runs without a bound",
+      "file": "services/common/host.go",
+      "find": "\tctx, cancel := context.WithTimeout(context.Background(), timeout)\n\tdefer cancel()\n\n\tcmd := toolCommand(ctx, name, args...)",
+      "replace": "\tctx, cancel := context.WithCancel(context.Background())\n\tdefer cancel()\n\n\tcmd := toolCommand(ctx, name, args...)",
+      "run": [
+        "go test -count=1 -run '^(TestAHungToolIsKilled)$' ./services/wireguard/"
+      ],
+      "expect": "--- FAIL"
     }
   ]
 }

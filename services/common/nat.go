@@ -4,8 +4,6 @@ package common
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
 	"strings"
 )
 
@@ -19,13 +17,10 @@ type NAT struct {
 	Uplink    string
 }
 
-// RunCommand executes one rule command; a variable so tests can record it.
+// RunCommand executes one rule command within ToolTimeout; a variable so
+// tests can record it.
 var RunCommand = func(name string, args ...string) error {
-	cmd := exec.Command(name, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	return cmd.Run()
+	return RunTool(ToolTimeout, name, args...)
 }
 
 func (n NAT) rules(action string) [][]string {

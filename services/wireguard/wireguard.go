@@ -10,11 +10,11 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/spf13/viper"
 
@@ -32,6 +32,9 @@ var (
 
 	// ensureForwarding turns IP forwarding on; a variable so tests can skip it.
 	ensureForwarding = common.EnsureForwarding
+
+	// quickTimeout bounds wg-quick, which runs ip, wg and iptables in turn.
+	quickTimeout = 2 * time.Minute
 )
 
 // Variant is one implementation of the WireGuard family: the tools that
@@ -192,11 +195,7 @@ func (s *WireGuard) Info() []byte {
 }
 
 func (s *WireGuard) wgQuick(action string) error {
-	cmd := exec.Command(s.variant.Quick, action, s.config.Interface)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	return cmd.Run()
+	return common.RunTool(quickTimeout, s.variant.Quick, action, s.config.Interface)
 }
 
 // egress is the firewall that keeps the interface's peers off the host and
@@ -280,13 +279,10 @@ func (s *WireGuard) AddPeer(data []byte) (result []byte, err error) {
 		v6 = wgtypes.IPv6{}
 	}
 
-	cmd := exec.Command(s.variant.Tool, strings.Split(
+	err = common.RunTool(common.ToolTimeout, s.variant.Tool, strings.Split(
 		fmt.Sprintf(`set %s peer %s allowed-ips %s`,
 			s.config.Interface, identity, allowedIPs), " ")...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err = cmd.Run(); err != nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -315,13 +311,10 @@ func (s *WireGuard) HasPeer(data []byte) bool {
 func (s *WireGuard) RemovePeer(data []byte) error {
 	identity := base64.StdEncoding.EncodeToString(data)
 
-	cmd := exec.Command(s.variant.Tool, strings.Split(
+	err := common.RunTool(common.ToolTimeout, s.variant.Tool, strings.Split(
 		fmt.Sprintf(`set %s peer %s remove`,
 			s.config.Interface, identity), " ")...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
+	if err != nil {
 		return err
 	}
 
@@ -334,8 +327,8 @@ func (s *WireGuard) RemovePeer(data []byte) error {
 }
 
 func (s *WireGuard) Peers() (items []types.Peer, err error) {
-	output, err := exec.Command(s.variant.Tool, strings.Split(
-		fmt.Sprintf("show %s transfer", s.config.Interface), " ")...).Output()
+	output, err := common.ToolOutput(common.ToolTimeout, s.variant.Tool, strings.Split(
+		fmt.Sprintf("show %s transfer", s.config.Interface), " ")...)
 	if err != nil {
 		return nil, err
 	}

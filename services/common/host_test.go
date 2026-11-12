@@ -3,6 +3,8 @@
 package common
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -21,5 +23,51 @@ func TestCheckInterfaceName(t *testing.T) {
 		if err := CheckInterfaceName("interface", name); err == nil {
 			t.Errorf("%q accepted", name)
 		}
+	}
+}
+
+// fakeTools puts scripts named after each tool first on PATH; each logs its
+// name and arguments to the returned file.
+func fakeTools(t *testing.T, names ...string) string {
+	t.Helper()
+
+	bin := t.TempDir()
+	log := filepath.Join(bin, "calls.log")
+	for _, name := range names {
+		script := "#!/bin/sh\necho \"" + name + " $*\" >> " + log + "\n"
+		if err := os.WriteFile(filepath.Join(bin, name), []byte(script), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	return log
+}
+
+// TestIptablesWaitsForTheLock: iptables fails at once while another program
+// (Docker, ufw, firewalld) holds the xtables lock unless told to wait; a
+// removal that failed that way was dropped without a word.
+//
+// Rules: [RT-18].
+func TestIptablesWaitsForTheLock(t *testing.T) {
+	log := fakeTools(t, "iptables", "ip6tables", "wg")
+
+	if err := RunCommand("iptables", "-A", "FORWARD", "-j", "X"); err != nil {
+		t.Fatal(err)
+	}
+	if err := RunQuiet("ip6tables", "-D", "FORWARD", "-j", "X"); err != nil {
+		t.Fatal(err)
+	}
+	if err := RunCommand("wg", "show"); err != nil {
+		t.Fatal(err)
+	}
+
+	raw, err := os.ReadFile(log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "iptables -w 5 -A FORWARD -j X\nip6tables -w 5 -D FORWARD -j X\nwg show\n"
+	if string(raw) != want {
+		t.Fatalf("calls:\n%s\nwant:\n%s", raw, want)
 	}
 }
