@@ -54,18 +54,37 @@ func newServer(handler http.Handler, logger cmtlog.Logger) *http.Server {
 	}
 }
 
-func ListenAndServeTLS(address, certFile, keyFile string, handler http.Handler, logger cmtlog.Logger) error {
-	l, err := net.Listen("tcp", address)
-	if err != nil {
-		return err
-	}
+// Listener is the node's API port, bound, with its certificate loaded.
+type Listener struct {
+	l    net.Listener
+	cert tls.Certificate
+}
 
+// ListenTLS loads the certificate and binds the API port. The start command
+// calls it before the node goes active on the chain, so a missing certificate
+// or a port in use stops the node first.
+func ListenTLS(address, certFile, keyFile string) (*Listener, error) {
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return serve(l, cert, handler, logger)
+	l, err := net.Listen("tcp", address)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Listener{l: l, cert: cert}, nil
+}
+
+// Serve answers TLS and plain HTTP on the port until it fails.
+func (l *Listener) Serve(handler http.Handler, logger cmtlog.Logger) error {
+	return serve(l.l, l.cert, handler, logger)
+}
+
+// Close releases the port; it is closed already once Serve has returned.
+func (l *Listener) Close() error {
+	return l.l.Close()
 }
 
 // serve answers TLS and plain HTTP on l, telling them apart by the first

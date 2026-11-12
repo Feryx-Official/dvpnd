@@ -434,6 +434,14 @@ func StartCmd() *cobra.Command {
 				log.Info("The legacy handshake endpoint is on: [node] legacy_handshake")
 			}
 
+			// The API port is bound and the certificate loaded before the node
+			// goes active on the chain: a node that cannot serve stops first.
+			port, err := utils.ListenTLS(config.Node.ListenOn, filepath.Join(home, "tls.crt"), filepath.Join(home, "tls.key"))
+			if err != nil {
+				return err
+			}
+			defer func() { _ = port.Close() }()
+
 			n := node.NewNode(ctx)
 			if halt, stopErr := stop.within(0); halt {
 				return stopErr
@@ -453,7 +461,7 @@ func StartCmd() *cobra.Command {
 			// API server fails or a job panics; the deferred stop above then
 			// takes the service down.
 			errCh := make(chan error, 1)
-			go func() { errCh <- n.Start(home) }()
+			go func() { errCh <- n.Start(port) }()
 			stop.failed = errCh
 			_, err = stop.within(-1)
 

@@ -64,3 +64,6 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
   daemon had died stayed up and listed as active on the chain, and Hysteria and OpenVPN
   nodes kept admitting clients who had paid for a session they could not serve. A daemon
   that exits within a second of starting stops the node before it goes active.
+- **[RT-16] A node goes active on the chain only once it can serve: its API port is bound
+  and its certificate loaded first.** A port in use or a missing certificate showed only
+  after the node had gone active, and every restart went active again.

@@ -173,6 +173,33 @@ func TestCommandsStartNoProcessThemselves(t *testing.T) {
 	}
 }
 
+// TestStartBindsThePortBeforeGoingActive reads the start command: the API port
+// is bound and the certificate loaded (utils.ListenTLS) before the node goes
+// active on the chain (n.Initialize). A port in use or a missing certificate
+// showed only once the node was active, and every restart went active again.
+//
+// Rules: [RT-16].
+func TestStartBindsThePortBeforeGoingActive(t *testing.T) {
+	_, body, _ := startCommand(t)
+	listen, initialize := -1, -1
+	for i, s := range body.List {
+		if listen < 0 && callsOn(s, "utils", "ListenTLS") {
+			listen = i
+		}
+		if initialize < 0 && callsOn(s, "n", "Initialize") {
+			initialize = i
+		}
+	}
+	switch {
+	case initialize < 0:
+		t.Fatal("no n.Initialize() in the start command: re-aim this test")
+	case listen < 0:
+		t.Error("the start command never binds the API port with utils.ListenTLS before going active")
+	case listen > initialize:
+		t.Error("utils.ListenTLS comes after n.Initialize(): the node goes active before it knows it can serve")
+	}
+}
+
 // startCommand returns the body of the start command's RunE and the index of
 // the statement in it that calls service.Start().
 func startCommand(t *testing.T) (*token.FileSet, *ast.BlockStmt, int) {

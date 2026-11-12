@@ -9,10 +9,13 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -147,4 +150,44 @@ func TestServeEndsWhenTheListenerCloses(t *testing.T) {
 		t.Fatal("serve still runs 5 s after its listener closed")
 	}
 	time.Sleep(200 * time.Millisecond) // a server that outlived serve and panics does so here
+}
+
+// TestListenTLSRefusesWhatCannotServe: a missing certificate or a port in use
+// is an error from ListenTLS, which the start command calls before the node
+// goes active on the chain.
+//
+// Rules: [RT-16].
+func TestListenTLSRefusesWhatCannotServe(t *testing.T) {
+	dir := t.TempDir()
+	certFile, keyFile := filepath.Join(dir, "tls.crt"), filepath.Join(dir, "tls.key")
+	if _, err := ListenTLS("127.0.0.1:0", certFile, keyFile); err == nil {
+		t.Error("ListenTLS without a certificate succeeded")
+	}
+
+	cert := selfSigned(t)
+	der, err := x509.MarshalECPrivateKey(cert.PrivateKey.(*ecdsa.PrivateKey))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(certFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Certificate[0]}), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(keyFile, pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: der}), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	busy, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer busy.Close()
+	if _, err := ListenTLS(busy.Addr().String(), certFile, keyFile); err == nil {
+		t.Error("ListenTLS on a port in use succeeded")
+	}
+
+	l, err := ListenTLS("127.0.0.1:0", certFile, keyFile)
+	if err != nil {
+		t.Fatalf("ListenTLS with a certificate and a free port: %v", err)
+	}
+	_ = l.Close()
 }

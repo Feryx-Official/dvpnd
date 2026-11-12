@@ -814,6 +814,48 @@
         "go test -count=1 -run '^TestHandshakeResolverStopsWithTheNode$' ./cmd/"
       ],
       "expect": "the daemon still runs 5 s after the node stopped the resolver"
+    },
+    {
+      "name": "[RT-16] the node goes active before it binds its API port",
+      "file": "cmd/start.go",
+      "find": [
+        "\t\t\t// The API port is bound and the certificate loaded before the node",
+        "\t\t\t// goes active on the chain: a node that cannot serve stops first.",
+        "\t\t\tport, err := utils.ListenTLS(config.Node.ListenOn, filepath.Join(home, \"tls.crt\"), filepath.Join(home, \"tls.key\"))",
+        "\t\t\tif err != nil {",
+        "\t\t\t\treturn err",
+        "\t\t\t}",
+        "\t\t\tdefer func() { _ = port.Close() }()",
+        "",
+        "\t\t\tn := node.NewNode(ctx)",
+        "\t\t\tif halt, stopErr := stop.within(0); halt {",
+        "\t\t\t\treturn stopErr",
+        "\t\t\t}",
+        "\t\t\tif err = n.Initialize(); err != nil {",
+        "\t\t\t\treturn err",
+        "\t\t\t}"
+      ],
+      "replace": [
+        "\t\t\tn := node.NewNode(ctx)",
+        "\t\t\tif halt, stopErr := stop.within(0); halt {",
+        "\t\t\t\treturn stopErr",
+        "\t\t\t}",
+        "\t\t\tif err = n.Initialize(); err != nil {",
+        "\t\t\t\treturn err",
+        "\t\t\t}",
+        "",
+        "\t\t\t// The API port is bound and the certificate loaded before the node",
+        "\t\t\t// goes active on the chain: a node that cannot serve stops first.",
+        "\t\t\tport, err := utils.ListenTLS(config.Node.ListenOn, filepath.Join(home, \"tls.crt\"), filepath.Join(home, \"tls.key\"))",
+        "\t\t\tif err != nil {",
+        "\t\t\t\treturn err",
+        "\t\t\t}",
+        "\t\t\tdefer func() { _ = port.Close() }()"
+      ],
+      "run": [
+        "go test -count=1 -run '^TestStartBindsThePortBeforeGoingActive$' ./test/static/"
+      ],
+      "expect": "comes after n.Initialize"
     }
   ]
 }

@@ -4,8 +4,6 @@
 package node
 
 import (
-	"path"
-
 	sessiontypes "github.com/sentinel-official/sentinelhub/v12/x/session/types/v3"
 	subscriptiontypes "github.com/sentinel-official/sentinelhub/v12/x/subscription/types/v3"
 
@@ -56,30 +54,16 @@ func (n *Node) Initialize() error {
 	return n.UpdateNodeInfo()
 }
 
-// Start runs the jobs and serves the API until the API server fails or a job
-// panics; either error ends the node through the caller, which then stops the
-// VPN service.
-func (n *Node) Start(home string) error {
+// Start runs the jobs and serves the API on api, bound by the caller before the
+// node went active, until the API server fails or a job panics; either error
+// ends the node through the caller, which then stops the VPN service.
+func (n *Node) Start(api *utils.Listener) error {
 	errCh := make(chan error, 4)
 
 	go n.runJob("set_sessions", n.IntervalSetSessions(), n.setSessions, errCh)
 	go n.runJob("update_sessions", n.IntervalUpdateSessions(), n.updateSessions, errCh)
 	go n.runJob("update_status", n.IntervalUpdateStatus(), n.UpdateNodeStatus, errCh)
-
-	var (
-		certFile = path.Join(home, "tls.crt")
-		keyFile  = path.Join(home, "tls.key")
-	)
-
-	go func() {
-		errCh <- utils.ListenAndServeTLS(
-			n.ListenOn(),
-			certFile,
-			keyFile,
-			n.Handler(),
-			n.Log(),
-		)
-	}()
+	go func() { errCh <- api.Serve(n.Handler(), n.Log()) }()
 
 	return <-errCh
 }
