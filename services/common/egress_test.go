@@ -303,3 +303,30 @@ func TestChainNamesFitIptables(t *testing.T) {
 		}
 	}
 }
+
+// TestChainThatCannotBeCreated: -N fails when the chain is left from an
+// earlier run, and the chain is emptied then; when emptying it fails too, -N
+// failed for another reason (the xtables lock, a missing module), which the
+// error names instead of the flush's "no chain".
+func TestChainThatCannotBeCreated(t *testing.T) {
+	f := fakeIptables(t)
+	withEgress(t, Egress{})
+
+	RunQuiet = func(name string, args ...string) error {
+		if args[0] == "-N" {
+			return errors.New("exit status 4")
+		}
+		return f.run(name, args...)
+	}
+	RunCommand = func(name string, args ...string) error {
+		if args[0] == "-F" {
+			return errors.New("exit status 1")
+		}
+		return f.run(name, args...)
+	}
+
+	err := (TunnelEgress{Interface: "wg0"}).Up()
+	if err == nil || !strings.Contains(err.Error(), "iptables -N DVPND-FWD-wg0: exit status 4") {
+		t.Fatalf("Up: %v", err)
+	}
+}

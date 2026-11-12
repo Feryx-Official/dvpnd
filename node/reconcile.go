@@ -31,8 +31,11 @@ type chainSessionView interface {
 // yet reached the chain, then clear the table. A reconnect is then admitted
 // fresh: the client is handed a new tunnel address and traffic flows again.
 func (n *Node) ReconcileSessions() error {
+	// A table that cannot be read is not an empty one: its rows would stay.
 	var items []types.Session
-	n.Database().Model(&types.Session{}).Find(&items)
+	if err := n.Database().Model(&types.Session{}).Find(&items).Error; err != nil {
+		return err
+	}
 	if len(items) == 0 {
 		n.compactDatabase()
 		return nil

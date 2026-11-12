@@ -542,3 +542,47 @@ func TestAFailedKillKeepsThePeerCounted(t *testing.T) {
 		t.Fatal("not removed once the kill worked")
 	}
 }
+
+// TestUnreadableCountersAreNotZero: a byte count OpenVPN reports that cannot
+// be read fails the status read, so the pass is tried again, and a final
+// count that cannot be read banks what the status table last showed for the
+// connection: a zero would make the peer's total drop.
+//
+// Rules: [SL-2].
+func TestUnreadableCountersAreNotZero(t *testing.T) {
+	s, f := startOpenVPN(t)
+	t.Cleanup(func() { _ = s.Stop() })
+	data := []byte("0123456789abcdef")
+	cn := "30313233-3435-3637-3839-616263646566"
+	if _, err := s.AddPeer(data); err != nil {
+		t.Fatal(err)
+	}
+
+	f.mu.Lock()
+	f.clients = []clientStatus{{commonName: cn, received: 10, sent: 20, cid: "4"}}
+	f.mu.Unlock()
+	if peers, err := s.Peers(); err != nil || peers[0].Upload != 10 || peers[0].Download != 20 {
+		t.Fatalf("want 10 up and 20 down, got %+v, %v", peers, err)
+	}
+
+	f.mu.Lock()
+	f.clients = []clientStatus{{commonName: cn, received: -1, sent: 30, cid: "4"}}
+	f.mu.Unlock()
+	if peers, err := s.Peers(); err == nil {
+		t.Fatalf("a status row with an unreadable count was read: %+v", peers)
+	}
+
+	f.mu.Lock()
+	f.clients = nil
+	f.mu.Unlock()
+	f.event("DISCONNECT", "4", "", map[string]string{"common_name": cn, "bytes_received": "x", "bytes_sent": "25"})
+	waitFor(t, "the disconnect", func() bool {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		_, ok := s.banked["4"]
+		return ok
+	})
+	if peers, err := s.Peers(); err != nil || peers[0].Upload != 10 || peers[0].Download != 25 {
+		t.Fatalf("want 10 up and 25 down, got %+v, %v", peers, err)
+	}
+}

@@ -170,10 +170,11 @@ func (c chains) up() error {
 	for _, f := range families() {
 		for _, chain := range c.names {
 			// -N fails when the chain is left from an earlier run; then it is
-			// emptied instead.
-			if RunQuiet(f.tool, "-N", chain) != nil {
+			// emptied instead. When that fails too, -N failed for another
+			// reason, which the error names.
+			if nerr := RunQuiet(f.tool, "-N", chain); nerr != nil {
 				if err := run(f.tool, "-F", chain); err != nil {
-					return err
+					return fmt.Errorf("%s -N %s: %v; %w", f.tool, chain, nerr, err)
 				}
 			}
 		}

@@ -388,10 +388,25 @@ func (s *Hysteria) RemovePeer(data []byte) error {
 	return nil
 }
 
-// Peers reads the traffic since the previous read and reports the totals
-// for every registered peer.
-func (s *Hysteria) Peers() ([]types.Peer, error) {
-	res, err := s.statsAPI(http.MethodGet, "/traffic?clear=1", nil)
+// trafficDelta is the server's traffic per id since the last clearing read,
+// from the client's point of view: tx = bytes the client sent (its upload),
+// rx = bytes it received (its download). Checked against the real server
+// with a large download.
+type trafficDelta map[string]struct {
+	Tx int64 `json:"tx"`
+	Rx int64 `json:"rx"`
+}
+
+// errBrokenReply is a traffic reply that arrived but could not be decoded.
+var errBrokenReply = errors.New("traffic: broken reply")
+
+// readTraffic reads the traffic table; clear also clears it on the server.
+func (s *Hysteria) readTraffic(clear bool) (trafficDelta, error) {
+	path := "/traffic"
+	if clear {
+		path += "?clear=1"
+	}
+	res, err := s.statsAPI(http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -401,15 +416,32 @@ func (s *Hysteria) Peers() ([]types.Peer, error) {
 		return nil, fmt.Errorf("traffic: status %d", res.StatusCode)
 	}
 
-	// The server reports, per id, traffic from the client's point of view:
-	// tx = bytes the client sent (its upload), rx = bytes it received (its
-	// download). Checked against the real server with a large download.
-	var delta map[string]struct {
-		Tx int64 `json:"tx"`
-		Rx int64 `json:"rx"`
-	}
+	var delta trafficDelta
 	if err := json.NewDecoder(io.LimitReader(res.Body, 8<<20)).Decode(&delta); err != nil {
-		return nil, fmt.Errorf("traffic: %w", err)
+		return nil, fmt.Errorf("%w: %v", errBrokenReply, err)
+	}
+
+	return delta, nil
+}
+
+// Peers reads the traffic since the previous read and reports the totals
+// for every registered peer. The server clears its table as it answers a
+// clearing read, so a broken reply to one would lose what it carried: the
+// table is read once without clearing first, and that reading counts when
+// the clearing one arrives broken. Only what moved between the two is then
+// lost.
+func (s *Hysteria) Peers() ([]types.Peer, error) {
+	peek, err := s.readTraffic(false)
+	if err != nil {
+		return nil, err
+	}
+	delta, err := s.readTraffic(true)
+	if errors.Is(err, errBrokenReply) {
+		delta = peek
+	} else if err != nil {
+		// The server may not have cleared: counting peek could count it
+		// twice, so this pass reads nothing.
+		return nil, err
 	}
 
 	s.mu.Lock()

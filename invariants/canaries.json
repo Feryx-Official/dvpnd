@@ -1002,6 +1002,26 @@
         "go test -count=1 -run '^TestStartRunsALastUsagePass$' ./test/static/"
       ],
       "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-2] Hysteria loses the traffic a broken clearing reply carried",
+      "file": "services/hysteria/hysteria.go",
+      "find": "\t\tdelta = peek\n",
+      "replace": "\t\t_ = peek\n\t\treturn nil, err\n",
+      "run": [
+        "go test -count=1 -run '^TestABrokenTrafficReplyLosesNothing$' ./services/hysteria/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-2] OpenVPN banks an unreadable final count as zero",
+      "file": "services/openvpn/openvpn.go",
+      "find": "\t\treceived = s.seen[cid].received\n",
+      "replace": "\t\treceived = 0\n",
+      "run": [
+        "go test -count=1 -run '^TestUnreadableCountersAreNotZero$' ./services/openvpn/"
+      ],
+      "expect": "--- FAIL"
     }
   ]
 }

@@ -29,7 +29,8 @@ type management struct {
 
 	// onConnect decides whether a client (identified by its certificate's
 	// common name) may connect; onDisconnect receives the final traffic of
-	// a client's connection (cid is its client id) that ended.
+	// a client's connection (cid is its client id) that ended, -1 for a
+	// count it could not read.
 	onConnect    func(commonName string) bool
 	onDisconnect func(commonName, cid string, received, sent int64)
 
@@ -209,11 +210,27 @@ func (m *management) finishEvent(ev *clientEvent) {
 		}
 	case "DISCONNECT":
 		if m.onDisconnect != nil {
-			received, _ := strconv.ParseInt(ev.env["bytes_received"], 10, 64)
-			sent, _ := strconv.ParseInt(ev.env["bytes_sent"], 10, 64)
+			received, err := parseCount(ev.env["bytes_received"])
+			if err != nil {
+				received = -1
+			}
+			sent, err := parseCount(ev.env["bytes_sent"])
+			if err != nil {
+				sent = -1
+			}
 			m.onDisconnect(cn, ev.cid, received, sent)
 		}
 	}
+}
+
+// parseCount reads a byte count, which OpenVPN reports unsigned.
+func parseCount(s string) (int64, error) {
+	v, err := strconv.ParseUint(s, 10, 63)
+	if err != nil {
+		return 0, fmt.Errorf("byte count %q: %w", s, err)
+	}
+
+	return int64(v), nil
 }
 
 // clientStatus is one row of "status 3".
@@ -237,8 +254,14 @@ func (m *management) status() ([]clientStatus, error) {
 		if len(fields) < 11 || fields[0] != "CLIENT_LIST" {
 			continue
 		}
-		received, _ := strconv.ParseInt(fields[5], 10, 64)
-		sent, _ := strconv.ParseInt(fields[6], 10, 64)
+		received, err := parseCount(fields[5])
+		if err != nil {
+			return nil, err
+		}
+		sent, err := parseCount(fields[6])
+		if err != nil {
+			return nil, err
+		}
 		rows = append(rows, clientStatus{commonName: fields[1], received: received, sent: sent, cid: fields[10]})
 	}
 

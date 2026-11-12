@@ -89,7 +89,9 @@ type OpenVPN struct {
 	// banked holds the client ids of ended connections whose traffic is in
 	// closed, until a status table no longer lists them.
 	banked map[string]struct{}
-	peers  *common.PeerSet
+	// seen is each live connection's row in the last status table read.
+	seen  map[string]clientStatus
+	peers *common.PeerSet
 }
 
 func NewOpenVPN() *OpenVPN {
@@ -100,6 +102,7 @@ func NewOpenVPN() *OpenVPN {
 		closed:  map[string]*traffic{},
 		revoked: map[string]struct{}{},
 		banked:  map[string]struct{}{},
+		seen:    map[string]clientStatus{},
 		peers:   common.NewPeerSet(),
 	}
 }
@@ -305,7 +308,9 @@ func (s *OpenVPN) admit(commonName string) bool {
 }
 
 // disconnected banks the traffic of a connection that ended, so a
-// reconnecting client's counters start again without losing what it used.
+// reconnecting client's counters start again without losing what it used. A
+// count the server sent unreadable (-1) is taken from the last status table
+// read: a zero would make the peer's total drop.
 func (s *OpenVPN) disconnected(commonName, cid string, received, sent int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -313,6 +318,12 @@ func (s *OpenVPN) disconnected(commonName, cid string, received, sent int64) {
 	key, ok := s.byCN[commonName]
 	if !ok {
 		return
+	}
+	if received < 0 {
+		received = s.seen[cid].received
+	}
+	if sent < 0 {
+		sent = s.seen[cid].sent
 	}
 	c := s.closed[key]
 	if c == nil {
@@ -466,6 +477,10 @@ func (s *OpenVPN) Peers() ([]types.Peer, error) {
 		if !listed[cid] {
 			delete(s.banked, cid)
 		}
+	}
+	s.seen = make(map[string]clientStatus, len(live))
+	for _, row := range live {
+		s.seen[row.cid] = row
 	}
 
 	return items, nil

@@ -196,3 +196,19 @@ func TestRowsOfThePreviousReleaseLoad(t *testing.T) {
 		t.Fatalf("a row without recorded hours reads as hours %d", items[0].MaxDuration)
 	}
 }
+
+// TestReconcileFailsOnAnUnreadableTable: a table the node cannot read is not
+// taken for an empty one. Its rows would stay and refuse every reconnect
+// with 409 until the chain ended the sessions.
+//
+// Rules: [SL-14].
+func TestReconcileFailsOnAnUnreadableTable(t *testing.T) {
+	n, _, db := usageRig(t, nil)
+	if err := db.Migrator().DropTable(&types.Session{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := n.ReconcileSessions(); err == nil {
+		t.Fatal("a session table that cannot be read was reconciled as empty")
+	}
+}

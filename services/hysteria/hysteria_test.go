@@ -24,14 +24,16 @@ import (
 )
 
 // fakeStats stands in for the server's statistics API: it serves a traffic
-// table once (clear=1 semantics) and records kicks; failKick fails them.
+// table once (clear=1 semantics) and records kicks; failKick fails them, and
+// breakClear cuts the reply to a clearing read short, after the clear.
 type fakeStats struct {
-	mu       sync.Mutex
-	secret   string
-	traffic  map[string]map[string]int64
-	kicked   [][]string
-	reads    int
-	failKick bool
+	mu         sync.Mutex
+	secret     string
+	traffic    map[string]map[string]int64
+	kicked     [][]string
+	reads      int
+	failKick   bool
+	breakClear bool
 }
 
 func (f *fakeStats) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -47,10 +49,14 @@ func (f *fakeStats) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == http.MethodGet && r.URL.Path == "/traffic":
 		f.reads++
-		_ = json.NewEncoder(w).Encode(f.traffic)
+		body, _ := json.Marshal(f.traffic)
 		if r.URL.Query().Get("clear") == "1" {
 			f.traffic = map[string]map[string]int64{}
+			if f.breakClear {
+				body = body[:len(body)/2]
+			}
 		}
+		_, _ = w.Write(body)
 	case r.Method == http.MethodPost && r.URL.Path == "/kick" && f.failKick:
 		http.Error(w, "busy", http.StatusInternalServerError)
 	case r.Method == http.MethodPost && r.URL.Path == "/kick":
@@ -362,6 +368,45 @@ func TestAFailedKickKeepsThePeerCounted(t *testing.T) {
 	}
 	if s.HasPeer(data) || s.PeerCount() != 0 || len(stats.kicked) != 1 || stats.kicked[0][0] != key {
 		t.Fatalf("not removed once the kick worked: kicked %v", stats.kicked)
+	}
+}
+
+// TestABrokenTrafficReplyLosesNothing: the server clears its counters as it
+// answers a clearing read, so a reply that arrives broken would lose what it
+// carried. The counters read just before, without clearing, are kept then.
+//
+// Rules: [SL-2].
+func TestABrokenTrafficReplyLosesNothing(t *testing.T) {
+	s := NewHysteria()
+	s.config = hysteriatypes.NewConfig().WithDefaultValues()
+	s.statsSecret = "shh"
+	stats, port := startFakeStats(t, s.statsSecret)
+	s.config.API.StatsPort = port
+
+	data, _ := s.ParsePeerRequest([]byte(`{"uuid":"01020304-0506-0708-090a-0b0c0d0e0f10"}`))
+	if _, err := s.AddPeer(data); err != nil {
+		t.Fatal(err)
+	}
+	key := base64.StdEncoding.EncodeToString(data)
+
+	stats.mu.Lock()
+	stats.traffic[key] = map[string]int64{"tx": 40, "rx": 400}
+	stats.breakClear = true
+	stats.mu.Unlock()
+	peers, err := s.Peers()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(peers) != 1 || peers[0].Upload != 40 || peers[0].Download != 400 {
+		t.Fatalf("want 40 up and 400 down kept, got %+v", peers)
+	}
+
+	stats.mu.Lock()
+	stats.traffic[key] = map[string]int64{"tx": 1, "rx": 2}
+	stats.breakClear = false
+	stats.mu.Unlock()
+	if peers, err = s.Peers(); err != nil || peers[0].Upload != 41 || peers[0].Download != 402 {
+		t.Fatalf("want 41 up and 402 down, got %+v, %v", peers, err)
 	}
 }
 
