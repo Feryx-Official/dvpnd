@@ -45,3 +45,9 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
   and the file was saved without it and the command exited 0: a misspelt key was lost
   without a word, and the Docker runner stored the operator's prices under keys the node
   no longer had, so the node it set up had no prices and refused to start.
+- **[RT-14] The installer builds only the release tag asked for, signed by the maintainer
+  and fetched from the repository's current home.** The signature covers the tag object,
+  not the ref that points at it: an older release's signed tag served under a newer name
+  passed the check and was built as root, so the object must name the tag asked for. An
+  upgrade fetched from the origin the first install cloned, which may be a former home
+  (LIC-8); origin is pointed at the current home before every fetch.

@@ -671,6 +671,26 @@
         "go test -count=1 -run '^TestNoFormerAccountName$' ./test/static/"
       ],
       "expect": "scripts/install\\.sh:\\d+ names \\S+, a former home of the repository"
+    },
+    {
+      "name": "[RT-14] the installer builds a signed tag fetched under another tag's name",
+      "file": "scripts/install.sh",
+      "find": "  if ! sed '/^$/q' \"${tmp}/payload\" | grep -qxF \"tag ${tag}\"; then",
+      "replace": "  if false; then",
+      "run": [
+        "go test -count=1 -run '^TestInstallerBuildsOnlyTheSignedTagAskedFor$' ./test/static/"
+      ],
+      "expect": "under another name: accepted = true, want false"
+    },
+    {
+      "name": "[RT-14] an upgrade fetches from the origin the first install cloned",
+      "file": "scripts/install.sh",
+      "find": "    git -C \"${SRC}\" remote set-url origin \"${REPO_URL}\" 2>/dev/null ||\n      git -C \"${SRC}\" remote add origin \"${REPO_URL}\"\n",
+      "replace": "",
+      "run": [
+        "go test -count=1 -run '^TestInstallerFetchesFromTheCurrentHome$' ./test/static/"
+      ],
+      "expect": "after fetch_source, want the current home"
     }
   ]
 }

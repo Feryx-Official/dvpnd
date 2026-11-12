@@ -205,22 +205,42 @@ esac
 # ---------------------------------------------------------------- source
 
 # verify_tag checks the tag's SSH signature against TAG_SIGNER with ssh-keygen
-# directly, since git learned SSH signatures only in 2.34.
+# directly, since git learned SSH signatures only in 2.34. The signature covers
+# the tag object, not the ref that points at it, so the object must also name
+# the tag asked for: an older release's signed tag under a newer name is refused.
 verify_tag() {
   local dir="$1" tag="$2" tmp rc
   tmp=$(mktemp -d)
   printf '%s\n' "${TAG_SIGNER}" >"${tmp}/allowed_signers"
-  if ! git -C "${dir}" cat-file tag "${tag}" >"${tmp}/tag" 2>/dev/null; then
+  if ! git -C "${dir}" cat-file tag "refs/tags/${tag}" >"${tmp}/tag" 2>/dev/null; then
     rm -rf "${tmp}"
     return 1
   fi
   sed -n '/^-----BEGIN SSH SIGNATURE-----$/,$p' "${tmp}/tag" >"${tmp}/sig"
   sed '/^-----BEGIN SSH SIGNATURE-----$/,$d' "${tmp}/tag" >"${tmp}/payload"
+  if ! sed '/^$/q' "${tmp}/payload" | grep -qxF "tag ${tag}"; then
+    rm -rf "${tmp}"
+    return 1
+  fi
   ssh-keygen -Y verify -f "${tmp}/allowed_signers" -I "${TAG_SIGNER%% *}" -n git \
     -s "${tmp}/sig" <"${tmp}/payload" >/dev/null 2>&1
   rc=$?
   rm -rf "${tmp}"
   return "${rc}"
+}
+
+# fetch_source clones REPO_URL into SRC, or brings an earlier clone up to date.
+# An earlier clone keeps the origin it was cloned from, which may be a former
+# home of the repository, so origin is pointed at REPO_URL before every fetch.
+fetch_source() {
+  if [[ -d "${SRC}/.git" ]]; then
+    git -C "${SRC}" remote set-url origin "${REPO_URL}" 2>/dev/null ||
+      git -C "${SRC}" remote add origin "${REPO_URL}"
+    git -C "${SRC}" fetch --quiet --tags origin
+  else
+    rm -rf "${SRC}"
+    git clone --quiet "${REPO_URL}" "${SRC}"
+  fi
 }
 
 if [[ -n "${SOURCE_DIR}" ]]; then
@@ -234,12 +254,7 @@ else
   fi
   SRC="${BUILD_DIR}"
   log "Fetching dvpnd ${VERSION}"
-  if [[ -d "${SRC}/.git" ]]; then
-    git -C "${SRC}" fetch --quiet --tags origin
-  else
-    rm -rf "${SRC}"
-    git clone --quiet "${REPO_URL}" "${SRC}"
-  fi
+  fetch_source
   verify_tag "${SRC}" "${VERSION}" ||
     die "${VERSION} is not a release tag signed by the maintainer; refusing to build it (build a tree you checked yourself with --source)"
   git -C "${SRC}" checkout --quiet "refs/tags/${VERSION}"
