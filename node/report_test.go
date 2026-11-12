@@ -3,6 +3,7 @@
 package node
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math"
@@ -217,6 +218,25 @@ func TestChainBytesPastInt64DoNotStopTheNode(t *testing.T) {
 			t.Fatal("usage that differs from the chain's needs a final report")
 		}
 	}()
+}
+
+// TestAnIdleSessionLogsNothingAtInfo: a session that moved no data is seen
+// on every pass; at the default log level that adds nothing to the journal.
+func TestAnIdleSessionLogsNothingAtInfo(t *testing.T) {
+	var out bytes.Buffer
+	n := NewNode(context.NewContext().WithLogger(cmtlog.NewFilter(cmtlog.NewTMLogger(&out), cmtlog.AllowInfo())))
+	n.chain = &holding{session: &nodetypes.Session{BaseSession: &sessiontypes.BaseSession{
+		ID: 1, Status: v1base.StatusActive,
+		DownloadBytes: sdkmath.NewInt(20), UploadBytes: sdkmath.NewInt(10), MaxBytes: sdkmath.ZeroInt(),
+	}}}
+
+	_, _, skip, err := n.checkSession(types.Session{ID: 1, Key: "k", Upload: 10, Download: 20})
+	if err != nil || !skip {
+		t.Fatalf("skip %v, err %v: an idle session is not reported", skip, err)
+	}
+	if out.Len() > 0 {
+		t.Fatalf("an idle session logged at info:\n%s", out.String())
+	}
 }
 
 // holding holds one session.

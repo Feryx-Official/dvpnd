@@ -63,7 +63,7 @@ func (c *Client) eachRemote(failed string, fn func(remote string) error, keyvals
 }
 
 func (c *Client) QueryAccount(accAddr sdk.AccAddress) (result authtypes.AccountI, err error) {
-	c.log.Info("Querying the account", "address", accAddr)
+	c.log.Debug("Querying the account", "address", accAddr)
 	err = c.query("account", func(ctx client.Context) error {
 		resp, err := authtypes.NewQueryClient(ctx).Account(
 			context.TODO(),
@@ -80,7 +80,7 @@ func (c *Client) QueryAccount(accAddr sdk.AccAddress) (result authtypes.AccountI
 }
 
 func (c *Client) QueryNode(nodeAddr base.NodeAddress) (result *nodetypes.Node, err error) {
-	c.log.Info("Querying the node", "address", nodeAddr)
+	c.log.Debug("Querying the node", "address", nodeAddr)
 	err = c.query("node", func(ctx client.Context) error {
 		resp, err := nodetypes.NewQueryServiceClient(ctx).QueryNode(
 			context.TODO(),
@@ -102,7 +102,7 @@ func (c *Client) QueryNode(nodeAddr base.NodeAddress) (result *nodetypes.Node, e
 // and MaxDuration) or *subscriptiontypes.Session (plan subscription, carries
 // SubscriptionID). nil, nil means the chain no longer has the session.
 func (c *Client) QuerySession(id uint64) (result sessiontypes.Session, err error) {
-	c.log.Info("Querying the session", "id", id)
+	c.log.Debug("Querying the session", "id", id)
 	err = c.query("session", func(ctx client.Context) error {
 		resp, err := sessiontypes.NewQueryServiceClient(ctx).QuerySession(
 			context.TODO(),
@@ -119,7 +119,7 @@ func (c *Client) QuerySession(id uint64) (result sessiontypes.Session, err error
 }
 
 func (c *Client) QuerySubscription(id uint64) (result *subscriptiontypes.Subscription, err error) {
-	c.log.Info("Querying the subscription", "id", id)
+	c.log.Debug("Querying the subscription", "id", id)
 	err = c.query("subscription", func(ctx client.Context) error {
 		resp, err := subscriptiontypes.NewQueryServiceClient(ctx).QuerySubscription(
 			context.TODO(),
@@ -139,7 +139,7 @@ func (c *Client) QuerySubscription(id uint64) (result *subscriptiontypes.Subscri
 // QueryAllocation reads the per-account byte allocation of a plan subscription.
 // Allocations are still served by the v2 query service at v12.
 func (c *Client) QueryAllocation(id uint64, accAddr sdk.AccAddress) (result *v2subscriptiontypes.Allocation, err error) {
-	c.log.Info("Querying the allocation", "id", id, "address", accAddr)
+	c.log.Debug("Querying the allocation", "id", id, "address", accAddr)
 	err = c.query("allocation", func(ctx client.Context) error {
 		resp, err := v2subscriptiontypes.NewQueryServiceClient(ctx).QueryAllocation(
 			context.TODO(),
@@ -228,7 +228,7 @@ func (c *Client) HasNodeForPlan(id uint64, nodeAddr base.NodeAddress) (result bo
 
 // QuerySessionsForAccount lists the account's sessions, newest last as stored.
 func (c *Client) QuerySessionsForAccount(accAddr sdk.AccAddress) (result []sessiontypes.Session, err error) {
-	c.log.Info("Querying the sessions for account", "address", accAddr)
+	c.log.Debug("Querying the sessions for account", "address", accAddr)
 	err = c.query("sessions_for_account", func(ctx client.Context) error {
 		resp, err := sessiontypes.NewQueryServiceClient(ctx).QuerySessionsForAccount(
 			context.TODO(),

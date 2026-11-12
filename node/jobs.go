@@ -194,7 +194,7 @@ func (n *Node) checkSession(item types.Session) (removePeer, removeSession, skip
 			removePeer = true
 		}
 
-		n.Log().Info("Stale peer connection", "key", types.KeyTag(item.Key),
+		n.Log().Debug("Stale peer connection", "key", types.KeyTag(item.Key),
 			"created_at", item.CreatedAt, "status_at", session.GetStatusAt())
 	}
 	if !session.GetStatus().Equal(v1base.StatusActive) {

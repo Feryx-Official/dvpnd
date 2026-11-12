@@ -78,3 +78,19 @@ func TestARemoteConnectionIsReused(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+// TestQueriesLogAtDebugOnly: a handshake costs up to three queries and a
+// session pass one per session; at the default log level they add nothing
+// to the journal, a client's account address included.
+func TestQueriesLogAtDebugOnly(t *testing.T) {
+	_, c := newFakeChain(t)
+	var out bytes.Buffer
+	c.WithLogger(cmtlog.NewFilter(cmtlog.NewTMLogger(&out), cmtlog.AllowInfo()))
+
+	if _, err := c.QueryAccount(c.FromAddress()); err != nil {
+		t.Fatal(err)
+	}
+	if out.Len() > 0 {
+		t.Fatalf("a query logged at info:\n%s", out.String())
+	}
+}
