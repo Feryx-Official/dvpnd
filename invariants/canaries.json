@@ -1272,6 +1272,26 @@
         "go test -count=1 -run '^TestInstallerDownloadsOnlyWhatItPins$' ./test/static/"
       ],
       "expect": "which is not a sha256 pinned in the script"
+    },
+    {
+      "name": "[RT-27] the runner's setup rewrites the host's daemon.json",
+      "file": "scripts/runner.sh",
+      "find": "  if [[ -e \"${DOCKER_DAEMON_CONFIG}\" ]]; then",
+      "replace": "  if false; then",
+      "run": [
+        "go test -count=1 -run '^TestRunnerSetupKeepsTheHostsSettings$' ./test/static/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[RT-27] the runner's setup replaces the certificate clients pin",
+      "file": "scripts/runner.sh",
+      "find": "  if [[ -f \"${NODE_DIR}/tls.crt\" && -f \"${NODE_DIR}/tls.key\" ]]; then",
+      "replace": "  if false; then",
+      "run": [
+        "go test -count=1 -run '^TestRunnerSetupKeepsTheHostsSettings$' ./test/static/"
+      ],
+      "expect": "setup replaced"
     }
   ]
 }

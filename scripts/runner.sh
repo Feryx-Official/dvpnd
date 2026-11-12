@@ -5,6 +5,7 @@ set -Eeou pipefail
 CONTAINER_NAME=dvpnd
 NODE_DIR="${HOME}/.dvpnd"
 NODE_IMAGE=ghcr.io/feryx-official/dvpnd:latest
+DOCKER_DAEMON_CONFIG=/etc/docker/daemon.json
 
 function stop {
   id=$(docker ps --filter name="${CONTAINER_NAME}" --quiet)
@@ -459,60 +460,75 @@ function cmd_setup {
     echo "Error: please run this command with sudo privileges" &&
     return 1
 
-  function install_packages {
-    echo "Installing the packages ${*}"
-    DEBIAN_FRONTEND=noninteractive apt-get install --quiet --yes "${@}"
-  }
-
-  function setup_docker {
-    function install {
-      if ! command -v docker &>/dev/null; then
-        curl -fsSL -o /tmp/get-docker.sh https://get.docker.com
-        sh /tmp/get-docker.sh
-      fi
-    }
-
-    function setup_ipv6 {
-      cat <<EOF >/etc/docker/daemon.json
-{
-    "ipv6": true,
-    "fixed-cidr-v6": "2001:db8:1::/64"
+  setup_host
 }
-EOF
-    }
 
-    install
-    setup_ipv6
-    systemctl restart docker
-  }
+function install_packages {
+  echo "Installing the packages ${*}"
+  DEBIAN_FRONTEND=noninteractive apt-get install --quiet --yes "${@}"
+}
 
-  function setup_iptables {
-    install_packages iptables-persistent
-    rule=(POSTROUTING -s 2001:db8:1::/64 ! -o docker0 -j MASQUERADE)
-    ip6tables -t nat -C "${rule[@]}" 2>/dev/null || ip6tables -t nat -A "${rule[@]}"
-    ip6tables-save >/etc/iptables/rules.v6
-  }
-
-  function setup_tls {
-    mkdir -p "${NODE_DIR}" &&
-      openssl req -new \
-        -newkey ec \
-        -pkeyopt ec_paramgen_curve:prime256v1 \
-        -subj "/C=NA/ST=NA/L=./O=NA/OU=./CN=." \
-        -x509 \
-        -sha256 \
-        -days 365 \
-        -nodes \
-        -out "${NODE_DIR}/tls.crt" \
-        -keyout "${NODE_DIR}/tls.key"
-  }
-
+# setup_host prepares a Debian or Ubuntu host for the node container and keeps
+# what the host already has. Docker must be installed already: setup ran
+# get.docker.com's script as root, unchecked. An existing daemon.json and TLS
+# certificate are left alone, and no package that replaces the firewall is
+# installed: iptables-persistent, which setup installed, removes ufw.
+function setup_host {
+  if ! command -v docker &>/dev/null; then
+    echo "Error: Docker is not installed. Install it from the distribution's packages or from"
+    echo "Docker's signed apt repository (https://docs.docker.com/engine/install/), then run setup again"
+    return 1
+  fi
   apt-get update
-  install_packages curl git jq openssl
-  setup_docker
-  setup_iptables
+  install_packages curl openssl
+  setup_docker_ipv6
   setup_tls
   docker pull "${NODE_IMAGE}"
+}
+
+# setup_docker_ipv6 gives containers IPv6 as the operator guide does (section
+# 7): Docker NATs their IPv6 itself. It writes DOCKER_DAEMON_CONFIG and
+# restarts Docker only when the host has no such file: rewriting it dropped
+# the host's own settings, and the restart restarts every container. A Docker
+# that does not start with the file has it removed again.
+function setup_docker_ipv6 {
+  if [[ -e "${DOCKER_DAEMON_CONFIG}" ]]; then
+    if grep -Eq '"ipv6"[[:space:]]*:[[:space:]]*true' "${DOCKER_DAEMON_CONFIG}"; then
+      echo "Keeping ${DOCKER_DAEMON_CONFIG}: it gives containers IPv6"
+    else
+      echo "Keeping ${DOCKER_DAEMON_CONFIG}, which does not give containers IPv6. For a dual-stack"
+      echo "WireGuard node add \"ipv6\": true, \"fixed-cidr-v6\": \"fd00:d0c:1::/64\" and \"ip6tables\": true"
+      echo "to it and restart Docker, or set enable_ipv6 = false in wireguard.toml (docs/operator.md, section 7)"
+    fi
+    return 0
+  fi
+  mkdir -p "$(dirname "${DOCKER_DAEMON_CONFIG}")"
+  cat <<EOF >"${DOCKER_DAEMON_CONFIG}"
+{
+  "ipv6": true,
+  "fixed-cidr-v6": "fd00:d0c:1::/64",
+  "ip6tables": true
+}
+EOF
+  if ! systemctl restart docker; then
+    rm -f "${DOCKER_DAEMON_CONFIG}"
+    systemctl restart docker
+    echo "Error: Docker did not start with IPv6 on; ${DOCKER_DAEMON_CONFIG} is removed again"
+    return 1
+  fi
+}
+
+# setup_tls makes the node's self-signed certificate, as the installer does,
+# unless NODE_DIR has one: clients pin it, and setup replaced it at every run.
+function setup_tls {
+  if [[ -f "${NODE_DIR}/tls.crt" && -f "${NODE_DIR}/tls.key" ]]; then
+    echo "Keeping the TLS certificate in ${NODE_DIR}"
+    return 0
+  fi
+  mkdir -p "${NODE_DIR}" && chmod 700 "${NODE_DIR}"
+  openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 3650 \
+    -subj "/CN=dvpnd" -keyout "${NODE_DIR}/tls.key" -out "${NODE_DIR}/tls.crt" 2>/dev/null
+  chmod 600 "${NODE_DIR}/tls.key"
 }
 
 function cmd_start {
@@ -719,6 +735,9 @@ function cmd_update {
   docker rmi --force "${NODE_IMAGE}"
   docker pull "${NODE_IMAGE}"
 }
+
+# Sourced, as the tests do, the script defines its functions and runs nothing.
+[[ "${BASH_SOURCE[0]}" == "${0}" ]] || return 0
 
 v="${1:-help}" && case "${v}" in
   "attach" | "help" | "init" | "setup" | "start" | "status" | "stop" | "remove" | "restart" | "update")

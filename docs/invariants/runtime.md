@@ -123,3 +123,9 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
   against a checksum the script pins.** It runs as root: a fixed path under `/tmp` can be
   created first by any local user, and the Go checksum, fetched from the site that served
   the tarball, proved the download intact but not authentic.
+- **[RT-27] The Docker runner's setup keeps what the host already has.** It installs no
+  Docker of its own: it ran get.docker.com's script as root, unchecked. It writes
+  `/etc/docker/daemon.json` and restarts Docker only on a host with no such file: it
+  rewrote the file, dropping the host's settings, and the restart restarted every
+  container. It keeps an existing TLS certificate, which clients pin, and installs no
+  package that replaces the firewall: the iptables-persistent it installed removes ufw.

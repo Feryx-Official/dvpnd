@@ -511,8 +511,10 @@ Docker enables IPv6 forwarding on the host itself, so no sysctl change is needed
 check fails and the host has no IPv6 connectivity at all, set `enable_ipv6 = false` instead.
 Docker NATs the container's IPv6 to the host's address, so with IPv6 on, clients exit with
 the host's IPv6 address on IPv6-capable sites. A V2Ray container without IPv6 only fails
-for IPv6-only destinations, which are rare. `scripts/runner.sh setup` writes its own
-`daemon.json` and overwrites an existing one.
+for IPv6-only destinations, which are rare. `scripts/runner.sh setup` writes this
+`daemon.json` and restarts Docker only on a host that has none; an existing one is left as
+it is, with a note when it leaves containers without IPv6. It needs Docker installed first,
+from the distribution or from [Docker's apt repository](https://docs.docker.com/engine/install/).
 
 **Configuration.** The image is named `dvpnd` and its entrypoint binary is `process`; the
 command after the image name is passed to the node. Prepare `config.toml`, the protocol's
