@@ -3,10 +3,12 @@
 package static
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -90,5 +92,54 @@ func TestCanaryCountsOnlyAFailureTheMutationCaused(t *testing.T) {
 	}
 	if t.Failed() {
 		t.Logf("runner output:\n%s", out)
+	}
+}
+
+// running tells whether the process pid is still there and not a zombie
+// waiting to be reaped.
+func running(pid int) bool {
+	b, err := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/stat")
+	if err != nil {
+		return false
+	}
+	i := bytes.LastIndexByte(b, ')') // the state follows the command name
+
+	return i < 0 || i+2 >= len(b) || b[i+2] != 'Z'
+}
+
+// TestCanaryTimeoutStopsWhatTheCommandStarted holds the canary timeout to
+// stopping everything the command started: killing the shell alone left what
+// it started, go test in a real canary, running on after the runner had moved
+// on and deleted its copy.
+func TestCanaryTimeoutStopsWhatTheCommandStarted(t *testing.T) {
+	pids := filepath.Join(t.TempDir(), "pids")
+	config := `{"timeout": 1, "canaries": [
+	  {"name": "hangs", "file": "rule.txt", "find": "guarded", "replace": "removed",
+	   "run": ["sleep 30 & echo $! >>` + pids + `; wait"]}
+	]}`
+	out, _, took := canaryRun(t, map[string]string{"rule.txt": "guarded\n"}, config)
+	if got := verdict(out, "hangs"); got != "TIMEOUT" {
+		t.Errorf("verdict %q, want TIMEOUT\n%s", got, out)
+	}
+	if took > 10*time.Second {
+		t.Errorf("the runner took %s with a 1 s timeout", took.Round(time.Second))
+	}
+
+	b, err := os.ReadFile(pids)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range strings.Fields(string(b)) {
+		pid, err := strconv.Atoi(field)
+		if err != nil {
+			t.Fatal(err)
+		}
+		deadline := time.Now().Add(5 * time.Second)
+		for running(pid) && time.Now().Before(deadline) {
+			time.Sleep(50 * time.Millisecond)
+		}
+		if running(pid) {
+			t.Errorf("process %d the timed-out command started is still running", pid)
+		}
 	}
 }

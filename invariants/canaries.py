@@ -23,6 +23,7 @@ import os
 import queue
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -132,13 +133,21 @@ def run_steps(steps, copy, root, cfg, slot):
     output = ''
     for step in steps:
         cmd, cwd = (step, '.') if isinstance(step, str) else (step['cmd'], step.get('cwd', '.'))
+        # A session of its own, so a timeout stops what the shell started too (go test and the
+        # test binary), not the shell alone.
+        p = subprocess.Popen(fill(cmd), shell=True, cwd=os.path.join(copy, cwd), env=env, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, text=True, start_new_session=True)
         try:
-            r = subprocess.run(fill(cmd), shell=True, cwd=os.path.join(copy, cwd), env=env, capture_output=True,
-                               text=True, timeout=cfg.get('timeout', 900))
+            out, err = p.communicate(timeout=cfg.get('timeout', 900))
         except subprocess.TimeoutExpired:
+            try:
+                os.killpg(p.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            p.communicate()
             return 'timeout', cmd, output
-        output += r.stdout + r.stderr
-        if r.returncode != 0:
+        output += out + err
+        if p.returncode != 0:
             return 'fail', cmd, output
     return 'pass', None, output
 
