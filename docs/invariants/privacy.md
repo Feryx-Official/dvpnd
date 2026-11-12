@@ -37,3 +37,6 @@ passwords) must not pile up on the node either. IDs as in `test/README.md`.
   what its service adds, not whatever the operator or the container passed the node. The
   files the node writes for it (a configuration that can hold a REALITY private key or the
   stats secret, a copy of the TLS key) are removed when the node stops.
+- **[PV-11] The GeoIP token is sent over HTTPS only.** A `url` override for a provider the
+  token goes to (ipinfo, ip2location) must be `https` when a token is set; over `http` it
+  would cross the network readable by anyone on the path.

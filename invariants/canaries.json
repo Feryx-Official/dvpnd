@@ -1162,6 +1162,36 @@
         "go test -count=1 -run '^(TestAPeerAddedTwiceKeepsItsAddresses)$' ./services/wireguard/"
       ],
       "expect": "--- FAIL"
+    },
+    {
+      "name": "[PV-6] a replaced config file is readable by others",
+      "file": "utils/file.go",
+      "find": "\tif err = tmp.Chmod(0o600); err != nil {",
+      "replace": "\tif err = tmp.Chmod(0o644); err != nil {",
+      "run": [
+        "go test -count=1 -run '^(TestWritePrivateFile)$' ./utils/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[RT-20] a config file is rewritten in place",
+      "file": "utils/file.go",
+      "find": "\terr = rename(tmp.Name(), path)",
+      "replace": "\terr = writeInPlace(path, data)",
+      "run": [
+        "go test -count=1 -run '^(TestWritePrivateFileReplacesTheFile)$' ./utils/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[PV-11] the GeoIP token is accepted with an http url",
+      "file": "types/config.go",
+      "find": "\t\tif c.Token != \"\" && u.Scheme != \"https\" &&",
+      "replace": "\t\tif false && c.Token != \"\" && u.Scheme != \"https\" &&",
+      "run": [
+        "go test -count=1 -run '^(TestGeoIPTokenOnlyOverHTTPS)$' ./types/"
+      ],
+      "expect": "--- FAIL"
     }
   ]
 }

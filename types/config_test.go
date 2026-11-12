@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/viper"
 
@@ -233,5 +234,113 @@ func TestKeyringGranter(t *testing.T) {
 	c.Granter = "not-an-address"
 	if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "invalid granter") {
 		t.Fatalf("granter validation: %v", err)
+	}
+}
+
+// TestConfigValidationGaps: values the node cannot run with are refused
+// when the file is read, under their own names: a listen address without a
+// port (the API's port then read as 0 in the egress policy), a gas
+// adjustment that is not a number, and an interval_update_status out of
+// range, which was reported as interval_set_sessions.
+func TestConfigValidationGaps(t *testing.T) {
+	node := func(edit func(c *NodeConfig)) error {
+		c := NewNodeConfig().WithDefaultValues()
+		c.Moniker = "a moniker"
+		c.GigabytePrices = "udvpn:0.5,1000"
+		c.HourlyPrices = "udvpn:0.5,1000"
+		c.RemoteURL = "https://node.example:7777"
+		edit(c)
+		return c.Validate()
+	}
+
+	for name, d := range map[string]time.Duration{"below": MinIntervalUpdateStatus - time.Second, "above": MaxIntervalUpdateStatus + time.Second} {
+		err := node(func(c *NodeConfig) { c.IntervalUpdateStatus = d })
+		if err == nil || !strings.Contains(err.Error(), "interval_update_status") {
+			t.Errorf("interval_update_status %s its range: %v", name, err)
+		}
+	}
+
+	for _, listen := range []string{"0.0.0.0", "0.0.0.0:", "0.0.0.0:0", "0.0.0.0:70000", "0.0.0.0:http", "[::]"} {
+		if err := node(func(c *NodeConfig) { c.ListenOn = listen }); err == nil || !strings.Contains(err.Error(), "listen_on") {
+			t.Errorf("listen_on %q: %v", listen, err)
+		}
+	}
+	for _, listen := range []string{"0.0.0.0:7777", ":7777", "[::]:7777", "127.0.0.1:65535"} {
+		if err := node(func(c *NodeConfig) { c.ListenOn = listen }); err != nil && strings.Contains(err.Error(), "listen_on") {
+			t.Errorf("listen_on %q refused: %v", listen, err)
+		}
+	}
+
+	for _, v := range []float64{math.NaN(), math.Inf(1)} {
+		c := NewChainConfig().WithDefaultValues()
+		c.GasAdjustment = v
+		if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "gas_adjustment") {
+			t.Errorf("gas_adjustment %v: %v", v, err)
+		}
+	}
+}
+
+// TestGeoIPTokenOnlyOverHTTPS: a URL override for a provider that is sent
+// the token must be https when a token is set; over http the token would
+// cross the network readable by anyone on the path.
+//
+// Rules: [PV-11].
+func TestGeoIPTokenOnlyOverHTTPS(t *testing.T) {
+	for _, c := range []GeoIPConfig{
+		{Provider: "ipinfo", Token: "t", URL: "http://api.ipinfo.io/lite/me"},
+		{Provider: "ip2location", Token: "k", URL: "http://api.ip2location.io/"},
+	} {
+		if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "https") {
+			t.Errorf("%s with a token over %s: %v", c.Provider, c.URL, err)
+		}
+	}
+	for _, c := range []GeoIPConfig{
+		{Provider: "ipinfo", Token: "t", URL: "https://api.ipinfo.io/lite/me"},
+		{Provider: "ip2location", URL: "http://api.ip2location.io/"},
+		{Provider: "ip-api", URL: "http://ip-api.com/json"},
+	} {
+		if err := c.Validate(); err != nil {
+			t.Errorf("%s over %s: %v", c.Provider, c.URL, err)
+		}
+	}
+}
+
+// TestUnknownConfigKeys: the keys in the file that no setting takes are
+// listed, so start can name them: a misspelt key, and a table this node does
+// not have, such as one left by the upstream node.
+//
+// Rules: [RT-21].
+func TestUnknownConfigKeys(t *testing.T) {
+	text := NewConfig().WithDefaultValues().String()
+	text = strings.Replace(text, "max_peers =", "max_peer =", 1)
+	text += "\n[legacy]\ntrust_node = true\n"
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	v := viper.New()
+	v.SetConfigFile(path)
+	if _, err := ReadInConfig(v); err != nil {
+		t.Fatal(err)
+	}
+	keys, err := UnknownConfigKeys(v, NewConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.Join(keys, ","), "legacy,qos.max_peer"; got != want {
+		t.Errorf("unknown keys %q, want %q", got, want)
+	}
+
+	if err := os.WriteFile(path, []byte(NewConfig().WithDefaultValues().String()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	v = viper.New()
+	v.SetConfigFile(path)
+	if _, err := ReadInConfig(v); err != nil {
+		t.Fatal(err)
+	}
+	if keys, err := UnknownConfigKeys(v, NewConfig()); err != nil || len(keys) != 0 {
+		t.Errorf("the file as the node writes it: unknown keys %q, %v", keys, err)
 	}
 }

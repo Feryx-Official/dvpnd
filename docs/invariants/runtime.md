@@ -87,3 +87,14 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
   root only. An interface left up is recreated only when `wg show` gives the node's private
   key for it. On a host with its own `wg0`, the administrator's file, key and peers were
   replaced, an existing file kept its mode, and an interface of that name was taken down.
+- **[RT-20] A configuration file is replaced whole, never rewritten in place.** The node
+  writes the new content to a file beside it and renames that over the old one, so a crash
+  or a full disk while writing leaves the old file as it was; rewritten in place, it could
+  be left empty or cut short. A path that is a symlink is written where it points, the
+  link kept. A file mounted on its own (`docker run -v file:file`), which cannot be
+  replaced, is rewritten in place.
+- **[RT-21] A key in the node's configuration file that no setting takes is named in the
+  log at start.** The node still starts and ignores the key. Viper ignores it without a
+  word, so a misspelt key silently fell back to the default; a file carried over from the
+  upstream node keeps keys this node no longer has, so refusing to start would turn an
+  upgrade into an outage.

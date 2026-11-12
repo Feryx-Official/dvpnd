@@ -169,6 +169,12 @@ func StartCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if unknown, err := types.UnknownConfigKeys(v, types.NewConfig()); err != nil {
+				return err
+			} else if len(unknown) > 0 {
+				log.Error("The configuration file has keys no setting takes; they are ignored",
+					"path", configPath, "keys", strings.Join(unknown, ","))
+			}
 
 			skipConfigValidation, err := cmd.Flags().GetBool(flagSkipConfigValidation)
 			if err != nil {

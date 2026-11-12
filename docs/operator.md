@@ -91,6 +91,10 @@ Edit `~/.dvpnd/config.toml`:
 | `[bandwidth]` | Leave both at `0`: at start the node measures its link. It picks speed test servers by measured latency, discards any that answer from inside its own datacenter (common on cloud hosts: those measure the local network and can overstate the link several times over), and reports the lowest of two or three independent servers. That takes one to two minutes and moves several gigabytes on a fast link; the result is kept in `~/.dvpnd/bandwidth.json` and reused for a week, or until the public IP changes (delete the file to measure again). If you know what your provider sells you, set `download_mbps` and `upload_mbps` (a 1 Gbit/s port is `1000`) and the measurement is skipped. See which you got with `curl -sk https://127.0.0.1:8585/status | jq .result.bandwidth`: `source` is `speedtest`, `config` or `none`. Nothing verifies the figure and clients use it to choose a node: do not overstate it. |
 | `[chain] rpc_addresses` | comma-separated, tried in order; the defaults are public endpoints from the [chain registry](https://github.com/cosmos/chain-registry/blob/master/sentinel/chain.json). Put your own RPC first if you run one. Each must be `https`; plain `http` is accepted only on loopback (`http://127.0.0.1:26657` for an RPC on the same host), because the node admits clients on what the RPC answers. An endpoint that answers with an HTTP redirect does not work with this client. |
 
+At start the node names, in an error line, any key in `config.toml` that no setting takes
+(a misspelt key, or one left by the upstream node's file) and then ignores it; `config set`
+refuses such a key outright. A GeoIP `url` must be `https` when a `token` is set.
+
 Geolocation services: ipwho.is and Cloudflare require no attribution. dvpnd uses IP2Location.io
 IP geolocation web service.
 

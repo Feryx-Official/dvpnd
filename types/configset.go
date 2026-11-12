@@ -4,6 +4,7 @@ package types
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
@@ -32,4 +33,18 @@ func SetConfigKey(v *viper.Viper, config any, key, value string) error {
 	}
 
 	return nil
+}
+
+// UnknownConfigKeys lists, sorted, the keys in the file v has read that no
+// field of config's type takes: "table.key", or "table" for a table no field
+// takes. config is a pointer to a value of the file's type to decode into.
+// Viper ignores such keys, so a misspelt one is otherwise lost without a word.
+func UnknownConfigKeys(v *viper.Viper, config any) ([]string, error) {
+	var md mapstructure.Metadata
+	if err := v.Unmarshal(config, func(c *mapstructure.DecoderConfig) { c.Metadata = &md }); err != nil {
+		return nil, err
+	}
+	sort.Strings(md.Unused)
+
+	return md.Unused, nil
 }

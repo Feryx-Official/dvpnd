@@ -9,6 +9,7 @@ import (
 	"math"
 	"net"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -245,8 +246,8 @@ func (c *ChainConfig) Validate() error {
 	if c.Gas <= 0 {
 		return errors.New("gas must be positive")
 	}
-	if c.GasAdjustment <= 0 {
-		return errors.New("gas_adjustment must be positive")
+	if !(c.GasAdjustment > 0) || math.IsInf(c.GasAdjustment, 1) {
+		return errors.New("gas_adjustment must be a positive number")
 	}
 	if _, err := sdk.ParseCoinsNormalized(c.GasPrices); err != nil {
 		return errors.Wrap(err, "invalid gas_prices")
@@ -356,8 +357,15 @@ func (c *GeoIPConfig) Validate() error {
 		if c.Provider == geoip.ProviderAuto || c.Provider == geoip.ProviderNone {
 			return fmt.Errorf("url cannot be set with provider %s", c.Provider)
 		}
-		if _, err := url.ParseRequestURI(c.URL); err != nil {
+		u, err := url.ParseRequestURI(c.URL)
+		if err != nil {
 			return errors.Wrap(err, "invalid url")
+		}
+		// Over http the token would cross the network readable by anyone on
+		// the path. Only ipinfo and ip2location are sent it.
+		if c.Token != "" && u.Scheme != "https" &&
+			(c.Provider == geoip.ProviderIPInfo || c.Provider == geoip.ProviderIP2Location) {
+			return errors.New("url must be https when a token is set")
 		}
 	}
 	// The token is a secret: it must only ever reach the host the operator named.
@@ -484,10 +492,10 @@ func (c *NodeConfig) Validate() error {
 		return fmt.Errorf("interval_update_sessions cannot be greater than %s", MaxIntervalUpdateSessions)
 	}
 	if c.IntervalUpdateStatus < MinIntervalUpdateStatus {
-		return fmt.Errorf("interval_set_sessions cannot be less than %s", MinIntervalUpdateStatus)
+		return fmt.Errorf("interval_update_status cannot be less than %s", MinIntervalUpdateStatus)
 	}
 	if c.IntervalUpdateStatus > MaxIntervalUpdateStatus {
-		return fmt.Errorf("interval_set_sessions cannot be greater than %s", MaxIntervalUpdateStatus)
+		return fmt.Errorf("interval_update_status cannot be greater than %s", MaxIntervalUpdateStatus)
 	}
 	if c.IPv4Address != "" {
 		addr := net.ParseIP(c.IPv4Address)
@@ -500,6 +508,13 @@ func (c *NodeConfig) Validate() error {
 	}
 	if c.ListenOn == "" {
 		return errors.New("listen_on cannot be empty")
+	}
+	// The API's port also goes into the egress policy, which reads a
+	// missing one as 0.
+	if _, port, err := net.SplitHostPort(c.ListenOn); err != nil {
+		return errors.Wrap(err, "invalid listen_on")
+	} else if v, err := strconv.ParseUint(port, 10, 16); err != nil || v == 0 {
+		return fmt.Errorf("listen_on port must be a number from 1 to 65535, not %q", port)
 	}
 	if c.Moniker == "" {
 		return errors.New("moniker cannot be empty")
