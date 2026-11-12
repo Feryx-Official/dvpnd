@@ -110,14 +110,19 @@ A canary is one deliberate regression: `invariants/canaries.json` names a file,
 an exact piece of it to replace (it must occur once), and the test command
 that must fail. `invariants/canaries.py` applies each one to a copy of the tree
 (uncommitted changes included) and requires the run to fail with `--- FAIL`,
-so a mutation that only breaks the build does not count. A canary that
-survives means nothing guards its rule any more.
+or the canary's own `expect`, so a mutation that only breaks the build does
+not count. The same commands run once on a copy without the mutation and must
+pass there. The copy is a git repository with no commit, so a test that lists
+the tree with git runs as it does in the checkout. A canary that survives
+means nothing guards its rule any more.
 
 - `caught`: the rule's test failed, as it must;
 - `SURVIVED`: every test passed with the rule broken;
 - `RE-AIM`: the code moved and the anchor no longer matches once. Re-aim it at
   the moved code; never delete it;
-- `WRONG RED`: the command failed without a test failing (a build error).
+- `WRONG RED`: the command failed without a test failing (a build error);
+- `RED BEFORE`: the command fails without the mutation too, so its failure
+  proves nothing. Make it pass on a clean copy; never delete the canary.
 
 The copies build with `-trimpath`, so they share the Go build cache and only
 the mutated package is compiled again. Every money, root and privacy rule has

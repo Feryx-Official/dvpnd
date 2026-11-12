@@ -4,7 +4,9 @@
 A canary is one deliberate regression - drop the refund call, let the root helper
 accept 0.0.0.0 - and the commands that must catch it. Each is applied to a private
 copy of the working tree (uncommitted changes included) and its commands run there;
-the run must FAIL. A canary the suite survives means nothing guards that rule any more.
+the run must FAIL. The same commands run once on a copy without the mutation, where
+they must pass: a command that fails anyway would count as catching any mutation.
+A canary the suite survives means nothing guards that rule any more.
 
 It reads canaries.json from its own directory; the project's suite doc describes the keys.
 Python 3.8+, standard library only.
@@ -83,6 +85,9 @@ def make_template(root, links):
             dest = os.path.join(template, link)
             os.makedirs(os.path.dirname(dest), exist_ok=True)
             os.symlink(src, dest)
+    # Tests list the tree with git, as tree_files does, so the copy is a repository too, with
+    # no commit: outside one they fail on any copy.
+    subprocess.run(['git', '-c', 'init.defaultBranch=main', 'init', '-q', template], capture_output=True, check=True)
     return template
 
 
@@ -111,13 +116,52 @@ def digest(path):
         return hashlib.sha256(fh.read()).hexdigest()
 
 
+def fresh_copy(template):
+    copy = tempfile.mkdtemp(prefix='canary-')
+    os.rmdir(copy)
+    shutil.copytree(template, copy, symlinks=True)
+    return copy
+
+
+def run_steps(steps, copy, root, cfg, slot):
+    """Runs a canary's commands in `copy` until one fails. Returns (status, command, output), the
+    status 'pass', 'fail' or 'timeout' and the command the one that ended the run."""
+    env = {k: v for k, v in os.environ.items() if k not in set(cfg.get('unsetEnv', ['NODE_TEST_CONTEXT']))}
+    fill = lambda s: s.replace('{slot}', str(slot)).replace('{root}', root).replace('{copy}', copy)
+    env.update({k: fill(v) for k, v in cfg.get('env', {}).items()})
+    output = ''
+    for step in steps:
+        cmd, cwd = (step, '.') if isinstance(step, str) else (step['cmd'], step.get('cwd', '.'))
+        try:
+            r = subprocess.run(fill(cmd), shell=True, cwd=os.path.join(copy, cwd), env=env, capture_output=True,
+                               text=True, timeout=cfg.get('timeout', 900))
+        except subprocess.TimeoutExpired:
+            return 'timeout', cmd, output
+        output += r.stdout + r.stderr
+        if r.returncode != 0:
+            return 'fail', cmd, output
+    return 'pass', None, output
+
+
+def run_bare(steps, template, root, cfg, slots):
+    """A canary's commands on a copy without its mutation."""
+    slot = slots.get()
+    copy = None
+    try:
+        copy = fresh_copy(template)
+        return run_steps(steps, copy, root, cfg, slot)
+    finally:
+        if copy:
+            shutil.rmtree(copy, ignore_errors=True)
+        slots.put(slot)
+
+
 def run_canary(c, template, root, cfg, slots):
     slot = slots.get()
-    copy = tempfile.mkdtemp(prefix='canary-')
+    copy = None
     started = time.time()
     try:
-        os.rmdir(copy)
-        shutil.copytree(template, copy, symlinks=True)
+        copy = fresh_copy(template)
         privatize(copy, c['file'])
         path = os.path.join(copy, c['file'])
         with open(path, encoding='utf-8') as fh:
@@ -128,28 +172,31 @@ def run_canary(c, template, root, cfg, slots):
             return 'RE-AIM', f'its anchor matches {hits} times in {c["file"]} (must be exactly 1): re-aim it at the moved code, never delete it'
         with open(path, 'w', encoding='utf-8') as fh:
             fh.write(src.replace(find, replace))
-        env = {k: v for k, v in os.environ.items() if k not in set(cfg.get('unsetEnv', ['NODE_TEST_CONTEXT']))}
-        fill = lambda s: s.replace('{slot}', str(slot)).replace('{root}', root).replace('{copy}', copy)
-        env.update({k: fill(v) for k, v in cfg.get('env', {}).items()})
-        output = ''
-        for step in c['run']:
-            cmd, cwd = (step, '.') if isinstance(step, str) else (step['cmd'], step.get('cwd', '.'))
-            try:
-                r = subprocess.run(fill(cmd), shell=True, cwd=os.path.join(copy, cwd), env=env, capture_output=True,
-                                   text=True, timeout=cfg.get('timeout', 900))
-            except subprocess.TimeoutExpired:
-                return 'TIMEOUT', f'`{cmd}` ran past {cfg.get("timeout", 900)} s: bound the waits in the tests it runs'
-            output += r.stdout + r.stderr
-            if r.returncode != 0:
-                expect = c.get('expect')
-                if expect and not re.search(expect, output):
-                    return 'WRONG RED', (f'`{cmd}` failed, but its output never matches /{expect}/: the mutation probably '
-                                         f'broke the build rather than tripping the rule\'s test\n' + output[-1500:])
-                return 'caught', f'by `{cmd}` in {time.time() - started:.0f} s'
+        status, cmd, output = run_steps(c['run'], copy, root, cfg, slot)
+        if status == 'timeout':
+            return 'TIMEOUT', f'`{cmd}` ran past {cfg.get("timeout", 900)} s: bound the waits in the tests it runs'
+        if status == 'fail':
+            expect = c.get('expect')
+            if expect and not re.search(expect, output):
+                return 'WRONG RED', (f'`{cmd}` failed, but its output never matches /{expect}/: the mutation probably '
+                                     f'broke the build rather than tripping the rule\'s test\n' + output[-1500:])
+            return 'caught', f'by `{cmd}` in {time.time() - started:.0f} s'
         return 'SURVIVED', 'every command passed with the rule broken: nothing guards it any more\n' + output[-1500:]
     finally:
-        shutil.rmtree(copy, ignore_errors=True)
+        if copy:
+            shutil.rmtree(copy, ignore_errors=True)
         slots.put(slot)
+
+
+def judge(cfg, bare, mutated):
+    """The canary's verdict: its own, once its commands passed without the mutation."""
+    status, cmd, output = bare.result()
+    if status == 'timeout':
+        return 'TIMEOUT', f'`{cmd}` ran past {cfg.get("timeout", 900)} s without the mutation: bound the waits in the tests it runs'
+    if status == 'fail':
+        return 'RED BEFORE', (f'`{cmd}` fails without the mutation too, so its failure proves nothing: make it pass on '
+                              f'a clean copy, never delete the canary\n' + output[-1500:])
+    return mutated.result()
 
 
 def main(argv):
@@ -193,11 +240,17 @@ def main(argv):
     started = time.time()
     try:
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = [(c, pool.submit(run_canary, c, template, root, cfg, slots)) for c in canaries]
+            bare = {}
+            for c in canaries:
+                key = json.dumps(c['run'], sort_keys=True)
+                if key not in bare:
+                    bare[key] = pool.submit(run_bare, c['run'], template, root, cfg, slots)
+            futures = [(c, bare[json.dumps(c['run'], sort_keys=True)], pool.submit(run_canary, c, template, root, cfg, slots))
+                       for c in canaries]
             results = []
-            for c, f in futures:
+            for c, b, f in futures:
                 try:
-                    verdict, detail = f.result()
+                    verdict, detail = judge(cfg, b, f)
                 except Exception as e:  # a broken canary entry is a failure, not a crash of the run
                     verdict, detail = 'ERROR', f'{type(e).__name__}: {e}'
                 results.append((c, verdict, detail))

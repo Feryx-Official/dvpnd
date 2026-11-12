@@ -660,7 +660,7 @@
       "run": [
         "go test -count=1 -run '^TestNoFormerAccountName$' ./test/static/"
       ],
-      "expect": "--- FAIL"
+      "expect": "scripts/install\\.sh:\\d+ names \\S+, a former home of the repository"
     },
     {
       "name": "[LIC-8] the installer clones from the path the repository was transferred from",
@@ -670,7 +670,7 @@
       "run": [
         "go test -count=1 -run '^TestNoFormerAccountName$' ./test/static/"
       ],
-      "expect": "--- FAIL"
+      "expect": "scripts/install\\.sh:\\d+ names \\S+, a former home of the repository"
     }
   ]
 }
