@@ -48,3 +48,7 @@ node must keep doing. IDs as in `test/README.md`.
   turned away. Rate-limited attempts stay at debug, so a flood can't fill the log.
 - **[HS-13] V2Ray accepts AEAD VMess headers only.** The legacy VMess header
   authenticates with MD5; client apps send AEAD headers (`alterId: 0`).
+- **[HS-14] A client app in a browser can send the handshake.** The preflight before a
+  JSON POST from any origin allows the `Content-Type` header. The node once listed the
+  media type's value (`application/json; charset=utf-8`) as the allowed header, and a
+  browser then blocked every handshake before sending it.

@@ -41,13 +41,36 @@ func TestBrowsersCanReadTheSignature(t *testing.T) {
 		}
 	}
 
+}
+
+// TestBrowsersCanPostTheHandshake: the preflight a browser sends before a
+// JSON POST asks for the content-type header by name, lower case; the node
+// must list that header as allowed, or the browser never sends the
+// handshake. A status below 300 alone does not show it: the browser, not the
+// node, compares the lists.
+//
+// Rules: [HS-14].
+func TestBrowsersCanPostTheHandshake(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ctx := context.NewContext().WithConfig(types.NewConfig().WithDefaultValues()).WithLogger(cmtlog.NewNopLogger())
+	r := gin.New()
+	RegisterRoutes(ctx, r)
+
 	pre := httptest.NewRequest(http.MethodOptions, "/", nil)
 	pre.Header.Set("Origin", "https://app.example")
 	pre.Header.Set("Access-Control-Request-Method", http.MethodPost)
-	pre.Header.Set("Access-Control-Request-Headers", types.ContentType)
-	rec = httptest.NewRecorder()
+	pre.Header.Set("Access-Control-Request-Headers", "content-type")
+	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, pre)
 	if rec.Code >= 300 || !strings.Contains(rec.Header().Get("Access-Control-Allow-Methods"), http.MethodPost) {
 		t.Fatalf("a browser's preflight for the handshake: %d, allow-methods %q", rec.Code, rec.Header().Get("Access-Control-Allow-Methods"))
+	}
+	allowed := false
+	for _, h := range strings.Split(rec.Header().Get("Access-Control-Allow-Headers"), ",") {
+		allowed = allowed || strings.EqualFold(strings.TrimSpace(h), "content-type")
+	}
+	if !allowed {
+		t.Fatalf("the preflight does not allow content-type (Access-Control-Allow-Headers: %q)",
+			rec.Header().Get("Access-Control-Allow-Headers"))
 	}
 }

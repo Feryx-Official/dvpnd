@@ -86,7 +86,8 @@ key on; the name is what `GET /` reports as `service_type`.
   `X-Dvpnd-Reply-Signing: dvpnd/handshake-reply/v1`, so a client that requires signed
   replies can refuse a node that does not sign before it pays for a session. It proves
   nothing by itself: anyone on the path can strip it or add it, and only the signature on
-  the reply counts. Both headers are exposed to browsers through CORS.
+  the reply counts. Both headers are exposed to browsers through CORS, and the preflight
+  allows the `Content-Type` header a JSON POST from a browser sends.
 - The session key stored by the node is `base64(peer data)`; `Peers()` must return each
   peer with exactly that key, or its usage is never reported.
 - `RemovePeer` is called by the node (session expired, allocation exceeded, paid hours
