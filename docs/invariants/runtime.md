@@ -7,7 +7,10 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
 - **[RT-1] The protocol daemons run as the unprivileged `dvpnd-proxy` account.** When
   the node runs as root and the account exists, the daemons start as it, with their
   files in the runtime directory and no access to the node's home or keys; OpenVPN drops
-  to it once its tunnel is up.
+  to it once its tunnel is up. The Handshake resolver, which parses DNS from every client,
+  runs as the account too, keeping only the right to bind port 53, and stops with the
+  node; it ran as root and outlived the node. It stays outside the proxies' egress chain,
+  which was never tried with it.
 - **[RT-2] However the node stops after its service has started, the service is stopped
   first.** A stop signal, a job that panics, or a step that fails after `Start` all take
   the tunnel down, remove the firewall rules and stop the daemon, so none of it outlives

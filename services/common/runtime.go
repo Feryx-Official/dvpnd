@@ -194,6 +194,14 @@ func (rt Runtime) proxyAttr(listenPort uint16) *syscall.SysProcAttr {
 	return attr
 }
 
+// StartUnprivileged starts a helper daemon as the proxy account when the node
+// has one, keeping the right to bind listenPort if it is below 1024, but
+// outside the proxies' egress chain, which was built and tested for the
+// proxies only: the Handshake resolver.
+func StartUnprivileged(name string, args, extraEnv []string, listenPort uint16) (*Process, error) {
+	return StartProcess(name, args, extraEnv, CurrentRuntime().proxyAttr(listenPort))
+}
+
 // StartProxy starts a proxy daemon: as the proxy account behind its kernel
 // egress chain when the node has one, as the node otherwise. loopback are
 // the ports on 127.0.0.1 the daemon must reach. Stopping the process removes

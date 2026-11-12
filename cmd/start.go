@@ -49,22 +49,6 @@ func init() {
 // spare, but never an open-ended wait on a remote service.
 const bandwidthTimeout = 5 * time.Minute
 
-// handshakeRestartDelay is the pause before the Handshake resolver is started
-// again after it exits, so a resolver that cannot run does not spin.
-const handshakeRestartDelay = 15 * time.Second
-
-// hnsdArgs is the Handshake resolver's command line. It listens on the node's
-// tunnel address only: on every address, as upstream had it, a node whose
-// port 53 was reachable would be an open resolver anyone could use against
-// third parties. It keeps no log of the names clients look up.
-func hnsdArgs(peers uint64, host net.IP) []string {
-	return []string{
-		"--log-file", "/dev/null",
-		"--pool-size", strconv.FormatUint(peers, 10),
-		"--rs-host", net.JoinHostPort(host.String(), "53"),
-	}
-}
-
 // checkGrants refuses to start a hot-key node whose grants are missing or
 // expired, since its every transaction would fail, and logs what will run
 // out within lite.GrantWarningWindow.
@@ -154,17 +138,6 @@ func apiPort(listenOn string) uint16 {
 	}
 
 	return uint16(v)
-}
-
-// runHandshake keeps the Handshake resolver running for the life of the node.
-func runHandshake(log cmtlog.Logger, peers uint64, host net.IP) {
-	for {
-		log.Info("Starting the Handshake resolver", "address", host)
-		if err := exec.Command("hnsd", hnsdArgs(peers, host)...).Run(); err != nil {
-			log.Error("handshake process exited unexpectedly", "error", err)
-		}
-		time.Sleep(handshakeRestartDelay)
-	}
 }
 
 func StartCmd() *cobra.Command {
@@ -373,7 +346,7 @@ func StartCmd() *cobra.Command {
 			// resolver that is not there.
 			if config.Handshake.Enable {
 				host, ok := service.(types.TunnelHost)
-				if _, err := exec.LookPath("hnsd"); err != nil || !ok {
+				if _, err := exec.LookPath(hnsdBinary); err != nil || !ok {
 					log.Error("The Handshake resolver stays off: hnsd is not installed or the node type has no tunnel")
 					config.Handshake.Enable = false
 				} else {
@@ -426,8 +399,11 @@ func StartCmd() *cobra.Command {
 				return stopErr
 			}
 
+			// The resolver binds the tunnel address, so it stops before the
+			// service takes the tunnel down (deferred calls run in reverse).
 			if egress.Resolver != nil {
-				go runHandshake(log, config.Handshake.Peers, egress.Resolver)
+				resolver := startHandshake(log, config.Handshake.Peers, egress.Resolver)
+				defer resolver.Stop()
 			}
 
 			log.Info("Opening the database", "path", databasePath)

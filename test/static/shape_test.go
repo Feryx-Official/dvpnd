@@ -144,6 +144,35 @@ func TestStartRemovesTheDaemonsFiles(t *testing.T) {
 	t.Fatal("no deferred service.Stop() after service.Start(): re-aim this test")
 }
 
+// TestCommandsStartNoProcessThemselves reads the commands: a process the node
+// keeps running goes through common.StartProxy or common.StartUnprivileged,
+// which run it as the proxy account. The Handshake resolver was started with
+// exec.Command, as root, and never stopped.
+//
+// Rules: [RT-1].
+func TestCommandsStartNoProcessThemselves(t *testing.T) {
+	for _, f := range files(t, "cmd/*.go") {
+		if strings.HasSuffix(f, "_test.go") {
+			continue
+		}
+		fset := token.NewFileSet()
+		file, err := parser.ParseFile(fset, filepath.Join(root(t), f), nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, c := range []struct{ pkg, fn string }{{"exec", "Command"}, {"exec", "CommandContext"}, {"common", "StartProcess"}} {
+			ast.Inspect(file, func(n ast.Node) bool {
+				if call, ok := n.(*ast.CallExpr); ok && calls(call, c.pkg, c.fn, false) {
+					if sel := call.Fun.(*ast.SelectorExpr); sel.Sel.Name == c.fn {
+						t.Errorf("%s: %s.%s starts a process as the node; use common.StartProxy or common.StartUnprivileged", fset.Position(call.Pos()), c.pkg, c.fn)
+					}
+				}
+				return true
+			})
+		}
+	}
+}
+
 // startCommand returns the body of the start command's RunE and the index of
 // the statement in it that calls service.Start().
 func startCommand(t *testing.T) (*token.FileSet, *ast.BlockStmt, int) {

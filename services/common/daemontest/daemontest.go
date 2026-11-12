@@ -19,21 +19,46 @@ func Script(pidFile string) string {
 	return "#!/bin/sh\necho $$ >" + pidFile + "\ntrap 'exit 0' TERM\nwhile :; do sleep 0.1; done\n"
 }
 
-// Crash waits for the stand-in daemon to write its pid to pidFile, kills it as
-// a crash would, and fails t unless done stays open until then and closes
-// after.
-func Crash(t testing.TB, pidFile string, done <-chan struct{}) {
+// Pid waits for the stand-in daemon to write its pid to pidFile.
+func Pid(t testing.TB, pidFile string) int {
 	t.Helper()
-	var pid int
 	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(10 * time.Millisecond) {
 		b, _ := os.ReadFile(pidFile)
-		if pid, _ = strconv.Atoi(strings.TrimSpace(string(b))); pid > 0 {
-			break
+		if pid, _ := strconv.Atoi(strings.TrimSpace(string(b))); pid > 0 {
+			return pid
 		}
 		if time.Now().After(deadline) {
 			t.Fatal("the stand-in daemon never wrote its pid")
 		}
 	}
+}
+
+// Gone fails t unless the process pid has ended, or is a zombie, within 5 s.
+func Gone(t testing.TB, pid int, what string) {
+	t.Helper()
+	alive := func() bool {
+		b, err := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/stat")
+		if err != nil {
+			return false
+		}
+		i := strings.LastIndexByte(string(b), ')') // the state follows the command name
+
+		return i < 0 || i+2 >= len(b) || b[i+2] != 'Z'
+	}
+	for deadline := time.Now().Add(5 * time.Second); alive() && time.Now().Before(deadline); {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if alive() {
+		t.Errorf("the daemon still runs 5 s after %s", what)
+	}
+}
+
+// Crash waits for the stand-in daemon to write its pid to pidFile, kills it as
+// a crash would, and fails t unless done stays open until then and closes
+// after.
+func Crash(t testing.TB, pidFile string, done <-chan struct{}) {
+	t.Helper()
+	pid := Pid(t, pidFile)
 
 	select {
 	case <-done:

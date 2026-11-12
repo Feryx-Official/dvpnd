@@ -439,7 +439,7 @@
     },
     {
       "name": "[PV-8] the Handshake resolver listens on every address",
-      "file": "cmd/start.go",
+      "file": "cmd/handshake.go",
       "find": "\t\t\"--rs-host\", net.JoinHostPort(host.String(), \"53\"),",
       "replace": "\t\t\"--rs-host\", net.JoinHostPort(\"0.0.0.0\", \"53\"),",
       "run": [
@@ -794,6 +794,26 @@
         "go test -count=1 -run '^TestChildEndsWithAKilledNode$' ./services/common/"
       ],
       "expect": "still runs 5 s after its node was killed"
+    },
+    {
+      "name": "[RT-1] the Handshake resolver runs as root",
+      "file": "cmd/handshake.go",
+      "find": "\t\tp, err := common.StartUnprivileged(hnsdBinary, hnsdArgs(peers, host), nil, 53)",
+      "replace": "\t\tp, err := common.StartProcess(hnsdBinary, hnsdArgs(peers, host), nil, nil)",
+      "run": [
+        "go test -count=1 -run '^TestCommandsStartNoProcessThemselves$' ./test/static/"
+      ],
+      "expect": "common.StartProcess starts a process as the node"
+    },
+    {
+      "name": "[RT-1] the Handshake resolver outlives the node",
+      "file": "cmd/handshake.go",
+      "find": "\t\t\t\tif err := p.Stop(resolverStopTimeout); err != nil {\n\t\t\t\t\tlog.Error(\"failed to stop the Handshake resolver\", \"error\", err)\n\t\t\t\t}\n",
+      "replace": "",
+      "run": [
+        "go test -count=1 -run '^TestHandshakeResolverStopsWithTheNode$' ./cmd/"
+      ],
+      "expect": "the daemon still runs 5 s after the node stopped the resolver"
     }
   ]
 }
