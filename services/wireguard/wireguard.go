@@ -118,7 +118,32 @@ type interfaceConfig struct {
 	*wgtypes.Config
 	// Address is the interface's own tunnel addresses, from its pools.
 	Address string
-	Extra   []string
+	// PostUp and PostDown add and remove the forwarding and NAT rules.
+	PostUp, PostDown string
+	Extra            []string
+}
+
+// renderInterface is the wg-quick configuration of an interface whose peers
+// get addresses from pool.
+func renderInterface(cfg *wgtypes.Config, pool *wgtypes.IPPool, extra []string) ([]byte, error) {
+	t, err := template.New("wireguard_conf").Parse(configTemplate)
+	if err != nil {
+		return nil, err
+	}
+
+	nat := common.NAT{Interface: "%i", Uplink: cfg.Uplink, Networks: []*net.IPNet{pool.V4.Net, pool.V6.Net}}
+	up, down := nat.Hooks()
+
+	var buffer bytes.Buffer
+	err = t.Execute(&buffer, interfaceConfig{
+		Config:   cfg,
+		Address:  TunnelAddress(pool),
+		PostUp:   up,
+		PostDown: down,
+		Extra:    extra,
+	})
+
+	return buffer.Bytes(), err
 }
 
 // TunnelAddress is the interface's own address in each of the pools it
@@ -161,13 +186,8 @@ func (s *WireGuard) Init(home string) (err error) {
 		}
 	}
 
-	t, err := template.New("wireguard_conf").Parse(configTemplate)
+	conf, err := renderInterface(s.config, s.pool, s.extra)
 	if err != nil {
-		return err
-	}
-
-	var buffer bytes.Buffer
-	if err = t.Execute(&buffer, interfaceConfig{Config: s.config, Address: TunnelAddress(s.pool), Extra: s.extra}); err != nil {
 		return err
 	}
 
@@ -175,7 +195,7 @@ func (s *WireGuard) Init(home string) (err error) {
 		return err
 	}
 	path := filepath.Join(s.variant.ConfigDir, s.config.Interface+".conf")
-	if err = os.WriteFile(path, buffer.Bytes(), 0600); err != nil {
+	if err = os.WriteFile(path, conf, 0600); err != nil {
 		return err
 	}
 

@@ -3,10 +3,12 @@
 package wireguard
 
 import (
-	"bytes"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
-	"text/template"
 
 	wgtypes "github.com/Feryx-Official/dvpnd/v9/services/wireguard/types"
 )
@@ -14,24 +16,15 @@ import (
 func renderConfig(t *testing.T, cfg *wgtypes.Config) string {
 	t.Helper()
 
-	tmpl, err := template.New("wireguard_conf").Parse(configTemplate)
+	v4, _ := wgtypes.NewIPv4PoolFromCIDR("10.8.0.2/24")
+	v6, _ := wgtypes.NewIPv6PoolFromCIDR("fd86:ea04:1115::2/120")
+
+	out, err := renderInterface(cfg, wgtypes.NewIPPool(v4, v6), []string{"Jc = 4", "H1 = 12345"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	v4, _ := wgtypes.NewIPv4PoolFromCIDR("10.8.0.2/24")
-	v6, _ := wgtypes.NewIPv6PoolFromCIDR("fd86:ea04:1115::2/120")
-
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, interfaceConfig{
-		Config:  cfg,
-		Address: TunnelAddress(wgtypes.NewIPPool(v4, v6)),
-		Extra:   []string{"Jc = 4", "H1 = 12345"},
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	return buf.String()
+	return string(out)
 }
 
 // Rules: [CT-9].
@@ -76,11 +69,11 @@ func TestConfigTemplateForwardRules(t *testing.T) {
 		t.Fatalf("layout:\n%s", out)
 	}
 
-	for _, tool := range []string{"iptables", "ip6tables"} {
+	for tool, network := range map[string]string{"iptables": "10.8.0.0/24", "ip6tables": "fd86:ea04:1115::/120"} {
 		want := []string{
 			tool + " -w 5 -A FORWARD -i %i -j ACCEPT;",
 			tool + " -w 5 -A FORWARD -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT;",
-			tool + " -w 5 -t nat -A POSTROUTING -o eth0 -j MASQUERADE;",
+			tool + " -w 5 -t nat -A POSTROUTING -s " + network + " -o eth0 -j MASQUERADE;",
 		}
 		for _, rule := range want {
 			if !strings.Contains(lines["PostUp"], rule) {
@@ -98,5 +91,79 @@ func TestConfigTemplateForwardRules(t *testing.T) {
 	up := lines["PostUp"]
 	if strings.Index(up, "-o %i -m conntrack") > strings.Index(up, "MASQUERADE") {
 		t.Errorf("return-path rule must precede MASQUERADE: %s", up)
+	}
+}
+
+// runHook runs a PostUp or PostDown line the way wg-quick does, in bash
+// with %i replaced, against fake iptables and ip6tables that log their
+// arguments and answer -C with check: 0 when the rule is there.
+func runHook(t *testing.T, hook, iface string, check int) []string {
+	t.Helper()
+
+	bin := t.TempDir()
+	log := filepath.Join(bin, "calls.log")
+	for _, tool := range []string{"iptables", "ip6tables"} {
+		script := fmt.Sprintf("#!/bin/sh\necho \"%s $*\" >> %s\ncase \" $* \" in *\" -C \"*) exit %d;; esac\n", tool, log, check)
+		if err := os.WriteFile(filepath.Join(bin, tool), []byte(script), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cmd := exec.Command("bash", "-e", "-c", strings.ReplaceAll(hook, "%i", iface))
+	cmd.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("%v: %s\n%s", err, out, hook)
+	}
+	raw, _ := os.ReadFile(log)
+
+	return strings.Split(strings.TrimSpace(string(raw)), "\n")
+}
+
+func hookLine(t *testing.T, out, key string) string {
+	t.Helper()
+
+	for _, l := range strings.Split(out, "\n") {
+		if v, ok := strings.CutPrefix(l, key+" = "); ok {
+			return v
+		}
+	}
+	t.Fatalf("no %s in:\n%s", key, out)
+
+	return ""
+}
+
+// TestPostUpAddsScopedRulesOnce: PostUp masquerades only the tunnel's own
+// networks, adds a rule only where an interface left by a node that died
+// has not left it already, and PostDown removes the same rules.
+//
+// Rules: [EG-9], [EG-14].
+func TestPostUpAddsScopedRulesOnce(t *testing.T) {
+	cfg := wgtypes.NewConfig().WithDefaultValues()
+	cfg.Uplink = "eth0"
+	out := renderConfig(t, cfg)
+
+	added := strings.Join(runHook(t, hookLine(t, out, "PostUp"), "wg0", 1), "\n")
+	for _, rule := range []string{
+		"iptables -w 5 -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE",
+		"ip6tables -w 5 -t nat -A POSTROUTING -s fd86:ea04:1115::/120 -o eth0 -j MASQUERADE",
+		"iptables -w 5 -A FORWARD -i wg0 -j ACCEPT",
+		"ip6tables -w 5 -A FORWARD -o wg0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT",
+	} {
+		if !strings.Contains(added, rule+"\n") && !strings.HasSuffix(added, rule) {
+			t.Errorf("PostUp on a clean host lacks %q:\n%s", rule, added)
+		}
+	}
+	if strings.Contains(added, "POSTROUTING -o") {
+		t.Errorf("PostUp masquerades every source:\n%s", added)
+	}
+
+	for _, call := range runHook(t, hookLine(t, out, "PostUp"), "wg0", 0) {
+		if strings.Contains(call, " -A ") {
+			t.Errorf("PostUp adds a rule that is already there: %s", call)
+		}
+	}
+
+	removed := strings.Join(runHook(t, hookLine(t, out, "PostDown"), "wg0", 0), "\n")
+	if !strings.Contains(removed, "iptables -w 5 -t nat -D POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE") {
+		t.Errorf("PostDown leaves the masquerade rule:\n%s", removed)
 	}
 }

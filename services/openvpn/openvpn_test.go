@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -238,7 +239,7 @@ func TestStartStop(t *testing.T) {
 	saved, savedQuiet := common.RunCommand, common.RunQuiet
 	common.RunCommand = func(name string, args ...string) error {
 		rules = append(rules, name+" "+strings.Join(args, " "))
-		if args[0] == "-C" { // no jump in place yet
+		if slices.Contains(args, "-C") { // no rule or jump in place yet
 			return os.ErrNotExist
 		}
 		return nil
@@ -267,7 +268,7 @@ func TestStartStop(t *testing.T) {
 	}
 	joined := strings.Join(rules, "\n")
 	if !strings.Contains(joined, "iptables -A FORWARD -i ovpn0 -j ACCEPT") ||
-		!strings.Contains(joined, "iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE") ||
+		!strings.Contains(joined, "iptables -t nat -A POSTROUTING -s 10.9.0.0/24 -o eth0 -j MASQUERADE") ||
 		!strings.Contains(joined, "ip6tables -A FORWARD -o ovpn0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT") {
 		t.Fatalf("rules:\n%s", joined)
 	}
@@ -321,7 +322,7 @@ func TestDoneWhenTheServerOrTheManagementChannelEnds(t *testing.T) {
 
 		saved, savedQuiet := common.RunCommand, common.RunQuiet
 		common.RunCommand = func(_ string, args ...string) error {
-			if args[0] == "-C" { // no jump in place yet
+			if slices.Contains(args, "-C") { // no rule or jump in place yet
 				return os.ErrNotExist
 			}
 			return nil
@@ -405,7 +406,7 @@ func startOpenVPN(t *testing.T) (*OpenVPN, *fakeServer) {
 
 	saved, savedQuiet := common.RunCommand, common.RunQuiet
 	common.RunCommand = func(_ string, args ...string) error {
-		if args[0] == "-C" { // no jump in place yet
+		if slices.Contains(args, "-C") { // no rule or jump in place yet
 			return os.ErrNotExist
 		}
 		return nil
@@ -584,5 +585,55 @@ func TestUnreadableCountersAreNotZero(t *testing.T) {
 	})
 	if peers, err := s.Peers(); err != nil || peers[0].Upload != 10 || peers[0].Download != 25 {
 		t.Fatalf("want 10 up and 25 down, got %+v, %v", peers, err)
+	}
+}
+
+// TestNATRulesAreScopedAndAddedOnce: the masquerade rule matches the
+// tunnel's own network, and a rule a node that died without Stop left
+// behind is not added a second time.
+//
+// Rules: [EG-9], [EG-14].
+func TestNATRulesAreScopedAndAddedOnce(t *testing.T) {
+	for _, left := range []bool{false, true} {
+		stubBinary(t)
+		dir, _ := home(t, ovpntypes.ProtoUDP, false)
+
+		var rules []string
+		saved, savedQuiet := common.RunCommand, common.RunQuiet
+		common.RunCommand = func(name string, args ...string) error {
+			rules = append(rules, name+" "+strings.Join(args, " "))
+			if slices.Contains(args, "-C") && !left {
+				return os.ErrNotExist
+			}
+			return nil
+		}
+		common.RunQuiet = common.RunCommand
+		t.Cleanup(func() { common.RunCommand, common.RunQuiet = saved, savedQuiet })
+		savedFwd := ensureForwarding
+		ensureForwarding = func() error { return nil }
+		t.Cleanup(func() { ensureForwarding = savedFwd })
+
+		s := NewOpenVPN()
+		if err := s.Init(dir); err != nil {
+			t.Fatal(err)
+		}
+		startFakeServerOn(t, s.socketPath)
+		if err := s.Start(); err != nil {
+			t.Fatal(err)
+		}
+		_ = s.Stop()
+
+		joined := strings.Join(rules, "\n")
+		if left {
+			for _, rule := range rules {
+				if strings.Contains(rule, "-A FORWARD -i ovpn0 -j ACCEPT") || strings.Contains(rule, "-A POSTROUTING") {
+					t.Errorf("a rule left behind was added again: %s", rule)
+				}
+			}
+			continue
+		}
+		if !strings.Contains(joined, "iptables -t nat -A POSTROUTING -s 10.9.0.0/24 -o eth0 -j MASQUERADE") {
+			t.Errorf("the masquerade rule is not scoped to the tunnel:\n%s", joined)
+		}
 	}
 }

@@ -143,7 +143,8 @@ image, and a real session from a client, described in words only in the README.
 ### WireGuard (shipped)
 
 `wg-quick` brings `wg0` up from a rendered config; PostUp adds the FORWARD accept rules (both
-directions) and MASQUERADE on the uplink; peers via `wg set … allowed-ips …`; usage from
+directions) and MASQUERADE of the tunnel's own networks on the uplink, each rule only where it
+is not already, from the same rule set OpenVPN installs itself (`services/common/nat.go`); peers via `wg set … allowed-ips …`; usage from
 `wg show … transfer`. IPv4 and optional IPv6 pools hand out tunnel addresses. The egress
 chains go in before `wg-quick up` and come out after `wg-quick down`; they sit ahead of the
 PostUp accept rules, which stay as they are.

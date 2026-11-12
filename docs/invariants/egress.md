@@ -43,9 +43,12 @@ them.
   (client to client), and the input chain drops everything that isn't a reply, DNS to
   the resolver or the API port. Services bound to all of the host's addresses are
   otherwise reachable from the tunnel.
-- **[EG-9] Installing the chains is idempotent.** A node that died without removing them
-  starts again cleanly: an existing chain is flushed and refilled, and a jump is added
-  only where none is. Chain names fit iptables' 28 characters.
+- **[EG-9] Installing the chains and the forwarding rules is idempotent.** A node that
+  died without removing them starts again cleanly: an existing chain is flushed and
+  refilled, and a jump, a forwarding rule or a masquerade rule is added only where it is
+  not already (OpenVPN's NAT rules outlive a node killed without Stop, and each start
+  added another copy; WireGuard's PostUp checks the same way). Chain names fit iptables' 28
+  characters.
 - **[EG-10] A rule the kernel refuses stops the start.** The node never serves clients
   behind a partly installed firewall; the error names the command that failed.
 - **[EG-11] A kernel without IPv6 still runs a tunnel node.** Only iptables is used when
@@ -60,3 +63,6 @@ them.
 - **[EG-13] Every protocol in the registry is a case of the integration suite.** A
   protocol added to `services/registry.go` without one would ship with [EG-12] never
   checked for it.
+- **[EG-14] The node masquerades only its tunnels' own networks.** The masquerade rule on
+  the uplink matches the tunnel's subnet as its source. Without it the rule matched every
+  connection leaving through the uplink, other networks the host routes included.

@@ -1082,6 +1082,36 @@
         "go test -count=1 -run '^(TestAHungToolIsKilled)$' ./services/wireguard/"
       ],
       "expect": "--- FAIL"
+    },
+    {
+      "name": "[EG-9] OpenVPN adds NAT rules a dead server left behind again",
+      "file": "services/common/nat.go",
+      "find": "\t\tif RunQuiet(r.tool, r.args(\"-C\")...) == nil {\n\t\t\tcontinue\n\t\t}\n",
+      "replace": "",
+      "run": [
+        "go test -count=1 -run '^(TestNATRulesAreScopedAndAddedOnce)$' ./services/openvpn/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[EG-9] WireGuard's PostUp adds rules that are already there",
+      "file": "services/common/nat.go",
+      "find": "xtables(r.tool, r.args(\"-C\"))+\" 2>/dev/null || \"+xtables(r.tool, r.args(\"-A\"))",
+      "replace": "xtables(r.tool, r.args(\"-A\"))",
+      "run": [
+        "go test -count=1 -run '^(TestPostUpAddsScopedRulesOnce)$' ./services/wireguard/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[EG-14] the masquerade rule matches every source",
+      "file": "services/common/nat.go",
+      "find": "[]string{\"-s\", network.String(), \"-o\", n.Uplink, \"-j\", \"MASQUERADE\"}",
+      "replace": "[]string{\"-o\", n.Uplink, \"-j\", \"MASQUERADE\"}",
+      "run": [
+        "go test -count=1 -run '^(TestPostUpAddsScopedRulesOnce|TestNATRulesAreScopedAndAddedOnce)$' ./services/wireguard/ ./services/openvpn/"
+      ],
+      "expect": "--- FAIL"
     }
   ]
 }

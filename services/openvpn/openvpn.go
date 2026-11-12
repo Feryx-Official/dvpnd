@@ -182,7 +182,7 @@ func (s *OpenVPN) Init(home string) (err error) {
 		return err
 	}
 
-	s.nat = common.NAT{Interface: s.config.Interface, Uplink: s.config.Uplink}
+	s.nat = common.NAT{Interface: s.config.Interface, Uplink: s.config.Uplink, Networks: tunnelNetworks()}
 	s.egress = common.TunnelEgress{Interface: s.config.Interface}
 
 	binary.BigEndian.PutUint16(s.info[0:], s.config.ListenPort)
@@ -203,6 +203,15 @@ func (s *OpenVPN) TunnelIPv4() net.IP {
 	ip := net.ParseIP(ipv4Network).To4()
 
 	return net.IPv4(ip[0], ip[1], ip[2], ip[3]+1)
+}
+
+// tunnelNetworks are the networks the server hands addresses from, which
+// the NAT rules masquerade.
+func tunnelNetworks() []*net.IPNet {
+	v4 := &net.IPNet{IP: net.ParseIP(ipv4Network).To4(), Mask: net.IPMask(net.ParseIP(ipv4Netmask).To4())}
+	_, v6, _ := net.ParseCIDR(ipv6Network)
+
+	return []*net.IPNet{v4, v6}
 }
 
 // Start installs the egress firewall, launches the server, attaches to its
