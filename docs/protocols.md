@@ -189,8 +189,11 @@ where the password is the peer's canonical UUID and the id is the session key, s
 statistics API files traffic under the session key directly. Usage comes from
 `GET /traffic?clear=1` (deltas, accumulated by the node; the server counts from the
 client's point of view: `tx` is the client's upload, `rx` its download, checked with a large
-download), removal is `POST /kick`. The node raises `net.core.rmem_max`/`wmem_max` on a host
-(not namespaced, so in Docker it is a host setting). The egress policy is an inline ACL of
+download), read after a plain `GET /traffic` whose reading counts if the clearing reply
+arrives broken. Removal is `POST /kick`; the authentication hook refuses the peer at once,
+but the node keeps it, and counts it, until the kick succeeds. The node raises
+`net.core.rmem_max`/`wmem_max` on a host (not namespaced, so in Docker it is a host
+setting). The egress policy is an inline ACL of
 `reject(...)` rules (CIDRs, not `geoip:private`, which makes hysteria download a database);
 hysteria resolves a name before it matches, and reuses that address to dial. Binary: release
 app/v2.10.0, sha256 checked in the Dockerfile. Port hopping is out of scope.
@@ -274,8 +277,10 @@ connection to the management interface (`services/openvpn/management.go`), answe
 `>CLIENT:CONNECT` with `client-auth-nt` for a registered common name or `client-deny`
 otherwise, reads per-client bytes from `status 3` (received = the client's upload, sent =
 its download), banks a connection's final counters from `>CLIENT:DISCONNECT` so a reconnect
-does not lose usage, and removes a peer with `client-kill <id> RESTART,…`, which makes the
-client reconnect at once and be denied. NAT and forwarding use the same rule set as
+does not lose usage (by client id, so a connection that ends while a pass reads the table
+counts once), and removes a peer with `client-kill <id> RESTART,…`, which makes the
+client reconnect at once and be denied; the peer is denied from the start of its removal,
+but kept, and counted, until the kill succeeds. NAT and forwarding use the same rule set as
 WireGuard (`services/common/nat.go`), installed by the node around the server's lifetime,
 with the egress chains installed before the server starts and removed after it ends.
 Without `client-to-client`, traffic between clients goes through the kernel and the egress
