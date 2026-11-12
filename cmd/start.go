@@ -457,6 +457,10 @@ func StartCmd() *cobra.Command {
 				return err
 			}
 
+			// Whatever ends the node from here, what the peers moved since
+			// the last pass is stored before the service stops.
+			defer n.LastUsagePass()
+
 			// Run until a stop signal arrives, the protocol daemon exits, the
 			// API server fails or a job panics; the deferred stop above then
 			// takes the service down.

@@ -200,6 +200,37 @@ func TestStartBindsThePortBeforeGoingActive(t *testing.T) {
 	}
 }
 
+// TestStartRunsALastUsagePass reads the start command: before the service
+// stops, the node stores what its peers moved since the last pass, which the
+// next start reports. The call is deferred after service.Stop(), so it runs
+// before it.
+//
+// Rules: [SL-18].
+func TestStartRunsALastUsagePass(t *testing.T) {
+	_, body, start := startCommand(t)
+	stop, last := -1, -1
+	for i, s := range body.List[start+1:] {
+		d, ok := s.(*ast.DeferStmt)
+		if !ok {
+			continue
+		}
+		if stop < 0 && calls(d, "service", "Stop", true) {
+			stop = i
+		}
+		if last < 0 && calls(d, "n", "LastUsagePass", true) {
+			last = i
+		}
+	}
+	switch {
+	case stop < 0:
+		t.Fatal("no deferred service.Stop() after service.Start(): re-aim this test")
+	case last < 0:
+		t.Error("the start command runs no last usage pass: defer n.LastUsagePass() once the node is built")
+	case last < stop:
+		t.Error("n.LastUsagePass() is deferred before service.Stop(), so it would run once the service stopped")
+	}
+}
+
 // startCommand returns the body of the start command's RunE and the index of
 // the statement in it that calls service.Start().
 func startCommand(t *testing.T) (*token.FileSet, *ast.BlockStmt, int) {

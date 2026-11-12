@@ -9,8 +9,8 @@
   "canaries": [
     {
       "name": "[SL-2] the reported upload ignores what the chain already held",
-      "file": "node/jobs.go",
-      "find": "\tupload = item.BaseUpload + peer.Upload",
+      "file": "types/session.go",
+      "find": "\tupload = s.BaseUpload + peer.Upload",
       "replace": "\tupload = peer.Upload",
       "run": [
         "go test -count=1 -run '^TestReportedUsage$' ./node/"
@@ -130,7 +130,7 @@
     {
       "name": "[SL-8] an account's earlier peer is not evicted",
       "file": "api/session/admit.go",
-      "find": "\t\tif err = ctx.RemovePeerIfExists(items[i].Key); err != nil {",
+      "find": "\t\tif err = ctx.RemovePeerIfExists(earlier[i].Key); err != nil {",
       "replace": "\t\tif err = error(nil); err != nil {",
       "run": [
         "go test -count=1 -run '^(TestAnAccountKeepsOnePeer)$' ./api/session/"
@@ -589,9 +589,9 @@
     },
     {
       "name": "[SL-3] usage counts as moved only when the upload grew",
-      "file": "node/jobs.go",
-      "find": "\treturn upload, download, upload != item.Upload || download != item.Download",
-      "replace": "\treturn upload, download, upload != item.Upload",
+      "file": "types/session.go",
+      "find": "\treturn upload, download, upload != s.Upload || download != s.Download",
+      "replace": "\treturn upload, download, upload != s.Upload",
       "run": [
         "go test -count=1 -run '^(TestReportedUsage|TestSetSessionsStoresDownloadOnlyUsage)$' ./node/"
       ],
@@ -635,14 +635,16 @@
     },
     {
       "name": "[SL-15] the usage update is a struct update, which skips a zero",
-      "file": "node/jobs.go",
+      "file": "context/service.go",
       "find": [
-        "\t\t\t\tmap[string]interface{}{",
-        "\t\t\t\t\t\"upload\":   upload,",
-        "\t\t\t\t\t\"download\": download,",
-        "\t\t\t\t},"
+        "\terr := c.Database().Model(&types.Session{}).Where(&types.Session{ID: item.ID}).Updates(",
+        "\t\tmap[string]interface{}{",
+        "\t\t\t\"upload\":   upload,",
+        "\t\t\t\"download\": download,",
+        "\t\t},",
+        "\t).Error"
       ],
-      "replace": "\t\t\t\t&types.Session{Upload: upload, Download: download},",
+      "replace": "\terr := c.Database().Model(&types.Session{}).Where(&types.Session{ID: item.ID}).Updates(\n\t\t&types.Session{Upload: upload, Download: download},\n\t).Error",
       "run": [
         "go test -count=1 -run '^(TestUsageUpdateWritesBothColumns)$' ./node/"
       ],
@@ -946,10 +948,58 @@
     {
       "name": "[SL-8] a handshake evicts only the account's peers of the same subscription",
       "file": "api/session/admit.go",
-      "find": "Where(\"address = ?\", req.AccAddress.String()).\n\t\tFind(&items).Error",
-      "replace": "Where(&types.Session{Subscription: a.subscriptionID, Address: req.AccAddress.String()}).\n\t\tFind(&items).Error",
+      "find": "Where(\"address = ?\", req.AccAddress.String()).\n\t\tFind(&earlier).Error",
+      "replace": "Where(&types.Session{Subscription: a.subscriptionID, Address: req.AccAddress.String()}).\n\t\tFind(&earlier).Error",
       "run": [
         "go test -count=1 -run '^TestAnAccountKeepsOnePeerAcrossItsSessions$' ./api/session/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-18] a handshake evicts a peer without storing what it moved",
+      "file": "api/session/admit.go",
+      "find": "\tif err = keepUsage(ctx, earlier); err != nil {",
+      "replace": "\tif err = error(nil); err != nil {",
+      "run": [
+        "go test -count=1 -run '^TestAnEvictedPeersUsageIsKept$' ./api/session/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-18] the usage pass reads the counters before it takes the admission lock",
+      "file": "node/jobs.go",
+      "find": [
+        "\tlock := n.Admission()",
+        "\tlock.Lock()",
+        "\tdefer lock.Unlock()",
+        "",
+        "\tpeers, err := n.Service().Peers()",
+        "\tif err != nil {",
+        "\t\treturn err",
+        "\t}"
+      ],
+      "replace": [
+        "\tpeers, err := n.Service().Peers()",
+        "\tif err != nil {",
+        "\t\treturn err",
+        "\t}",
+        "",
+        "\tlock := n.Admission()",
+        "\tlock.Lock()",
+        "\tdefer lock.Unlock()"
+      ],
+      "run": [
+        "go test -count=1 -run '^TestTheUsagePassReadsTheCountersUnderTheLock$' ./node/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-18] the node stops without a last usage pass",
+      "file": "cmd/start.go",
+      "find": "\t\t\tdefer n.LastUsagePass()\n",
+      "replace": "",
+      "run": [
+        "go test -count=1 -run '^TestStartRunsALastUsagePass$' ./test/static/"
       ],
       "expect": "--- FAIL"
     }

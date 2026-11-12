@@ -268,3 +268,42 @@ func TestSetSessionsCutsOffIdlePeers(t *testing.T) {
 		t.Errorf("the row of a peer that moved nothing was written: updated_at %s", got.UpdatedAt)
 	}
 }
+
+// lockedPeers is a peerService that records whether the admission lock was
+// free when the counters were read.
+type lockedPeers struct {
+	*peerService
+	lock   *sync.Mutex
+	freeAt []bool
+}
+
+func (s *lockedPeers) Peers() ([]types.Peer, error) {
+	free := s.lock.TryLock()
+	if free {
+		s.lock.Unlock()
+	}
+	s.freeAt = append(s.freeAt, free)
+
+	return s.peerService.Peers()
+}
+
+// TestTheUsagePassReadsTheCountersUnderTheLock: a handshake stores what an
+// evicted peer moved under the admission lock; a pass that read the counters
+// before taking the lock would then write its older figures over them.
+//
+// Rules: [SL-18].
+func TestTheUsagePassReadsTheCountersUnderTheLock(t *testing.T) {
+	n, service, _ := usageRig(t,
+		[]types.Session{{ID: 1, Key: key(1), Address: "a"}},
+		types.Peer{Key: key(1), Upload: 10, Download: 20},
+	)
+	locked := &lockedPeers{peerService: service, lock: n.Admission()}
+	n.WithService(locked)
+
+	if err := n.setSessions(); err != nil {
+		t.Fatal(err)
+	}
+	if len(locked.freeAt) != 1 || locked.freeAt[0] {
+		t.Fatalf("the counters were read outside the admission lock: %v", locked.freeAt)
+	}
+}

@@ -26,6 +26,27 @@ func (c *Context) RemovePeer(key string) error {
 	return nil
 }
 
+// StoreUsage writes the totals the service's counters for a peer give into
+// its session's row, if they moved since the last write; it says whether
+// they did. The caller holds the admission lock and read the counters under
+// it, so an older reading never overwrites a newer one.
+func (c *Context) StoreUsage(item types.Session, peer types.Peer) (bool, error) {
+	upload, download, moved := item.Usage(peer)
+	if !moved {
+		return false, nil
+	}
+
+	// Both columns by name: a struct update would skip a zero.
+	err := c.Database().Model(&types.Session{}).Where(&types.Session{ID: item.ID}).Updates(
+		map[string]interface{}{
+			"upload":   upload,
+			"download": download,
+		},
+	).Error
+
+	return true, err
+}
+
 func (c *Context) HasPeer(key string) (bool, error) {
 	data, err := base64.StdEncoding.DecodeString(key)
 	if err != nil {

@@ -116,12 +116,27 @@ func admit(ctx *context.Context, chain chainQuerier, req admitRequest) (*admitRe
 		return nil, apiErr
 	}
 
+	// One peer per account, whatever its sessions: the account's earlier
+	// peers, of node and plan sessions alike, are evicted below. What they
+	// moved since the last pass is stored first; it also counts against the
+	// allocation. A struct condition would skip a node session's zero
+	// subscription.
+	var earlier []types.Session
+	err := ctx.Database().Model(&types.Session{}).Where("address = ?", req.AccAddress.String()).
+		Find(&earlier).Error
+	if err != nil {
+		return nil, newAPIError(http.StatusInternalServerError, 9, err)
+	}
+	if err = keepUsage(ctx, earlier); err != nil {
+		return nil, newAPIError(http.StatusInternalServerError, 9, err)
+	}
+
 	remainingBytes := a.remainingBytes
 	if a.alloc != nil {
 		// Count bytes this node has already served on the same allocation
 		// but not yet reported to the chain.
 		var items []types.Session
-		err := ctx.Database().Model(&types.Session{}).Where(&types.Session{
+		err = ctx.Database().Model(&types.Session{}).Where(&types.Session{
 			Subscription: a.subscriptionID,
 			Address:      req.AccAddress.String(),
 		}).Find(&items).Error
@@ -143,18 +158,9 @@ func admit(ctx *context.Context, chain chainQuerier, req admitRequest) (*admitRe
 		}
 	}
 
-	// One peer per account, whatever its sessions: drop the account's
-	// earlier peers, of node and plan sessions alike, before adding the new
-	// one. A struct condition would skip a node session's zero subscription.
-	var items []types.Session
-	err := ctx.Database().Model(&types.Session{}).Where("address = ?", req.AccAddress.String()).
-		Find(&items).Error
-	if err != nil {
-		return nil, newAPIError(http.StatusInternalServerError, 9, err)
-	}
-
-	for i := 0; i < len(items); i++ {
-		if err = ctx.RemovePeerIfExists(items[i].Key); err != nil {
+	// The account's earlier peers go before its new one comes.
+	for i := 0; i < len(earlier); i++ {
+		if err = ctx.RemovePeerIfExists(earlier[i].Key); err != nil {
 			return nil, newAPIError(http.StatusInternalServerError, 9, err)
 		}
 	}
@@ -198,6 +204,40 @@ func admit(ctx *context.Context, chain chainQuerier, req admitRequest) (*admitRe
 	ctx.Log().Info("Added a new peer", "key", types.KeyTag(req.PeerKey()), "count", ctx.Service().PeerCount())
 
 	return &admitResult{Session: a.session, Peer: peer}, nil
+}
+
+// keepUsage stores what the connected ones among items moved since the last
+// pass. It runs under the admission lock, as the usage pass does.
+func keepUsage(ctx *context.Context, items []types.Session) error {
+	connected := false
+	for i := 0; i < len(items) && !connected; i++ {
+		ok, err := ctx.HasPeer(items[i].Key)
+		if err != nil {
+			return err
+		}
+		connected = ok
+	}
+	if !connected {
+		return nil
+	}
+
+	peers, err := ctx.Service().Peers()
+	if err != nil {
+		return err
+	}
+	byKey := make(map[string]types.Peer, len(peers))
+	for _, p := range peers {
+		byKey[p.Key] = p
+	}
+	for _, item := range items {
+		if p, ok := byKey[item.Key]; ok {
+			if _, err = ctx.StoreUsage(item, p); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 // checkCapacity refuses a handshake when the node is full or already holds

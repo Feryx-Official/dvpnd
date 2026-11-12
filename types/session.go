@@ -46,6 +46,17 @@ func (s *Session) ServedBytes() int64 {
 	return (s.Download - s.BaseDownload) + (s.Upload - s.BaseUpload)
 }
 
+// Usage turns the service's counters for the session's peer, which count
+// from the moment the peer was added, into the totals to store and report:
+// what the chain held when the peer was admitted plus what moved since. moved
+// is false when nothing moved in either direction since the last write.
+func (s *Session) Usage(peer Peer) (upload, download int64, moved bool) {
+	upload = s.BaseUpload + peer.Upload
+	download = s.BaseDownload + peer.Download
+
+	return upload, download, upload != s.Upload || download != s.Download
+}
+
 // Duration is the session duration to report: what the chain held at
 // admission plus the time this node has served the peer.
 func (s *Session) Duration() time.Duration {

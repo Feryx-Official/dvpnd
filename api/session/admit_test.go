@@ -28,12 +28,27 @@ import (
 )
 
 // fakeService keeps peers in a map and takes a moment to add one, as a real
-// service does, so concurrent handshakes overlap.
+// service does, so concurrent handshakes overlap. counters holds what a
+// connected peer has moved.
 type fakeService struct {
 	types.Service
 
-	mu    sync.Mutex
-	peers map[string]bool
+	mu       sync.Mutex
+	peers    map[string]bool
+	counters map[string]types.Peer
+}
+
+func (f *fakeService) Peers() ([]types.Peer, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var list []types.Peer
+	for key := range f.peers {
+		p := f.counters[key]
+		p.Key = key
+		list = append(list, p)
+	}
+
+	return list, nil
 }
 
 func (f *fakeService) AddPeer(data []byte) ([]byte, error) {
@@ -124,7 +139,7 @@ func admissionRig(t *testing.T, maxPeers int) (*context.Context, *fakeService, *
 
 	config := types.NewConfig().WithDefaultValues()
 	config.QOS.MaxPeers = maxPeers
-	service := &fakeService{peers: map[string]bool{}}
+	service := &fakeService{peers: map[string]bool{}, counters: map[string]types.Peer{}}
 	ctx := context.NewContext().
 		WithClient(lite.NewDefaultClient().WithFromAddress(randomBytes(t, 20))).
 		WithConfig(config).

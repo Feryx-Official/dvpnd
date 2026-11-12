@@ -48,16 +48,18 @@ func (n *Node) runJob(name string, interval time.Duration, pass func() error, er
 // setSessions stores each peer's usage and removes peers the node has no
 // session for, or that used up their allocation or the hours their session
 // paid for. It runs under the admission lock, so a peer whose handshake is
-// still writing its row is not taken for an unknown one.
+// still writing its row is not taken for an unknown one, and reads the
+// counters under it too: a handshake stores what a peer it evicts moved,
+// and figures read before that would overwrite it.
 func (n *Node) setSessions() error {
+	lock := n.Admission()
+	lock.Lock()
+	defer lock.Unlock()
+
 	peers, err := n.Service().Peers()
 	if err != nil {
 		return err
 	}
-
-	lock := n.Admission()
-	lock.Lock()
-	defer lock.Unlock()
 
 	count := len(peers)
 	n.Log().Debug("Validating the peers", "count", count)
@@ -83,18 +85,11 @@ func (n *Node) setSessions() error {
 
 		// The checks below run for an idle peer too: it may idle past its
 		// hours, or still be connected after a removal that failed.
-		upload, download, moved := reportedUsage(item, peers[i])
-		if moved {
-			err = n.Database().Model(&types.Session{}).Where(&types.Session{ID: item.ID}).Updates(
-				map[string]interface{}{
-					"upload":   upload,
-					"download": download,
-				},
-			).Error
-			if err != nil {
-				errs = append(errs, err)
-			}
-		} else {
+		moved, err := n.StoreUsage(item, peers[i])
+		if err != nil {
+			errs = append(errs, err)
+		}
+		if !moved {
 			n.Log().Debug("The peer has not sent any data", "key", types.KeyTag(item.Key),
 				"update_at", item.UpdatedAt)
 		}
@@ -120,15 +115,13 @@ func (n *Node) setSessions() error {
 	return errors.Join(errs...)
 }
 
-// reportedUsage turns the service's per-peer counters, which count from the
-// moment the peer was added, into the session totals to store and report:
-// what the chain held when the peer was admitted plus what moved since. moved
-// is false when nothing moved in either direction since the last pass.
-func reportedUsage(item types.Session, peer types.Peer) (upload, download int64, moved bool) {
-	upload = item.BaseUpload + peer.Upload
-	download = item.BaseDownload + peer.Download
-
-	return upload, download, upload != item.Upload || download != item.Download
+// LastUsagePass stores what the peers moved since the last pass, once more
+// before the service stops; the next start reports it (ReconcileSessions).
+func (n *Node) LastUsagePass() {
+	n.Log().Info("Storing the peers' usage before the service stops")
+	if err := n.setSessions(); err != nil {
+		n.Log().Error("could not store the peers' usage before the service stops", "error", err)
+	}
 }
 
 // updateSessions reconciles the local session table with the chain (v3):

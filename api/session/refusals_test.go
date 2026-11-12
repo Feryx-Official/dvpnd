@@ -278,3 +278,60 @@ func TestAnAccountKeepsOnePeerAcrossItsSessions(t *testing.T) {
 		}
 	}
 }
+
+// TestAnEvictedPeersUsageIsKept: what an account's earlier peer moved since
+// the last pass is stored before a new handshake evicts it, so the next pass
+// reports it; on a plan session it counts against the allocation the new
+// handshake asks for.
+//
+// Rules: [SL-7], [SL-18].
+func TestAnEvictedPeersUsageIsKept(t *testing.T) {
+	ctx, service, db, account := admissionRig(t, 50)
+	node, acct := ctx.Address().String(), account.String()
+	chain := &sessionsChain{sessions: map[uint64]sessiontypes.Session{
+		1: nodeSession(baseSession(1, acct, node)),
+		2: nodeSession(baseSession(2, acct, node)),
+	}}
+
+	first := randomBytes(t, 32)
+	if _, apiErr := admit(ctx, chain, admitRequest{AccAddress: account, ID: 1, PeerData: first}); apiErr != nil {
+		t.Fatal(apiErr)
+	}
+	service.mu.Lock()
+	service.counters[base64.StdEncoding.EncodeToString(first)] = types.Peer{Upload: 10, Download: 20}
+	service.mu.Unlock()
+	if _, apiErr := admit(ctx, chain, admitRequest{AccAddress: account, ID: 2, PeerData: randomBytes(t, 32)}); apiErr != nil {
+		t.Fatal(apiErr)
+	}
+	if service.HasPeer(first) {
+		t.Fatal("the earlier peer was not evicted")
+	}
+	var item types.Session
+	if err := db.Where(&types.Session{ID: 1}).First(&item).Error; err != nil {
+		t.Fatal(err)
+	}
+	if item.Upload != 10 || item.Download != 20 {
+		t.Fatalf("the evicted peer's usage was not kept: upload %d download %d", item.Upload, item.Download)
+	}
+
+	// A plan session: the earlier peer has used the allocation since the
+	// last pass, so the next handshake on it is refused.
+	ctx, service, _, account = admissionRig(t, 50)
+	node, acct = ctx.Address().String(), account.String()
+	plan := &scriptChain{
+		subscription: &subscriptiontypes.Subscription{ID: 5, Status: v1base.StatusActive},
+		allocation:   allocation(100, 0),
+	}
+	plan.session = planSession(baseSession(3, acct, node), 5)
+	earlier := randomBytes(t, 32)
+	if _, apiErr := admit(ctx, plan, admitRequest{AccAddress: account, ID: 3, PeerData: earlier}); apiErr != nil {
+		t.Fatal(apiErr)
+	}
+	service.mu.Lock()
+	service.counters[base64.StdEncoding.EncodeToString(earlier)] = types.Peer{Upload: 60, Download: 50}
+	service.mu.Unlock()
+	plan.session = planSession(baseSession(4, acct, node), 5)
+	if _, apiErr := admit(ctx, plan, admitRequest{AccAddress: account, ID: 4, PeerData: randomBytes(t, 32)}); apiErr == nil || apiErr.Code != 8 {
+		t.Fatalf("a handshake on a used allocation was admitted: %v", apiErr)
+	}
+}

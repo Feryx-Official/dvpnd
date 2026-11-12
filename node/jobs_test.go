@@ -39,7 +39,7 @@ func TestReportedUsage(t *testing.T) {
 			types.Peer{Upload: 10, Download: 90}, 310, 490, true},
 	}
 	for _, c := range cases {
-		up, down, moved := reportedUsage(c.item, c.peer)
+		up, down, moved := c.item.Usage(c.peer)
 		if up != c.wantUp || down != c.wantDown || moved != c.wantMoved {
 			t.Errorf("%s: got (%d, %d, %v), want (%d, %d, %v)",
 				c.name, up, down, moved, c.wantUp, c.wantDown, c.wantMoved)

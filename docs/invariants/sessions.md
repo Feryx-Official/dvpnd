@@ -25,8 +25,9 @@ reported, a report refused) or gives clients service nobody pays for. IDs as in
   account's or another node's is refused. A plan subscription must be active and the
   account must hold an allocation on it.
 - **[SL-7] Admission enforces the session's byte cap and the plan allocation.** The
-  allocation counts what this node has served on it but not yet reported, so a client
-  can't start session after session on usage the chain hasn't seen yet.
+  allocation counts what this node has served on it but not yet reported, the account's
+  connected peer up to the handshake included, so a client can't start session after
+  session on usage the chain hasn't seen yet.
 - **[SL-8] An account has one peer at a time.** A new handshake from the account evicts
   its earlier peer, whatever session either serves: a node session, or a plan session
   on the same subscription or another.
@@ -65,3 +66,8 @@ reported, a report refused) or gives clients service nobody pays for. IDs as in
   they are served, also while it idles, and the pass that asks the chain removes it
   too, for a row written before the node recorded them. The usage of a peer cut off is
   still reported.
+- **[SL-18] What a peer moved is stored before the node lets it go.** A handshake that
+  evicts an account's earlier peer first stores what that peer moved since the last
+  pass, and the node runs one more usage pass before it stops the service; the next
+  pass, or the next start, reports it. The usage pass reads the counters under the
+  admission lock, so figures read before an eviction never overwrite what it stored.
