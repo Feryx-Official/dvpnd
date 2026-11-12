@@ -199,7 +199,7 @@ func runTunnel(t *testing.T, tc tunnelCase, tier tunnelTier, allowSMTP bool) {
 	waitBlocked(t, nsDial(t), public, 30*time.Second)
 
 	running = false
-	if err := svc.Stop(); err != nil {
+	if err := stopWatched(t, svc); err != nil {
 		t.Error("Stop:", err)
 	}
 	noChainsLeft(t)
@@ -618,7 +618,7 @@ func TestOpenVPNDaemon(t *testing.T) {
 	if _, err := svc.Peers(); err != nil {
 		t.Error("Peers over the management socket:", err)
 	}
-	if err := svc.Stop(); err != nil {
+	if err := stopWatched(t, svc); err != nil {
 		t.Error("Stop:", err)
 	}
 	if left := processes(t, "openvpn", rt.Dir); len(left) != 0 {

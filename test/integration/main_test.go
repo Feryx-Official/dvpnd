@@ -31,7 +31,34 @@ import (
 	"time"
 
 	"github.com/Feryx-Official/dvpnd/v9/services/common"
+	"github.com/Feryx-Official/dvpnd/v9/types"
 )
+
+// stopWatched stops svc after checking how its daemon was watched: Done
+// stays open while the real daemon serves (the start command stops the node
+// on it, so a false alarm would restart a healthy node again and again), and
+// it is closed once Stop returns.
+func stopWatched(t *testing.T, svc types.Service) error {
+	t.Helper()
+	d, watched := svc.(types.Supervised)
+	if watched {
+		select {
+		case <-d.Done():
+			t.Error("Done is closed while the daemon serves: the start command would stop a healthy node")
+		default:
+		}
+	}
+	err := svc.Stop()
+	if watched {
+		select {
+		case <-d.Done():
+		case <-time.After(5 * time.Second):
+			t.Error("Done is still open 5 s after Stop")
+		}
+	}
+
+	return err
+}
 
 // Ports the targets and the host's own services listen on.
 const (

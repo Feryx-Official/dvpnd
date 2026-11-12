@@ -168,7 +168,7 @@ func runProxy(t *testing.T, pc proxyCase, allowSMTP bool) {
 	}
 
 	running = false
-	if err := svc.Stop(); err != nil {
+	if err := stopWatched(t, svc); err != nil {
 		t.Error("Stop:", err)
 	}
 	if left := processes(t, pc.daemon, rt.Dir); len(left) != 0 {
