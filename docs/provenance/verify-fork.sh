@@ -64,14 +64,22 @@ if curl -sSf -o "$T/v071.zip" https://proxy.golang.org/github.com/sentinel-offic
   [ "$sha_zip" = "$sha_head" ] && pass "proxy.golang.org dvpn-node@v0.7.1 zip carries the identical LICENSE ($sha_zip)" || fail "proxy.golang.org LICENSE differs ($sha_zip)"
   curl -sSf https://sum.golang.org/lookup/github.com/sentinel-official/dvpn-node@v0.7.1 2>/dev/null | grep 'h1:' | sed 's/^/      sum.golang.org: /'
 else info "proxy.golang.org unreachable; skipped"; fi
+# The status decides: an error page served while the archive is down says nothing about the
+# commit, and a 404 is the archive's answer that it does not hold it.
 for s in "$FORK" "$RELICENSE"; do
-  j=$(curl -s "https://archive.softwareheritage.org/api/1/revision/$s/" 2>/dev/null)
-  if [ -z "$j" ]; then info "Software Heritage unreachable for $s"; continue; fi
-  if printf '%s' "$j" | grep -q "\"id\":\"$s\""; then
-    dt=$(printf '%s' "$j" | grep -o '"date":"[^"]*"' | head -1 | cut -d'"' -f4); msg=$(printf '%s' "$j" | grep -o '"message":"[^"]*"' | head -1 | cut -d'"' -f4)
-    pass "Software Heritage archives $s ($dt, \"${msg%\\n}\")"
-  elif printf '%s' "$j" | grep -qi 'rate limit\|throttl'; then info "Software Heritage rate-limited; re-run later for $s"
-  else fail "Software Heritage: unexpected response for $s"; fi
+  rm -f "$T/swh.json"
+  code=$(curl -s -o "$T/swh.json" -w '%{http_code}' "https://archive.softwareheritage.org/api/1/revision/$s/" 2>/dev/null)
+  j=$(cat "$T/swh.json" 2>/dev/null)
+  case "$code" in
+    200)
+      if printf '%s' "$j" | grep -q "\"id\":\"$s\""; then
+        dt=$(printf '%s' "$j" | grep -o '"date":"[^"]*"' | head -1 | cut -d'"' -f4); msg=$(printf '%s' "$j" | grep -o '"message":"[^"]*"' | head -1 | cut -d'"' -f4)
+        pass "Software Heritage archives $s ($dt, \"${msg%\\n}\")"
+      else fail "Software Heritage: unexpected response for $s"; fi ;;
+    404) fail "Software Heritage does not archive $s" ;;
+    429) info "Software Heritage rate-limited; re-run later for $s" ;;
+    *) info "Software Heritage unreachable for $s (HTTP ${code:-none})" ;;
+  esac
 done
 echo
 [ $fail = 0 ] && echo "RESULT: all checks passed" || echo "RESULT: FAILURES PRESENT"

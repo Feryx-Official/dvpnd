@@ -184,6 +184,72 @@ func TestProvenanceRecordVerifies(t *testing.T) {
 	}
 }
 
+// archiveCurl stands in for curl with one site reachable, Software Heritage,
+// which answers with the HTTP status in ARCHIVE_STATUS: a revision record for
+// the commit asked about on 200, an error page otherwise. It honours -o, -w
+// and -f as curl does; every other address fails to connect.
+const archiveCurl = `#!/bin/sh
+out=; fmt=; url=; fail=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o) out=$2; shift 2 ;;
+    -w) fmt=$2; shift 2 ;;
+    --*) shift ;;
+    -*) case "$1" in *f*) fail=1 ;; esac; shift ;;
+    *) url=$1; shift ;;
+  esac
+done
+case "$url" in
+  https://archive.softwareheritage.org/*) ;;
+  *) exit 7 ;;
+esac
+[ "$fail" = 1 ] && [ "$ARCHIVE_STATUS" -ge 400 ] && exit 22
+id=${url%/}; id=${id##*/}
+case "$ARCHIVE_STATUS" in
+  200) page="{\"id\":\"$id\",\"date\":\"2024-01-25T00:00:00+00:00\",\"message\":\"a commit\"}" ;;
+  404) page='{"exception":"NotFoundExc","reason":"Revision not found"}' ;;
+  *) page="<html><body><h1>$ARCHIVE_STATUS</h1>The server is temporarily unable to serve your request.</body></html>" ;;
+esac
+if [ -n "$out" ]; then printf '%s' "$page" >"$out"; else printf '%s' "$page"; fi
+[ -z "$fmt" ] || printf '%s' "$ARCHIVE_STATUS"
+`
+
+// TestProvenanceCheckTellsAnArchiveDownFromACommitMissing holds the provenance
+// script to failing on the archive's answer, not on the archive being down: an
+// error page Software Heritage served while unavailable failed make check, the
+// commit hook and CI. A 404 is an answer and still fails.
+//
+// Rules: [LIC-5].
+func TestProvenanceCheckTellsAnArchiveDownFromACommitMissing(t *testing.T) {
+	stub := t.TempDir()
+	if err := os.WriteFile(filepath.Join(stub, "curl"), []byte(archiveCurl), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		status string
+		pass   bool
+		says   string
+	}{
+		{"200", true, "PASS  Software Heritage archives"},
+		{"503", true, "info  Software Heritage unreachable"},
+		{"502", true, "info  Software Heritage unreachable"},
+		{"429", true, "info  Software Heritage rate-limited"},
+		{"404", false, "FAIL  Software Heritage does not archive"},
+	} {
+		cmd := exec.Command("bash", "docs/provenance/verify-fork.sh")
+		cmd.Dir = root(t)
+		cmd.Env = append(os.Environ(), "PATH="+stub+string(os.PathListSeparator)+os.Getenv("PATH"),
+			"GIT_OPTIONAL_LOCKS=0", "ARCHIVE_STATUS="+c.status)
+		out, err := cmd.CombinedOutput()
+		if passed := err == nil && bytes.Contains(out, []byte("RESULT: all checks passed")); passed != c.pass {
+			t.Errorf("with Software Heritage answering %s the script passed = %v, want %v (%v)", c.status, passed, c.pass, err)
+		}
+		if !bytes.Contains(out, []byte(c.says)) {
+			t.Errorf("with Software Heritage answering %s the script never says %q:\n%s", c.status, c.says, out)
+		}
+	}
+}
+
 // bech32Candidate matches what could be a Sentinel account, node or
 // validator address; the checksum decides.
 var bech32Candidate = regexp.MustCompile(`\bsent[a-z]*1[02-9ac-hj-np-z]{6,}\b`)
