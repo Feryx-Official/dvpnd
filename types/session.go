@@ -7,7 +7,6 @@ import (
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"gorm.io/gorm"
 )
 
 // Session is a local row for an on-chain session whose peer this node serves.
@@ -20,9 +19,14 @@ import (
 // zero). So admission records what the chain held at that moment in
 // BaseDownload, BaseUpload and BaseDuration, and the counters the service
 // reports are added on top of that.
+//
+// The row has no soft delete (gorm.Model's DeletedAt): a delete removes it,
+// and with it the wallet address and peer key. CreatedAt is when the peer
+// was admitted; UpdatedAt is the last write, which gorm sets.
 type Session struct {
-	gorm.Model
 	ID           uint64 `gorm:"primaryKey;uniqueIndex:idx_sessions_id"`
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 	Subscription uint64 `gorm:"index:idx_sessions_subscription_address"`
 	Key          string `gorm:"uniqueIndex:idx_sessions_key"`
 	Address      string `gorm:"index:idx_sessions_address;index:idx_sessions_subscription_address"`

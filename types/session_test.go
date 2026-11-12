@@ -5,15 +5,14 @@ package types
 import (
 	"testing"
 	"time"
-
-	"gorm.io/gorm"
 )
 
 // Rules: [SL-2].
 func TestSessionServedBytesAndDuration(t *testing.T) {
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	s := Session{
-		Model:        gorm.Model{CreatedAt: start, UpdatedAt: start.Add(90 * time.Second)},
+		CreatedAt:    start,
+		UpdatedAt:    start.Add(90 * time.Second),
 		Download:     420,
 		Upload:       310,
 		BaseDownload: 400,

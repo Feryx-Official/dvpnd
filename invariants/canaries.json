@@ -40,8 +40,8 @@
     {
       "name": "[PV-4] the node's database is opened without secure_delete",
       "file": "node/database.go",
-      "find": "sqlite.Open(path+\"?_secure_delete=on\")",
-      "replace": "sqlite.Open(path)",
+      "find": "const databaseOptions = \"?_secure_delete=on&",
+      "replace": "const databaseOptions = \"?",
       "run": [
         "go test -count=1 -run '^TestDeletedSessionsLeaveNoTrace$' ./node/"
       ],
@@ -1190,6 +1190,16 @@
       "replace": "\t\tif false && c.Token != \"\" && u.Scheme != \"https\" &&",
       "run": [
         "go test -count=1 -run '^(TestGeoIPTokenOnlyOverHTTPS)$' ./types/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[PV-6] the database file keeps a mode others can read",
+      "file": "node/database.go",
+      "find": "\tif err := os.Chmod(path, 0o600); err != nil {",
+      "replace": "\tif err := error(nil); err != nil {",
+      "run": [
+        "go test -count=1 -run '^(TestDatabaseFileIsPrivate)$' ./node/"
       ],
       "expect": "--- FAIL"
     }

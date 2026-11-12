@@ -18,12 +18,11 @@ import (
 	sessiontypes "github.com/sentinel-official/sentinelhub/v12/x/session/types/v3"
 	v2subscriptiontypes "github.com/sentinel-official/sentinelhub/v12/x/subscription/types/v2"
 	subscriptiontypes "github.com/sentinel-official/sentinelhub/v12/x/subscription/types/v3"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/Feryx-Official/dvpnd/v9/context"
 	"github.com/Feryx-Official/dvpnd/v9/lite"
+	"github.com/Feryx-Official/dvpnd/v9/node"
 	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
@@ -124,11 +123,8 @@ func randomBytes(t *testing.T, n int) []byte {
 func admissionRig(t *testing.T, maxPeers int) (*context.Context, *fakeService, *gorm.DB, sdk.AccAddress) {
 	t.Helper()
 
-	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "data.db")), &gorm.Config{Logger: gormlogger.Discard})
+	db, err := node.OpenDatabase(filepath.Join(t.TempDir(), "data.db"))
 	if err != nil {
-		t.Fatal(err)
-	}
-	if err := db.AutoMigrate(&types.Session{}); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
@@ -241,10 +237,10 @@ func TestFailedRecordRemovesThePeer(t *testing.T) {
 	ctx, service, db, account := admissionRig(t, 50)
 	chain := &fakeChain{node: ctx.Address().String(), account: func(uint64) string { return account.String() }}
 
-	// A soft-deleted row is invisible to the duplicate checks but still
-	// holds the primary key, so the insert fails.
-	db.Create(&types.Session{ID: 7, Key: "old", Address: "old"})
-	db.Delete(&types.Session{}, 7)
+	// The table refuses every insert; the checks before it still read.
+	if err := db.Exec("CREATE TRIGGER refuse_insert BEFORE INSERT ON sessions BEGIN SELECT RAISE(ABORT, 'refused'); END").Error; err != nil {
+		t.Fatal(err)
+	}
 
 	_, apiErr := admit(ctx, chain, admitRequest{AccAddress: account, ID: 7, PeerData: randomBytes(t, 32)})
 	if apiErr == nil || apiErr.Status != 500 {

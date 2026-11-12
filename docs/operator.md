@@ -600,8 +600,8 @@ real traffic this way and reported it on chain.
   node. The OpenVPN, XRAY and Hysteria2 daemons log errors only. Run the node with
   `--log_level debug` to chase a fault: request lines then carry the client's address, and
   the daemons log at their usual level, which includes client addresses and (for the
-  proxies) the destinations clients reach. Switch back once done. `data.db` zeroes deleted
-  rows and is compacted at every start. journald keeps old lines until its size cap; to keep
+  proxies) the destinations clients reach. Switch back once done. `data.db` is readable
+  by its owner only, zeroes deleted rows and is compacted at every start. journald keeps old lines until its size cap; to keep
   less, set `MaxRetentionSec=7day` in `/etc/systemd/journald.conf` and
   `sudo systemctl restart systemd-journald` (Docker: the 3×50MB cap in §7 already applies).
 - **Handshakes** are accepted over HTTPS only (plain HTTP gets 403; the status pages answer

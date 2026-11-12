@@ -20,9 +20,7 @@ import (
 	nodetypes "github.com/sentinel-official/sentinelhub/v12/x/node/types/v3"
 	sessiontypes "github.com/sentinel-official/sentinelhub/v12/x/session/types/v3"
 	subscriptiontypes "github.com/sentinel-official/sentinelhub/v12/x/subscription/types/v3"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/Feryx-Official/dvpnd/v9/context"
 	"github.com/Feryx-Official/dvpnd/v9/lite"
@@ -389,7 +387,7 @@ func TestUpdateSessionsCutsOffUsedHours(t *testing.T) {
 	start := time.Now().Add(-2 * time.Hour)
 	served := func(id uint64, key string, d time.Duration) {
 		db.Create(&types.Session{ID: id, Key: key, Address: key, Upload: 10, Download: 10,
-			Model: gorm.Model{CreatedAt: start, UpdatedAt: start.Add(d)}})
+			CreatedAt: start, UpdatedAt: start.Add(d)})
 	}
 	served(1, "YQ==", 61*time.Minute) // "a": one hour paid
 	served(2, "Yg==", 30*time.Minute) // "b": two hours paid
@@ -448,11 +446,8 @@ func (f *flaky) QuerySession(id uint64) (sessiontypes.Session, error) {
 func testDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
-	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "data.db")), &gorm.Config{Logger: gormlogger.Discard})
+	db, err := OpenDatabase(filepath.Join(t.TempDir(), "data.db"))
 	if err != nil {
-		t.Fatal(err)
-	}
-	if err := db.AutoMigrate(&types.Session{}); err != nil {
 		t.Fatal(err)
 	}
 

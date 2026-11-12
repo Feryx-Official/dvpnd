@@ -13,15 +13,18 @@ passwords) must not pile up on the node either. IDs as in `test/README.md`.
   level, OpenVPN's verb 3 and XRAY's warnings; V2Ray logs nothing.
 - **[PV-3] Peer keys and session passwords appear in the log only as a short tag.**
 - **[PV-4] A deleted session leaves no trace in the database file.** The database is
-  opened with `secure_delete`, which zeroes deleted rows, and compacted (VACUUM) at
-  start, because rows deleted by an earlier release can still sit in free pages with
-  their wallet addresses and peer keys.
+  opened with `secure_delete`, which zeroes deleted rows, and a rollback journal deleted
+  after each write, and compacted (VACUUM) at start, because rows deleted by an earlier
+  release can still sit in free pages with their wallet addresses and peer keys. The
+  session table has no soft delete: a delete removes the row, where gorm's soft delete
+  kept it unless the delete said `Unscoped`.
 - **[PV-5] A recovered mnemonic is never printed back.** A new key's mnemonic is shown
   once, as its only backup; echoing a recovered one would leave it in the scrollback or
   in a log of the install.
 - **[PV-6] The node's files are readable by their owner only, and a configured value
-  stays one value.** Config files hold keys and passwords; a value passed to
-  `config set` is escaped so it reads back as the same single value.
+  stays one value.** Config files hold keys and passwords, and the session database
+  wallet addresses and proxy UUIDs; a file an earlier release left wider is narrowed. A
+  value passed to `config set` is escaped so it reads back as the same single value.
 - **[PV-7] The configuration the node logs at start is redacted.**
 - **[PV-8] The Handshake resolver is off by default; when on, it listens on the tunnel
   address only and keeps no log.** On every address it would be an open resolver anyone

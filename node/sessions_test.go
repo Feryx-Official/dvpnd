@@ -11,9 +11,7 @@ import (
 	"time"
 
 	cmtlog "github.com/cometbft/cometbft/libs/log"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/Feryx-Official/dvpnd/v9/context"
 	"github.com/Feryx-Official/dvpnd/v9/types"
@@ -85,11 +83,8 @@ func key(b byte) string { return base64.StdEncoding.EncodeToString([]byte{b, b, 
 // peers with the given counters.
 func usageRig(t *testing.T, rows []types.Session, peers ...types.Peer) (*Node, *peerService, *gorm.DB) {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "data.db")), &gorm.Config{Logger: gormlogger.Discard})
+	db, err := OpenDatabase(filepath.Join(t.TempDir(), "data.db"))
 	if err != nil {
-		t.Fatal(err)
-	}
-	if err := db.AutoMigrate(&types.Session{}); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
@@ -193,18 +188,16 @@ func TestSetSessionsStoresDownloadOnlyUsage(t *testing.T) {
 //
 // Rules: [SL-17].
 func TestSetSessionsCutsOffUsedHours(t *testing.T) {
-	since := func(d time.Duration) gorm.Model {
-		at := time.Now().Add(-d)
-		return gorm.Model{CreatedAt: at, UpdatedAt: at}
-	}
+	ago := func(d time.Duration) time.Time { return time.Now().Add(-d) }
+	at61, at30, at5h := ago(61*time.Minute), ago(30*time.Minute), ago(5*time.Hour)
 	hour := int64(time.Hour)
 	n, service, db := usageRig(t,
 		[]types.Session{
-			{ID: 1, Key: key(1), Address: "a", MaxDuration: hour, Model: since(61 * time.Minute)},
-			{ID: 2, Key: key(2), Address: "b", MaxDuration: hour, Model: since(30 * time.Minute),
+			{ID: 1, Key: key(1), Address: "a", MaxDuration: hour, CreatedAt: at61, UpdatedAt: at61},
+			{ID: 2, Key: key(2), Address: "b", MaxDuration: hour, CreatedAt: at30, UpdatedAt: at30,
 				BaseDuration: int64(31 * time.Minute)}, // served before a restart
-			{ID: 3, Key: key(3), Address: "c", MaxDuration: 2 * hour, Model: since(61 * time.Minute)},
-			{ID: 4, Key: key(4), Address: "d", Model: since(5 * time.Hour)}, // no hours
+			{ID: 3, Key: key(3), Address: "c", MaxDuration: 2 * hour, CreatedAt: at61, UpdatedAt: at61},
+			{ID: 4, Key: key(4), Address: "d", CreatedAt: at5h, UpdatedAt: at5h}, // no hours
 		},
 		types.Peer{Key: key(1), Upload: 10, Download: 20},
 		types.Peer{Key: key(2), Upload: 10, Download: 20},
@@ -238,12 +231,11 @@ func TestSetSessionsCutsOffUsedHours(t *testing.T) {
 // Rules: [SL-16], [SL-17].
 func TestSetSessionsCutsOffIdlePeers(t *testing.T) {
 	at := time.Now().Add(-61 * time.Minute)
-	since := gorm.Model{CreatedAt: at, UpdatedAt: at}
 	n, service, db := usageRig(t,
 		[]types.Session{
-			{ID: 1, Key: key(1), Address: "a", MaxDuration: int64(time.Hour), Model: since, Upload: 10, Download: 20},
-			{ID: 2, Key: key(2), Address: "b", Available: 25, Model: since, Upload: 10, Download: 20},
-			{ID: 3, Key: key(3), Address: "c", MaxDuration: int64(2 * time.Hour), Available: 100, Model: since,
+			{ID: 1, Key: key(1), Address: "a", MaxDuration: int64(time.Hour), CreatedAt: at, UpdatedAt: at, Upload: 10, Download: 20},
+			{ID: 2, Key: key(2), Address: "b", Available: 25, CreatedAt: at, UpdatedAt: at, Upload: 10, Download: 20},
+			{ID: 3, Key: key(3), Address: "c", MaxDuration: int64(2 * time.Hour), Available: 100, CreatedAt: at, UpdatedAt: at,
 				Upload: 10, Download: 20},
 		},
 		types.Peer{Key: key(1), Upload: 10, Download: 20},
