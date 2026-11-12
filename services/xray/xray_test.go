@@ -586,3 +586,52 @@ func TestInitRendersEgressPolicy(t *testing.T) {
 		t.Fatalf("allow_smtp: rules %v", rules)
 	}
 }
+
+// TestConfigStringsReadBackAsThemselves: every string the node writes into
+// xray's configuration is JSON-encoded, so a quote or a backslash in the
+// REALITY server name or in the runtime directory's path neither breaks the
+// file nor adds a key.
+//
+// Rules: [RT-22].
+func TestConfigStringsReadBackAsThemselves(t *testing.T) {
+	stubBinary(t)
+	odd := `a"b\c`
+
+	dir, cfg := home(t, xraytypes.SecurityReality)
+	cfg.Reality.ServerName = odd + ".example"
+	if err := cfg.SaveToPath(filepath.Join(dir, xraytypes.ConfigFileName)); err != nil {
+		t.Fatal(err)
+	}
+	if err := NewXRay().Init(dir); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(filepath.Join(dir, "xray_config.json"))
+	var doc map[string]interface{}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("a quote in server_name broke the config: %v\n%s", err, raw)
+	}
+	reality := doc["inbounds"].([]interface{})[1].(map[string]interface{})["streamSettings"].(map[string]interface{})["realitySettings"].(map[string]interface{})
+	if reality["serverNames"].([]interface{})[0] != cfg.Reality.ServerName || reality["dest"] != cfg.Reality.ServerName+":443" {
+		t.Fatalf("reality settings: %v", reality)
+	}
+
+	dir, _ = home(t, xraytypes.SecurityTLS)
+	run := filepath.Join(dir, odd)
+	if err := os.Mkdir(run, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TMPDIR", run)
+	if err := NewXRay().Init(dir); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ = os.ReadFile(filepath.Join(run, "xray_config.json"))
+	doc = nil
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("a quote in the runtime path broke the config: %v\n%s", err, raw)
+	}
+	certs := doc["inbounds"].([]interface{})[1].(map[string]interface{})["streamSettings"].(map[string]interface{})["tlsSettings"].(map[string]interface{})["certificates"].([]interface{})
+	cert := certs[0].(map[string]interface{})
+	if cert["certificateFile"] != filepath.Join(run, "tls.crt") || cert["keyFile"] != filepath.Join(run, "tls.key") {
+		t.Fatalf("certificate paths: %v", cert)
+	}
+}

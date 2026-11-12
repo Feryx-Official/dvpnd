@@ -70,11 +70,11 @@ func TestInitRendersServerConfig(t *testing.T) {
 	for _, want := range []string{
 		"dev ovpn0\n", "dev-type tun\n", "proto udp\n", "port 1194\n",
 		"server 10.9.0.0 255.255.255.0\n", "server-ipv6 fd86:ea04:1116::/112\n", "topology subnet\n",
-		"ca " + filepath.Join(dir, "openvpn", "ca.crt") + "\n",
-		"tls-crypt " + filepath.Join(dir, "openvpn", "tc.key") + "\n",
+		"ca \"" + filepath.Join(dir, "openvpn", "ca.crt") + "\"\n",
+		"tls-crypt \"" + filepath.Join(dir, "openvpn", "tc.key") + "\"\n",
 		"dh none\n", "tls-cipher TLS-ECDHE-ECDSA-WITH-AES-256-GCM-SHA384\n",
 		"data-ciphers AES-256-GCM:AES-128-GCM\n", "remote-cert-tls client\n",
-		"management " + filepath.Join(dir, "openvpn.sock") + " unix\n", "management-client-user root\n",
+		"management \"" + filepath.Join(dir, "openvpn.sock") + "\" unix\n", "management-client-user root\n",
 		"management-client-auth\n", "auth-user-pass-optional\n",
 		"explicit-exit-notify 1\n",
 	} {
@@ -695,5 +695,68 @@ func TestIPv6OffMeansNoIPv6(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestConfigPathsReadBackAsThemselves: the node writes every path into the
+// server configuration quoted, the way OpenVPN reads a quoted argument (\"
+// and \\ escaped), so a space, a quote or a backslash in the node's home can
+// neither break the file nor add a directive. A path with a line break,
+// which no quoting carries, stops the start before the file is written.
+//
+// Rules: [RT-22].
+func TestConfigPathsReadBackAsThemselves(t *testing.T) {
+	stubBinary(t)
+	saved := kernelHasIPv6
+	kernelHasIPv6 = func() bool { return true }
+	t.Cleanup(func() { kernelHasIPv6 = saved })
+
+	cfg := ovpntypes.NewConfig().WithDefaultValues()
+	cfg.ListenPort = 1194
+	cfg.Uplink = "eth0"
+	dir := filepath.Join(t.TempDir(), `node "home" a\b #c`)
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.SaveToPath(filepath.Join(dir, ovpntypes.ConfigFileName)); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TMPDIR", dir)
+
+	if err := NewOpenVPN().Init(dir); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, "openvpn_server.conf"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	quoted := func(path string) string {
+		return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(path) + `"`
+	}
+	for _, want := range []string{
+		"ca " + quoted(filepath.Join(dir, "openvpn", "ca.crt")) + "\n",
+		"cert " + quoted(filepath.Join(dir, "openvpn", "server.crt")) + "\n",
+		"key " + quoted(filepath.Join(dir, "openvpn", "server.key")) + "\n",
+		"tls-crypt " + quoted(filepath.Join(dir, "openvpn", "tc.key")) + "\n",
+		"management " + quoted(filepath.Join(dir, "openvpn.sock")) + " unix\n",
+	} {
+		if !strings.Contains(string(raw), want) {
+			t.Errorf("server.conf lacks %q:\n%s", want, raw)
+		}
+	}
+
+	broken := filepath.Join(t.TempDir(), "a\nverb 11")
+	if err := os.Mkdir(broken, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.SaveToPath(filepath.Join(broken, ovpntypes.ConfigFileName)); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TMPDIR", broken)
+	if err := NewOpenVPN().Init(broken); err == nil || !strings.Contains(err.Error(), "line break") {
+		t.Fatalf("Init with a line break in the home: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(broken, "openvpn_server.conf")); !os.IsNotExist(err) {
+		t.Fatalf("a server configuration was written: %v", err)
 	}
 }

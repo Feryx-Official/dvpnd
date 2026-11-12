@@ -3,6 +3,7 @@
 package openvpn
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/Feryx-Official/dvpnd/v9/services/common"
@@ -13,6 +14,7 @@ import (
 // AES-GCM data channel, SHA256 HMAC, tls-crypt. Clients are admitted over the
 // management interface (management-client-auth), not by a script; their
 // credential is the certificate, so no username or password is demanded.
+// Paths and names go through quote.
 var configTemplate = strings.TrimSpace(`
 dev {{ .Interface }}
 dev-type tun
@@ -23,11 +25,11 @@ server {{ .IPv4Network }} {{ .IPv4Netmask }}
 server-ipv6 {{ .IPv6Network }}
 {{- end }}
 topology subnet
-ca {{ .CACert }}
-cert {{ .ServerCert }}
-key {{ .ServerKey }}
+ca {{ quote .CACert }}
+cert {{ quote .ServerCert }}
+key {{ quote .ServerKey }}
 dh none
-tls-crypt {{ .TLSCrypt }}
+tls-crypt {{ quote .TLSCrypt }}
 tls-server
 tls-version-min 1.2
 auth SHA256
@@ -41,16 +43,28 @@ persist-tun
 {{- if eq .Proto "udp" }}
 explicit-exit-notify 1
 {{- end }}
-management {{ .ManagementSocket }} unix
+management {{ quote .ManagementSocket }} unix
 management-client-user root
 management-client-auth
 auth-user-pass-optional
 verb {{ .Verb }}
 {{- if .User }}
-user {{ .User }}
-group {{ .Group }}
+user {{ quote .User }}
+group {{ quote .Group }}
 {{- end }}
 `) + "\n"
+
+// quote renders s as one OpenVPN argument: in double quotes, with each
+// backslash and double quote escaped, which is how OpenVPN reads a quoted
+// argument back. A line break ends a directive whatever the quotes, so a
+// value with one is refused rather than written.
+func quote(s string) (string, error) {
+	if strings.ContainsAny(s, "\r\n") {
+		return "", fmt.Errorf("%q has a line break, which an OpenVPN configuration cannot hold", s)
+	}
+
+	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s) + `"`, nil
+}
 
 // templateData is what the server configuration renders from.
 type templateData struct {

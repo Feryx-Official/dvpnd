@@ -1202,6 +1202,26 @@
         "go test -count=1 -run '^(TestDatabaseFileIsPrivate)$' ./node/"
       ],
       "expect": "--- FAIL"
+    },
+    {
+      "name": "[RT-22] a line break in an OpenVPN path reaches the configuration",
+      "file": "services/openvpn/config.go",
+      "find": "\tif strings.ContainsAny(s, \"\\r\\n\") {",
+      "replace": "\tif false {",
+      "run": [
+        "go test -count=1 -run '^(TestConfigPathsReadBackAsThemselves)$' ./services/openvpn/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[RT-22] an OpenVPN path is written without its escapes",
+      "file": "services/openvpn/config.go",
+      "find": "\treturn `\"` + strings.NewReplacer(`\\`, `\\\\`, `\"`, `\\\"`).Replace(s) + `\"`, nil",
+      "replace": "\treturn `\"` + s + `\"`, nil",
+      "run": [
+        "go test -count=1 -run '^(TestConfigPathsReadBackAsThemselves)$' ./services/openvpn/"
+      ],
+      "expect": "--- FAIL"
     }
   ]
 }

@@ -98,3 +98,10 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
   word, so a misspelt key silently fell back to the default; a file carried over from the
   upstream node keeps keys this node no longer has, so refusing to start would turn an
   upgrade into an outage.
+- **[RT-22] A value the node writes into a daemon's configuration reads back as itself.**
+  Strings in xray's and v2ray's JSON go through `json`, and OpenVPN's paths and account
+  names are quoted the way OpenVPN reads a quoted argument, so a space, a quote or a
+  backslash in the node's home or in the REALITY server name can neither break the file nor
+  add a directive. A value with a line break, which no OpenVPN quoting carries, stops the
+  start. Fields the node sets itself, V2Ray's security and TLS paths, take no key from the
+  file.

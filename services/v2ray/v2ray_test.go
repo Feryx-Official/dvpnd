@@ -316,3 +316,77 @@ func TestConfigWithoutAPISection(t *testing.T) {
 		t.Fatal("the API port may not be the VMess port")
 	}
 }
+
+// TestConfigStringsReadBackAsThemselves: every string the node writes into
+// v2ray's configuration is JSON-encoded, so a quote or a backslash in the
+// runtime directory's path neither breaks the file nor adds a key; and the
+// security and TLS paths are the node's own, not keys of v2ray.toml.
+//
+// Rules: [RT-22].
+func TestConfigStringsReadBackAsThemselves(t *testing.T) {
+	stub(t, "trap 'exit 0' TERM")
+	dir := t.TempDir()
+	certPEM, keyPEM, err := common.SelfSignedCertificate("dvpnd", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "tls.crt"), certPEM, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "tls.key"), keyPEM, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	run := filepath.Join(dir, `a"b\c`)
+	if err := os.Mkdir(run, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TMPDIR", run)
+
+	cfg := v2raytypes.NewConfig().WithDefaultValues()
+	cfg.VMess.TLS = true
+	if err := cfg.SaveToPath(filepath.Join(dir, v2raytypes.ConfigFileName)); err != nil {
+		t.Fatal(err)
+	}
+	if err := NewV2Ray().Init(dir); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(filepath.Join(run, "v2ray_config.json"))
+	var doc struct {
+		Inbounds []struct {
+			StreamSettings struct {
+				Security    string `json:"security"`
+				TLSSettings struct {
+					Certificates []struct {
+						CertificateFile string `json:"certificateFile"`
+						KeyFile         string `json:"keyFile"`
+					} `json:"certificates"`
+				} `json:"tlsSettings"`
+			} `json:"streamSettings"`
+		} `json:"inbounds"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("a quote in the runtime path broke the config: %v\n%s", err, raw)
+	}
+	stream := doc.Inbounds[1].StreamSettings
+	if stream.Security != "tls" || len(stream.TLSSettings.Certificates) != 1 ||
+		stream.TLSSettings.Certificates[0].CertificateFile != filepath.Join(run, "tls.crt") ||
+		stream.TLSSettings.Certificates[0].KeyFile != filepath.Join(run, "tls.key") {
+		t.Fatalf("stream settings: %+v", stream)
+	}
+
+	path := filepath.Join(t.TempDir(), v2raytypes.ConfigFileName)
+	file := "[vmess]\nlisten_port = 8443\ntls = false\ntransport = \"tcp\"\n" +
+		"security = \"tls\"\ntlscertpath = \"/etc/shadow\"\ntls_key_path = \"/etc/shadow\"\n"
+	if err := os.WriteFile(path, []byte(file), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	v := viper.New()
+	v.SetConfigFile(path)
+	read, err := v2raytypes.ReadInConfig(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if read.VMess.Security != "" || read.VMess.TLSCertPath != "" || read.VMess.TLSKeyPath != "" {
+		t.Fatalf("v2ray.toml set the node's own fields: %+v", read.VMess)
+	}
+}

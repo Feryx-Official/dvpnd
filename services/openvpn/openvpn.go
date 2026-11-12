@@ -177,7 +177,7 @@ func (s *OpenVPN) Init(home string) (err error) {
 		data.User, data.Group = rt.Proxy.Name, rt.Proxy.Group
 	}
 
-	t, err := template.New("openvpn_conf").Parse(configTemplate)
+	t, err := template.New("openvpn_conf").Funcs(template.FuncMap{"quote": quote}).Parse(configTemplate)
 	if err != nil {
 		return err
 	}

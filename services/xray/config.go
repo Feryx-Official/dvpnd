@@ -16,12 +16,13 @@ import (
 // (listed explicitly, not with geoip:private, which needs the geoip asset
 // file), localhost by name, and TCP port 25 unless allowed. IPIfNonMatch
 // resolves a destination given as a name and matches its addresses too, so a
-// name that points at loopback cannot reach the control API.
+// name that points at loopback cannot reach the control API. Every string is
+// written through json, so a value reads back as itself.
 var configTemplate = strings.TrimSpace(`
 {
     "log": {
         "access": "none",
-        "loglevel": "{{ .LogLevel }}"
+        "loglevel": {{ json .LogLevel }}
     },
     "api": {
         "tag": "api",
@@ -59,28 +60,28 @@ var configTemplate = strings.TrimSpace(`
             },
             "streamSettings": {
                 "network": "tcp",
-                "security": "{{ .VLESS.Security }}",
+                "security": {{ json .VLESS.Security }},
 {{- if eq .VLESS.Security "tls" }}
                 "tlsSettings": {
                     "minVersion": "1.2",
                     "certificates": [
                         {
-                            "certificateFile": "{{ .TLSCertPath }}",
-                            "keyFile": "{{ .TLSKeyPath }}"
+                            "certificateFile": {{ json .TLSCertPath }},
+                            "keyFile": {{ json .TLSKeyPath }}
                         }
                     ]
                 }
 {{- else }}
                 "realitySettings": {
                     "show": false,
-                    "dest": "{{ .Reality.Dest }}",
+                    "dest": {{ json .Reality.Dest }},
                     "xver": 0,
                     "serverNames": [
-                        "{{ .Reality.ServerName }}"
+                        {{ json .Reality.ServerName }}
                     ],
-                    "privateKey": "{{ .Reality.PrivateKey }}",
+                    "privateKey": {{ json .Reality.PrivateKey }},
                     "shortIds": [
-                        "{{ .Reality.ShortID }}"
+                        {{ json .Reality.ShortID }}
                     ]
                 }
 {{- end }}
@@ -110,7 +111,7 @@ var configTemplate = strings.TrimSpace(`
             {
                 "type": "field",
                 "domain": [
-                    "domain:{{ .BlockedDomain }}"
+                    {{ json (print "domain:" .BlockedDomain) }}
                 ],
                 "outboundTag": "blocked"
             },

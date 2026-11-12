@@ -583,9 +583,11 @@ func hasIPv4(t *testing.T, iface string) bool {
 // TestOpenVPNDaemon runs the OpenVPN server without a client, which needs no
 // namespace of its own and so runs under the systemd unit too: the server
 // must open its tunnel, drop to the proxy account, answer the node over its
-// management socket, and leave nothing behind when stopped.
+// management socket, and leave nothing behind when stopped. The home's name
+// has a space, a quote and a backslash, which the server reads back from the
+// quoted paths in its configuration.
 //
-// Rules: [RT-1], [RT-7].
+// Rules: [RT-1], [RT-7], [RT-22].
 func TestOpenVPNDaemon(t *testing.T) {
 	requireEnv(t)
 	if _, err := exec.LookPath("openvpn"); err != nil {
@@ -595,7 +597,10 @@ func TestOpenVPNDaemon(t *testing.T) {
 		t.Skip("no tun device here")
 	}
 
-	home := t.TempDir()
+	home := filepath.Join(t.TempDir(), `node "home" a\b`)
+	if err := os.Mkdir(home, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	common.SetEgress(common.Egress{APIPort: apiPort})
 	rt, err := common.PrepareRuntime(home, os.Geteuid(), true)
 	if err != nil {

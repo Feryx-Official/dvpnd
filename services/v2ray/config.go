@@ -14,7 +14,8 @@ import (
 // node's egress policy is routed to a blackhole: the blocked networks,
 // localhost by name, and TCP port 25 unless allowed. IPIfNonMatch resolves a
 // destination given as a name and matches its addresses too, so a name that
-// points at loopback cannot reach the control API.
+// points at loopback cannot reach the control API. Every string is written
+// through json, so a value reads back as itself.
 var (
 	configTemplate = strings.TrimSpace(`
 {
@@ -39,14 +40,14 @@ var (
             "port": "{{ .VMess.ListenPort }}",
             "protocol": "vmess",
             "streamSettings": {
-                "network": "{{ .VMess.Transport }}",
-                "security": "{{ .VMess.Security }}",
+                "network": {{ json .VMess.Transport }},
+                "security": {{ json .VMess.Security }},
                 "tlsSettings": {
                     "allowInsecure": true,
                     "certificates": [
                         {
-                            "certificateFile": "{{ .VMess.TLSCertPath }}",
-                            "keyFile": "{{ .VMess.TLSKeyPath }}"
+                            "certificateFile": {{ json .VMess.TLSCertPath }},
+                            "keyFile": {{ json .VMess.TLSKeyPath }}
                         }
                     ]
                 }
@@ -89,7 +90,7 @@ var (
             },
             {
                 "domain": [
-                    "domain:{{ .BlockedDomain }}"
+                    {{ json (print "domain:" .BlockedDomain) }}
                 ],
                 "outboundTag": "blocked",
                 "type": "field"

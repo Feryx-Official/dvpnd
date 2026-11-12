@@ -34,10 +34,12 @@ port = {{ .API.Port }}
 	t = utils.ConfigTemplate("v2ray_toml", ct)
 )
 
+// VMessConfig is the [vmess] section. Security and the TLS paths are the
+// node's own, set at Init from tls; no key of the file reaches them.
 type VMessConfig struct {
-	Security    string `json:"security"`
-	TLSCertPath string `json:"tls_cert_path"`
-	TLSKeyPath  string `json:"tls_key_path"`
+	Security    string `json:"security" mapstructure:"-"`
+	TLSCertPath string `json:"tls_cert_path" mapstructure:"-"`
+	TLSKeyPath  string `json:"tls_key_path" mapstructure:"-"`
 
 	ListenPort uint16 `json:"listen_port" mapstructure:"listen_port"`
 	TLS        bool   `json:"tls" mapstructure:"tls"`
