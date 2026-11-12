@@ -4,6 +4,7 @@ package lite
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -144,6 +145,30 @@ func TestHotKeyTransactions(t *testing.T) {
 	}
 	if _, err := c.TxConfig().TxEncoder()(txb.GetTx()); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestFeeAllowanceFoundPastTheFirstPage: anyone can grant a fee allowance to
+// any address, so a hot key can hold any number; the granter's is found on
+// whichever page the chain lists it, and grants that sort before it cannot
+// keep the node from starting.
+//
+// Rules: [CH-9].
+func TestFeeAllowanceFoundPastTheFirstPage(t *testing.T) {
+	chain, c := newFakeChain(t)
+	for i := 0; i < 1000; i++ {
+		chain.grantAllowance(sdk.AccAddress(fmt.Sprintf("dust-granter-%07d", i)), &feegrant.BasicAllowance{})
+	}
+	granter := sdk.AccAddress("node-account-addr-01")
+	limit := sdk.NewCoins(sdk.NewInt64Coin("udvpn", 42))
+	chain.grantAllowance(granter, &feegrant.BasicAllowance{SpendLimit: limit})
+
+	got, err := c.QueryFeeAllowance(granter, c.FromAddress())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if basic, ok := got.(*feegrant.BasicAllowance); !ok || !basic.SpendLimit.IsEqual(limit) {
+		t.Fatalf("the granter's allowance, listed after 1000 others, came back as %v", got)
 	}
 }
 

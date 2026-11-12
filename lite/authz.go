@@ -9,6 +9,7 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	sdkquery "github.com/cosmos/cosmos-sdk/types/query"
 	"github.com/cosmos/cosmos-sdk/x/authz"
 	"github.com/cosmos/cosmos-sdk/x/feegrant"
 
@@ -79,24 +80,37 @@ func noAuthorization(err error) bool {
 
 // QueryFeeAllowance returns the fee allowance granter gave grantee, or nil.
 // It lists the grantee's allowances rather than asking for the one: the chain
-// answers a missing allowance with an internal error, not "not found".
+// answers a missing allowance with an internal error, not "not found". It
+// reads every page: anyone can grant the hot key an allowance, and grants
+// listed before the granter's must not hide it.
 func (c *Client) QueryFeeAllowance(granter, grantee sdk.AccAddress) (result feegrant.FeeAllowanceI, err error) {
 	c.log.Info("Querying the fee allowance", "granter", granter, "grantee", grantee)
 	err = c.query("fee allowance", func(ctx client.Context) error {
-		resp, err := feegrant.NewQueryClient(ctx).Allowances(
-			context.TODO(),
-			&feegrant.QueryAllowancesRequest{Grantee: grantee.String()},
+		var (
+			qc   = feegrant.NewQueryClient(ctx)
+			page = &sdkquery.PageRequest{Limit: 500}
 		)
-		if err != nil {
-			return types.QueryError(err)
-		}
-		for _, grant := range resp.Allowances {
-			if grant.Granter == granter.String() {
-				return c.ctx.InterfaceRegistry.UnpackAny(grant.Allowance, &result)
-			}
-		}
 
-		return nil
+		for {
+			resp, err := qc.Allowances(
+				context.TODO(),
+				&feegrant.QueryAllowancesRequest{Grantee: grantee.String(), Pagination: page},
+			)
+			if err != nil {
+				return types.QueryError(err)
+			}
+			for _, grant := range resp.Allowances {
+				if grant.Granter == granter.String() {
+					return c.ctx.InterfaceRegistry.UnpackAny(grant.Allowance, &result)
+				}
+			}
+
+			if resp.Pagination == nil || len(resp.Pagination.NextKey) == 0 {
+				return nil
+			}
+
+			page = &sdkquery.PageRequest{Key: resp.Pagination.NextKey, Limit: 500}
+		}
 	})
 
 	return result, err

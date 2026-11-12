@@ -28,3 +28,6 @@ signs transactions unattended, so its key lives on the server. IDs as in
 - **[CH-8] Every RPC remote is tried in turn, and each one's error is logged.** A remote
   that redirects or refuses must not stop the node while another one works, and the
   operator must see which ones failed.
+- **[CH-9] The granter's fee allowance is found on whichever page the chain lists it.**
+  Anyone can grant an allowance to any address. Read from the first page only, a hundred
+  dust grants that sort before the granter's made a hot-key node refuse to start.
