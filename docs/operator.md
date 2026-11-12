@@ -102,7 +102,8 @@ dvpnd wireguard config init           # writes ~/.dvpnd/wireguard.toml
 
 Pick a fixed `listen_port` (the default is random) and keep it — it is what clients are told
 to connect to. `uplink` may stay empty; the interface of the default route is detected at
-start and used for NAT. `enable_ipv6` is `true`, as on every other node: the host must then
+start and used for NAT. `interface` and `uplink` take up to 15 letters, digits, `_`, `.` or
+`-`, starting with a letter or digit; the node refuses anything else. `enable_ipv6` is `true`, as on every other node: the host must then
 reach the IPv6 internet (check in §6; Docker needs extra steps, §7). Set it `false` for an
 IPv4-only tunnel; clients then exit with the node's IPv4 address only.
 

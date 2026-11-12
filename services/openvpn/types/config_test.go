@@ -71,3 +71,23 @@ func TestConfigWithManagementPort(t *testing.T) {
 		t.Fatalf("read %+v: %v", read, err)
 	}
 }
+
+// TestConfigRefusesUnsafeNames: the interface and uplink names reach
+// iptables and the server's configuration.
+//
+// Rules: [RT-17].
+func TestConfigRefusesUnsafeNames(t *testing.T) {
+	for _, name := range []string{"ovpn0;id", "$(id)", "`id`", "a/b", "ovpn-123456789ab"} {
+		c := NewConfig().WithDefaultValues()
+		c.Interface = name
+		if err := c.Validate(); err == nil {
+			t.Errorf("interface %q accepted", name)
+		}
+
+		c = NewConfig().WithDefaultValues()
+		c.Uplink = name
+		if err := c.Validate(); err == nil {
+			t.Errorf("uplink %q accepted", name)
+		}
+	}
+}

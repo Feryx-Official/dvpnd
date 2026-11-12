@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
+	"github.com/Feryx-Official/dvpnd/v9/services/common"
 	"github.com/Feryx-Official/dvpnd/v9/utils"
 )
 
@@ -52,8 +53,13 @@ func NewConfig() *Config {
 }
 
 func (c *Config) Validate() error {
-	if c.Interface == "" {
-		return errors.New("interface cannot be empty")
+	if err := common.CheckInterfaceName("interface", c.Interface); err != nil {
+		return err
+	}
+	if c.Uplink != "" {
+		if err := common.CheckInterfaceName("uplink", c.Uplink); err != nil {
+			return err
+		}
 	}
 	if c.ListenPort == 0 {
 		return errors.New("listen_port cannot be zero")

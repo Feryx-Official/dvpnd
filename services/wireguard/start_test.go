@@ -145,3 +145,29 @@ func TestFailedStartRemovesTheFirewall(t *testing.T) {
 		t.Fatal("chains removed before the attempt")
 	}
 }
+
+// TestDetectedUplinkIsChecked: the name the default route gives goes through
+// the same check as a configured one before it reaches PostUp.
+//
+// Rules: [RT-17].
+func TestDetectedUplinkIsChecked(t *testing.T) {
+	bin, dir := t.TempDir(), t.TempDir()
+	ip := "#!/bin/sh\necho 'default via 192.0.2.1 dev eth0;reboot proto static'\n"
+	if err := os.WriteFile(filepath.Join(bin, "ip"), []byte(ip), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	cfg := wgtypes.NewConfig().WithDefaultValues()
+	cfg.Uplink = ""
+	v4, _ := wgtypes.NewIPv4PoolFromCIDR("10.8.0.2/24")
+	v6, _ := wgtypes.NewIPv6PoolFromCIDR("fd86:ea04:1115::2/120")
+	variant := Default
+	variant.ConfigDir = dir
+	s := NewVariant(variant, wgtypes.NewIPPool(v4, v6)).WithConfig(cfg, nil)
+
+	if err := s.Init(dir); err == nil {
+		raw, _ := os.ReadFile(filepath.Join(dir, cfg.Interface+".conf"))
+		t.Fatalf("Init took the uplink %q:\n%s", cfg.Uplink, raw)
+	}
+}

@@ -1042,6 +1042,26 @@
         "go test -count=1 -run '^TestAPeerAddedAgainStartsFromZero$' ./services/v2ray/"
       ],
       "expect": "--- FAIL"
+    },
+    {
+      "name": "[RT-17] a WireGuard uplink with shell syntax is accepted",
+      "file": "services/wireguard/types/config.go",
+      "find": "\t\tif err := common.CheckInterfaceName(\"uplink\", c.Uplink); err != nil {",
+      "replace": "\t\tif err := error(nil); err != nil {",
+      "run": [
+        "go test -count=1 -run '^(TestConfigRefusesUnsafeNames)$' ./services/wireguard/types/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[RT-17] the detected uplink is used unchecked",
+      "file": "services/common/host.go",
+      "find": "\tif err := CheckInterfaceName(\"the default route's interface\", name); err != nil {",
+      "replace": "\tif err := error(nil); err != nil {",
+      "run": [
+        "go test -count=1 -run '^(TestDetectedUplinkIsChecked)$' ./services/wireguard/"
+      ],
+      "expect": "--- FAIL"
     }
   ]
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
+	"github.com/Feryx-Official/dvpnd/v9/services/common"
 	"github.com/Feryx-Official/dvpnd/v9/utils"
 )
 
@@ -50,8 +51,8 @@ func NewConfig() *Config {
 }
 
 func (c *Config) Validate() error {
-	if c.Interface == "" || strings.ContainsAny(c.Interface, " /\n") || len(c.Interface) > 15 {
-		return errors.New("interface must be a valid interface name")
+	if err := common.CheckInterfaceName("interface", c.Interface); err != nil {
+		return err
 	}
 	if c.ListenPort == 0 {
 		return errors.New("listen_port cannot be zero")
@@ -59,8 +60,10 @@ func (c *Config) Validate() error {
 	if c.Proto != ProtoUDP && c.Proto != ProtoTCP {
 		return errors.Errorf("proto must be %q or %q", ProtoUDP, ProtoTCP)
 	}
-	if strings.ContainsAny(c.Uplink, " \n") {
-		return errors.New("invalid uplink")
+	if c.Uplink != "" {
+		if err := common.CheckInterfaceName("uplink", c.Uplink); err != nil {
+			return err
+		}
 	}
 
 	return nil

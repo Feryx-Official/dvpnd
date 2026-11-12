@@ -153,7 +153,9 @@ func (s *WireGuard) Init(home string) (err error) {
 	}
 
 	if s.config.Uplink == "" {
-		s.config.Uplink = common.DetectUplink()
+		if s.config.Uplink, err = common.DetectUplink(); err != nil {
+			return err
+		}
 	}
 
 	t, err := template.New("wireguard_conf").Parse(configTemplate)

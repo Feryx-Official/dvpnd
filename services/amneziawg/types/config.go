@@ -17,6 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
+	"github.com/Feryx-Official/dvpnd/v9/services/common"
 	wgtypes "github.com/Feryx-Official/dvpnd/v9/services/wireguard/types"
 	"github.com/Feryx-Official/dvpnd/v9/utils"
 )
@@ -343,8 +344,11 @@ type V3 struct {
 // Validate checks the tier against the engine's rules and against the
 // default tier, which it must not collide with. Only called when enabled.
 func (v *V3) Validate(defaultInterface string, defaultPort uint16) error {
-	if v.Interface == "" || v.Interface == defaultInterface {
-		return errors.New("interface must be set and differ from the default tier's")
+	if err := common.CheckInterfaceName("interface", v.Interface); err != nil {
+		return err
+	}
+	if v.Interface == defaultInterface {
+		return errors.New("interface must differ from the default tier's")
 	}
 	if v.ListenPort == 0 || v.ListenPort == defaultPort {
 		return errors.New("listen_port must be set and differ from the default tier's")

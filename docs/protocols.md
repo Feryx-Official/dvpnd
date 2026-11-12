@@ -127,9 +127,9 @@ document's `service_type` and `service_metadata`, and both halves of the handsha
 `services/common/` has what protocols share: UUID parsing for peer requests, the TLS
 certificate pin, a self-signed certificate generator, the generic config CLI built from a
 `ConfigSpec`, a child-process helper (start, reap, SIGTERM then kill), a peer set, the
-NAT and forwarding rule set for tunnel interfaces, and the egress policy with its tunnel
-firewall. The WireGuard service exports its
-uplink detection and forwarding switch for the other tunnel protocols.
+NAT and forwarding rule set for tunnel interfaces, the egress policy with its tunnel
+firewall, and what the tunnel protocols share from the host: uplink detection, the
+forwarding switches and the check every interface and uplink name passes.
 
 Outside the code, a protocol also needs a `scripts/runner.sh` branch, its binary in the
 `Dockerfile`, and its sections in `docs/operator.md` (§2x, §5, §6, §7).

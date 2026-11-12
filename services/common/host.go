@@ -6,11 +6,30 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 )
 
-// The tunnel services share what they need from the host: IP forwarding and
-// the interface peer traffic leaves through.
+// The tunnel services share what they need from the host: IP forwarding,
+// the interface peer traffic leaves through, and the check every interface
+// name passes.
+
+// interfaceName is what an interface or uplink setting may hold: letters,
+// digits, '_', '.' and '-', starting with a letter or digit so iptables
+// cannot read it as an option, at most 15 characters (the kernel's limit).
+var interfaceName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,14}$`)
+
+// CheckInterfaceName refuses a name that is not a plain interface name. The
+// names go into iptables commands, the daemons' configurations and the
+// PostUp line wg-quick runs in a root shell, so shell syntax in one would
+// run as root.
+func CheckInterfaceName(setting, name string) error {
+	if !interfaceName.MatchString(name) {
+		return fmt.Errorf("%s %q is not an interface name: use up to 15 letters, digits, '_', '.' or '-'", setting, name)
+	}
+
+	return nil
+}
 
 // forwardingSwitch is a kernel setting peer traffic depends on. IPv4 is
 // mandatory; IPv6 is best-effort because a host or container without IPv6
@@ -52,16 +71,21 @@ func EnsureForwarding() error {
 
 // DetectUplink returns the interface of the default IPv4 route, which is where
 // peer traffic must be masqueraded. Falls back to eth0, upstream's fixed choice.
-func DetectUplink() string {
-	out, err := exec.Command("ip", "-o", "-4", "route", "show", "default").Output()
-	if err == nil {
+// The name goes through the same check as a configured one.
+func DetectUplink() (string, error) {
+	name := "eth0"
+	if out, err := exec.Command("ip", "-o", "-4", "route", "show", "default").Output(); err == nil {
 		fields := strings.Fields(string(out))
 		for i := 0; i+1 < len(fields); i++ {
 			if fields[i] == "dev" {
-				return fields[i+1]
+				name = fields[i+1]
+				break
 			}
 		}
 	}
+	if err := CheckInterfaceName("the default route's interface", name); err != nil {
+		return "", fmt.Errorf("%w; set uplink in the service's configuration", err)
+	}
 
-	return "eth0"
+	return name, nil
 }

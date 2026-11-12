@@ -132,7 +132,9 @@ func (s *OpenVPN) Init(home string) (err error) {
 		return err
 	}
 	if s.config.Uplink == "" {
-		s.config.Uplink = common.DetectUplink()
+		if s.config.Uplink, err = common.DetectUplink(); err != nil {
+			return err
+		}
 	}
 
 	s.pki, err = loadOrCreatePKI(filepath.Join(home, "openvpn"))

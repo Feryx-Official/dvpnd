@@ -67,3 +67,9 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
 - **[RT-16] A node goes active on the chain only once it can serve: its API port is bound
   and its certificate loaded first.** A port in use or a missing certificate showed only
   after the node had gone active, and every restart went active again.
+- **[RT-17] An interface or uplink name is checked before it reaches a command or a daemon's
+  configuration.** Up to 15 letters, digits, `_`, `.` or `-`, starting with a letter or
+  digit, for WireGuard, AmneziaWG and OpenVPN, and for the name the default route gives.
+  wg-quick runs PostUp through `eval` as root, and WireGuard and AmneziaWG wrote the uplink
+  into it unchecked: a `;` in the setting, or in the detected name, split it into a second
+  command.

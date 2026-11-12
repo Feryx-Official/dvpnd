@@ -155,6 +155,7 @@ func TestV3Validation(t *testing.T) {
 		want string
 	}{
 		{"default interface", func(v *V3) { v.Interface = "awg0" }, "interface"},
+		{"interface with shell syntax", func(v *V3) { v.Interface = "awg1;id" }, "interface"},
 		{"default port", func(v *V3) { v.ListenPort = 51821 }, "listen_port"},
 		{"bad private key", func(v *V3) { v.PrivateKey = "x" }, "private_key"},
 		{"short header key", func(v *V3) { v.HeaderProtectionKey = "AAAA" }, "header_protection_key"},
