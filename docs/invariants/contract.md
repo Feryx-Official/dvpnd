@@ -54,3 +54,7 @@ leaves users unable to connect, or shows them a wrong fact. IDs as in `test/READ
   answers with no address, an IPv6 one or one no client can reach counts as failed: `auto`
   asks the next source, a chosen provider fails the start. An empty or IPv6 answer once
   reached clients as `<nil>`.
+- **[CT-15] V2Ray serves VMess over TCP only.** TCP is the one transport client apps are
+  confirmed to use; any other `transport` stops the start, naming `tcp`. The inherited
+  table refused `http`, took the typo `httpt` instead, and passed six transports nothing
+  had tested, each advertised under a code no client was checked against.

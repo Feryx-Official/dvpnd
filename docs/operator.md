@@ -122,8 +122,8 @@ without IPv6 the node runs the tunnel IPv4-only whatever the setting, and logs a
 dvpnd v2ray config init               # writes ~/.dvpnd/v2ray.toml
 ```
 
-Pick a fixed `listen_port` (TCP). `transport = "tcp"` is the only transport confirmed with
-current client apps. `tls = true` wraps the VMess inbound in TLS using the node's
+Pick a fixed `listen_port` (TCP). `transport` must be `"tcp"`, the only transport confirmed
+with current client apps; the node refuses to start with any other. `tls = true` wraps the VMess inbound in TLS using the node's
 `tls.crt`/`tls.key` from §4 and advertises the certificate's pin to clients; `false` relies
 on VMess's own encryption. The node needs the `v2ray` binary on `PATH` (see §6) and drives it
 over loopback `[api] port`, which `config init` picks at random; nothing else may bind it. A

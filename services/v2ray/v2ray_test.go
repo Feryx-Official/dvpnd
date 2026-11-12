@@ -390,3 +390,21 @@ func TestConfigStringsReadBackAsThemselves(t *testing.T) {
 		t.Fatalf("v2ray.toml set the node's own fields: %+v", read.VMess)
 	}
 }
+
+// TestOnlyTCPIsServed: TCP is the one VMess transport client apps are
+// confirmed to use. Any other value stops the start, naming tcp; the
+// inherited table took "httpt" for http, and six transports nothing tested.
+//
+// Rules: [CT-15].
+func TestOnlyTCPIsServed(t *testing.T) {
+	cfg := v2raytypes.NewConfig().WithDefaultValues()
+	if err := cfg.Validate(); err != nil || cfg.VMess.Transport != "tcp" {
+		t.Fatalf("default transport %q: %v", cfg.VMess.Transport, err)
+	}
+	for _, transport := range []string{"", "mkcp", "websocket", "http", "httpt", "domainsocket", "quic", "gun", "grpc", "TCP"} {
+		cfg.VMess.Transport = transport
+		if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), `"tcp"`) {
+			t.Errorf("transport %q: %v", transport, err)
+		}
+	}
+}

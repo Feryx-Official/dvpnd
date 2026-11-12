@@ -67,7 +67,7 @@ func (s *V2Ray) inbound() types.Inbound {
 	entry := types.Inbound{
 		Port:              s.ListenPort(),
 		ProxyProtocol:     types.ProxyProtocolVMess,
-		TransportProtocol: transportProtocolCode(s.info[2]),
+		TransportProtocol: types.TransportProtocolTCP,
 		TransportSecurity: types.TransportSecurityNone,
 	}
 	if s.info[3] != 0 {
@@ -97,15 +97,4 @@ func (s *V2Ray) PublicMetadata() interface{} {
 		TransportProtocol: in.TransportProtocol,
 		TransportSecurity: in.TransportSecurity,
 	}}
-}
-
-// transportProtocolCode maps this node's transport byte to the code clients
-// use. Only TCP is confirmed against current clients; the other transports
-// keep their historical byte value, which may or may not match.
-func transportProtocolCode(b byte) int {
-	if v2raytypes.Transport(b).String() == "tcp" {
-		return types.TransportProtocolTCP
-	}
-
-	return int(b)
 }

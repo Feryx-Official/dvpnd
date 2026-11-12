@@ -23,7 +23,7 @@ listen_port = {{ .VMess.ListenPort }}
 # Enable or disable TLS for secure connections
 tls = {{ .VMess.TLS }}
 
-# Transport protocol for the VMess inbound (tcp is the only one confirmed with current client apps)
+# Transport protocol for the VMess inbound; "tcp" is the only one served
 transport = {{ toml .VMess.Transport }}
 
 [api]
@@ -62,13 +62,8 @@ func (c *VMessConfig) Validate() error {
 	if c.ListenPort == 0 {
 		return errors.New("listen_port cannot be zero")
 	}
-	if c.Transport == "" {
-		return errors.New("transport cannot be empty")
-	}
-
-	t := NewTransportFromString(c.Transport)
-	if !t.IsValid() {
-		return fmt.Errorf("invalid transport %s", c.Transport)
+	if !NewTransportFromString(c.Transport).IsValid() {
+		return fmt.Errorf("transport must be %q, the only one served; got %q", "tcp", c.Transport)
 	}
 
 	return nil
