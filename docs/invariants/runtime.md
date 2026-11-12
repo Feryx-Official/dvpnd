@@ -52,3 +52,9 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
   passed the check and was built as root, so the object must name the tag asked for. An
   upgrade fetched from the origin the first install cloned, which may be a former home
   (LIC-8); origin is pointed at the current home before every fetch.
+- **[RT-15] A node whose protocol daemon exits stops, with an error, so its service manager
+  starts it again.** The daemon (xray, v2ray, Hysteria, OpenVPN), OpenVPN's management
+  channel and Hysteria's authentication hook are watched from `Start` on. A node whose
+  daemon had died stayed up and listed as active on the chain, and Hysteria and OpenVPN
+  nodes kept admitting clients who had paid for a session they could not serve. A daemon
+  that exits within a second of starting stops the node before it goes active.

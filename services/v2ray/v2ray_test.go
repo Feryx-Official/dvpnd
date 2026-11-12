@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/Feryx-Official/dvpnd/v9/services/common"
+	"github.com/Feryx-Official/dvpnd/v9/services/common/daemontest"
 	v2raytypes "github.com/Feryx-Official/dvpnd/v9/services/v2ray/types"
 )
 
@@ -73,6 +74,18 @@ func TestInitRequiresBinaryOnPath(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), `"v2ray" binary is not on PATH`) {
 		t.Fatalf("Init without the binary: %v", err)
 	}
+}
+
+// TestDoneWhenTheProxyDies: a proxy that dies closes Done, on which the start
+// command stops the node, since it would serve nothing while active.
+//
+// Rules: [RT-15].
+func TestDoneWhenTheProxyDies(t *testing.T) {
+	pidFile := filepath.Join(t.TempDir(), "pid")
+	s := startStub(t, "echo $$ >"+pidFile+"\ntrap 'exit 0' TERM")
+	t.Cleanup(func() { _ = s.Stop() })
+
+	daemontest.Crash(t, pidFile, s.Done())
 }
 
 // Rules: [RT-3].

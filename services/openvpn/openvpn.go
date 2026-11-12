@@ -78,6 +78,7 @@ type OpenVPN struct {
 	egress     common.TunnelEgress
 	configPath string
 	socketPath string
+	done       <-chan struct{} // closed once the server or the management channel has ended
 
 	mu     sync.Mutex
 	byCN   map[string]string   // certificate common name → session key
@@ -230,8 +231,15 @@ func (s *OpenVPN) Start() (err error) {
 
 		return err
 	}
+	s.done = common.EitherDone(s.process.Done(), s.mgmt.done)
 
 	return nil
+}
+
+// Done is closed once the server has exited or the management channel has
+// closed: without it the node admits no one and counts no traffic.
+func (s *OpenVPN) Done() <-chan struct{} {
+	return s.done
 }
 
 // Stop detaches from the management interface, ends the server and removes

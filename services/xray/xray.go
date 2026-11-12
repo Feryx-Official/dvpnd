@@ -167,6 +167,11 @@ func (s *XRay) Start() (err error) {
 	return err
 }
 
+// Done is closed once the proxy has exited.
+func (s *XRay) Done() <-chan struct{} {
+	return s.process.Done()
+}
+
 // Stop asks the proxy to exit and waits for it, killing it after stopTimeout.
 func (s *XRay) Stop() error {
 	s.connMu.Lock()

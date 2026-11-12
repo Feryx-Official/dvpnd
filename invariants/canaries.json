@@ -701,6 +701,46 @@
         "go test -count=1 -run '^TestInstallerFetchesFromTheCurrentHome$' ./test/static/"
       ],
       "expect": "after fetch_source, want the current home"
+    },
+    {
+      "name": "[RT-15] the start command ignores the protocol daemon exiting",
+      "file": "cmd/stop.go",
+      "find": "\tif d, ok := service.(types.Supervised); ok {\n\t\ts.daemon = d.Done()\n\t}\n",
+      "replace": "",
+      "run": [
+        "go test -count=1 -run '^TestStopperStopsWhenTheDaemonExits$' ./cmd/"
+      ],
+      "expect": "once the daemon exited: stop false"
+    },
+    {
+      "name": "[RT-15] XRAY never says its proxy died",
+      "file": "services/xray/xray.go",
+      "find": "func (s *XRay) Done() <-chan struct{} {\n\treturn s.process.Done()\n}",
+      "replace": "func (s *XRay) Done() <-chan struct{} {\n\treturn nil\n}",
+      "run": [
+        "go test -count=1 -run '^TestDoneWhenTheProxyDies$' ./services/xray/"
+      ],
+      "expect": "Done is still open 5 s after the daemon died"
+    },
+    {
+      "name": "[RT-15] Hysteria goes on without its authentication hook",
+      "file": "services/hysteria/hysteria.go",
+      "find": "\ts.done = common.EitherDone(s.process.Done(), s.authDone)",
+      "replace": "\ts.done = s.process.Done()",
+      "run": [
+        "go test -count=1 -run '^TestDoneWhenTheServerOrTheHookEnds$' ./services/hysteria/"
+      ],
+      "expect": "Done is still open 5 s after the hook stopped serving"
+    },
+    {
+      "name": "[RT-15] OpenVPN goes on without its management channel",
+      "file": "services/openvpn/openvpn.go",
+      "find": "\ts.done = common.EitherDone(s.process.Done(), s.mgmt.done)",
+      "replace": "\ts.done = s.process.Done()",
+      "run": [
+        "go test -count=1 -run '^TestDoneWhenTheServerOrTheManagementChannelEnds$' ./services/openvpn/"
+      ],
+      "expect": "Done is still open 5 s after the management channel closed"
     }
   ]
 }

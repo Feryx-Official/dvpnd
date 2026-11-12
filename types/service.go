@@ -33,6 +33,15 @@ type Service interface {
 	PublicMetadata() interface{}
 }
 
+// Supervised is a service whose data plane is a child process the node
+// started: a proxy or a VPN daemon. Done, called after Start, is closed once
+// that process, or the node's channel to it, is gone. The node then serves
+// nothing while it stays active on the chain, so it stops with an error and
+// its service manager starts it again.
+type Supervised interface {
+	Done() <-chan struct{}
+}
+
 type Peer struct {
 	Key      string `json:"key"`
 	Upload   int64  `json:"upload"`

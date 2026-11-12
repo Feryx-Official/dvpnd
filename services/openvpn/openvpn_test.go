@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/Feryx-Official/dvpnd/v9/services/common"
+	"github.com/Feryx-Official/dvpnd/v9/services/common/daemontest"
 	ovpntypes "github.com/Feryx-Official/dvpnd/v9/services/openvpn/types"
 )
 
@@ -300,6 +301,62 @@ func TestStartStop(t *testing.T) {
 	if err := NewOpenVPN().Stop(); err == nil {
 		t.Fatal("Stop before Start must fail")
 	}
+}
+
+// TestDoneWhenTheServerOrTheManagementChannelEnds: the server dying, or the
+// management channel closing (nothing is admitted or counted without it),
+// closes Done, on which the start command stops the node. OpenVPN's AddPeer
+// never reaches the server, so without it the node kept admitting paying
+// clients.
+//
+// Rules: [RT-15].
+func TestDoneWhenTheServerOrTheManagementChannelEnds(t *testing.T) {
+	start := func(t *testing.T) (*OpenVPN, *fakeServer, string) {
+		pidFile := filepath.Join(t.TempDir(), "pid")
+		stubBinary(t)
+		if err := os.WriteFile(binaryName, []byte(daemontest.Script(pidFile)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		dir, _ := home(t, ovpntypes.ProtoUDP, false)
+
+		saved, savedQuiet := common.RunCommand, common.RunQuiet
+		common.RunCommand = func(_ string, args ...string) error {
+			if args[0] == "-C" { // no jump in place yet
+				return os.ErrNotExist
+			}
+			return nil
+		}
+		common.RunQuiet = common.RunCommand
+		t.Cleanup(func() { common.RunCommand, common.RunQuiet = saved, savedQuiet })
+		savedFwd := ensureForwarding
+		ensureForwarding = func() error { return nil }
+		t.Cleanup(func() { ensureForwarding = savedFwd })
+
+		s := NewOpenVPN()
+		if err := s.Init(dir); err != nil {
+			t.Fatal(err)
+		}
+		f := startFakeServerOn(t, s.socketPath)
+		if err := s.Start(); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = s.Stop() })
+
+		return s, f, pidFile
+	}
+
+	t.Run("the server dies", func(t *testing.T) {
+		s, _, pidFile := start(t)
+		daemontest.Crash(t, pidFile, s.Done())
+	})
+	t.Run("the management channel closes", func(t *testing.T) {
+		s, f, _ := start(t)
+		<-f.ready
+		f.mu.Lock()
+		_ = f.conn.Close()
+		f.mu.Unlock()
+		daemontest.Closes(t, s.Done(), "the management channel closed")
+	})
 }
 
 // TestVerbFollowsNodeLogLevel: OpenVPN logs every client's address at its

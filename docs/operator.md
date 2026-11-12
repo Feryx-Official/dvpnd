@@ -412,6 +412,12 @@ the next start. A client that reconnects keeps its on-chain session, and the nod
 reporting that session's totals on top of what the chain already holds (the chain refuses a
 report lower than the last one, and one refused report fails the whole batch).
 
+If the protocol daemon (xray, v2ray, Hysteria or OpenVPN) exits on its own, or OpenVPN's
+management channel or Hysteria's authentication hook stops, the node logs `Stopping: the
+protocol daemon exited`, stops its service and exits with an error; systemd (`Restart=always`)
+or Docker (`--restart unless-stopped`) starts it again. Look above that line in the log for
+the daemon's own reason.
+
 ## 7. Run with Docker (when the host path does not fit)
 
 Use this when you want the bundled `v2ray`, `xray`, `hysteria`, `openvpn`, AmneziaWG tools

@@ -163,6 +163,11 @@ func (s *V2Ray) Start() (err error) {
 	return err
 }
 
+// Done is closed once the proxy has exited.
+func (s *V2Ray) Done() <-chan struct{} {
+	return s.process.Done()
+}
+
 // Stop asks the proxy to exit and waits for it, killing it after stopTimeout.
 func (s *V2Ray) Stop() error {
 	s.connMu.Lock()

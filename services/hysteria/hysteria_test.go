@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/Feryx-Official/dvpnd/v9/services/common"
+	"github.com/Feryx-Official/dvpnd/v9/services/common/daemontest"
 	hysteriatypes "github.com/Feryx-Official/dvpnd/v9/services/hysteria/types"
 )
 
@@ -103,10 +104,15 @@ func home(t *testing.T, obfs string) (string, *hysteriatypes.Config) {
 
 func stubBinary(t *testing.T) {
 	t.Helper()
+	stubScript(t, "#!/bin/sh\ntrap 'exit 0' TERM\nwhile :; do sleep 0.1; done\n")
+}
+
+// stubScript puts script where the hysteria binary is looked for.
+func stubScript(t *testing.T, script string) {
+	t.Helper()
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "hysteria")
-	script := "#!/bin/sh\ntrap 'exit 0' TERM\nwhile :; do sleep 0.1; done\n"
 	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -329,6 +335,40 @@ func TestStartStop(t *testing.T) {
 	if err := NewHysteria().Stop(); err == nil {
 		t.Fatal("Stop before Start must fail")
 	}
+}
+
+// TestDoneWhenTheServerOrTheHookEnds: the server dying, or the authentication
+// hook no longer serving (the server then admits no one), closes Done, on
+// which the start command stops the node. Hysteria's AddPeer never reaches
+// the server, so without it the node kept admitting paying clients.
+//
+// Rules: [RT-15].
+func TestDoneWhenTheServerOrTheHookEnds(t *testing.T) {
+	start := func(t *testing.T) (*Hysteria, string) {
+		pidFile := filepath.Join(t.TempDir(), "pid")
+		stubScript(t, daemontest.Script(pidFile))
+		dir, _ := home(t, "")
+		s := NewHysteria()
+		if err := s.Init(dir); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.Start(); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = s.Stop() })
+
+		return s, pidFile
+	}
+
+	t.Run("the server dies", func(t *testing.T) {
+		s, pidFile := start(t)
+		daemontest.Crash(t, pidFile, s.Done())
+	})
+	t.Run("the hook stops serving", func(t *testing.T) {
+		s, _ := start(t)
+		_ = s.auth.Close()
+		daemontest.Closes(t, s.Done(), "the hook stopped serving")
+	})
 }
 
 // Rules: [CT-3], [CT-4].

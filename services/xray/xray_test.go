@@ -19,6 +19,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/Feryx-Official/dvpnd/v9/services/common"
+	"github.com/Feryx-Official/dvpnd/v9/services/common/daemontest"
 	xraytypes "github.com/Feryx-Official/dvpnd/v9/services/xray/types"
 	"github.com/Feryx-Official/dvpnd/v9/types"
 )
@@ -123,10 +124,15 @@ func home(t *testing.T, security string) (string, *xraytypes.Config) {
 
 func stubBinary(t *testing.T) {
 	t.Helper()
+	stubScript(t, "#!/bin/sh\ntrap 'exit 0' TERM\nwhile :; do sleep 0.1; done\n")
+}
+
+// stubScript puts script where the xray binary is looked for.
+func stubScript(t *testing.T, script string) {
+	t.Helper()
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "xray")
-	script := "#!/bin/sh\ntrap 'exit 0' TERM\nwhile :; do sleep 0.1; done\n"
 	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -322,6 +328,27 @@ func TestStartStop(t *testing.T) {
 	if exited, _ := s.process.Exited(); !exited {
 		t.Fatal("child was not reaped")
 	}
+}
+
+// TestDoneWhenTheProxyDies: a proxy that dies closes Done, on which the start
+// command stops the node, since it would serve nothing while active.
+//
+// Rules: [RT-15].
+func TestDoneWhenTheProxyDies(t *testing.T) {
+	pidFile := filepath.Join(t.TempDir(), "pid")
+	stubScript(t, daemontest.Script(pidFile))
+	dir, _ := home(t, xraytypes.SecurityTLS)
+
+	s := NewXRay()
+	if err := s.Init(dir); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Stop() })
+
+	daemontest.Crash(t, pidFile, s.Done())
 }
 
 // Rules: [CT-3], [CT-4].

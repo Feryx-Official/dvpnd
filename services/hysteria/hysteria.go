@@ -84,6 +84,7 @@ type Hysteria struct {
 	peers    *common.PeerSet
 	auth     *http.Server
 	authDone chan struct{}
+	done     <-chan struct{} // closed once the server or the hook has ended
 	client   *http.Client
 }
 
@@ -229,8 +230,15 @@ func (s *Hysteria) Start() error {
 
 		return err
 	}
+	s.done = common.EitherDone(s.process.Done(), s.authDone)
 
 	return nil
+}
+
+// Done is closed once the server has exited or the authentication hook has
+// stopped serving: without the hook the server admits no one.
+func (s *Hysteria) Done() <-chan struct{} {
+	return s.done
 }
 
 // Stop ends the server, then the authentication hook.

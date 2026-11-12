@@ -29,8 +29,9 @@ func Verbose() bool { return verbose.Load() }
 // lifecycle every service needs: start, reap on exit, stop politely.
 type Process struct {
 	cmd    *exec.Cmd
-	exited chan error // receives the child's Wait result once it has exited
-	onStop func()     // runs once the child has exited after Stop
+	done   chan struct{} // closed once the child has exited and been reaped
+	err    error         // the child's Wait result, set before done is closed
+	onStop func()        // runs once the child has exited after Stop
 }
 
 // StartProcess launches name with args; extraEnv is appended to the current
@@ -48,10 +49,45 @@ func StartProcess(name string, args []string, extraEnv []string, attr *syscall.S
 		return nil, err
 	}
 
-	p := &Process{cmd: cmd, exited: make(chan error, 1)}
-	go func() { p.exited <- cmd.Wait() }()
+	p := &Process{cmd: cmd, done: make(chan struct{})}
+	go func() {
+		p.err = cmd.Wait()
+		close(p.done)
+	}()
 
 	return p, nil
+}
+
+// Done is closed once the child has exited, on its own or through Stop. It is
+// nil, so never ready, for a process that was not started.
+func (p *Process) Done() <-chan struct{} {
+	if p == nil {
+		return nil
+	}
+
+	return p.done
+}
+
+// EitherDone returns a channel closed once a or b is closed: a daemon and the
+// node's channel to it, either of which gone leaves the service unable to serve.
+func EitherDone(a, b <-chan struct{}) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-a:
+		case <-b:
+		}
+		close(done)
+	}()
+
+	return done
+}
+
+// Err is how the child exited, once Done is closed.
+func (p *Process) Err() error {
+	<-p.Done()
+
+	return p.err
 }
 
 // Stop sends SIGTERM and waits for the child, killing it after timeout. An
@@ -69,7 +105,7 @@ func (p *Process) Stop(timeout time.Duration) error {
 	}
 
 	select {
-	case <-p.exited:
+	case <-p.done:
 		return nil
 	case <-time.After(timeout):
 	}
@@ -77,7 +113,7 @@ func (p *Process) Stop(timeout time.Duration) error {
 	if err := p.cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
 		return err
 	}
-	<-p.exited
+	<-p.done
 
 	return nil
 }

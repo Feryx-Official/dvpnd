@@ -407,6 +407,19 @@ func StartCmd() *cobra.Command {
 				}
 			}()
 
+			// From here the node also stops when the protocol daemon exits, and
+			// it looks for a reason to stop between the steps that take time. A
+			// daemon that cannot run exits within the grace, before the node goes
+			// active on the chain.
+			stop := newStopper(log, sigCh, service)
+			grace := time.Duration(0)
+			if stop.daemon != nil {
+				grace = daemonStartGrace
+			}
+			if halt, stopErr := stop.within(grace); halt {
+				return stopErr
+			}
+
 			if egress.Resolver != nil {
 				go runHandshake(log, config.Handshake.Peers, egress.Resolver)
 			}
@@ -440,25 +453,27 @@ func StartCmd() *cobra.Command {
 			}
 
 			n := node.NewNode(ctx)
+			if halt, stopErr := stop.within(0); halt {
+				return stopErr
+			}
 			if err = n.Initialize(); err != nil {
 				return err
 			}
 
+			if halt, stopErr := stop.within(0); halt {
+				return stopErr
+			}
 			if err = n.ReconcileSessions(); err != nil {
 				return err
 			}
 
-			// Run until the API server fails, a job panics or a stop signal
-			// arrives; the deferred stop above then takes the service down.
+			// Run until a stop signal arrives, the protocol daemon exits, the
+			// API server fails or a job panics; the deferred stop above then
+			// takes the service down.
 			errCh := make(chan error, 1)
 			go func() { errCh <- n.Start(home) }()
-
-			select {
-			case sig := <-sigCh:
-				log.Info("Stopping: signal received", "signal", sig.String())
-			case err = <-errCh:
-				log.Error("The node stopped on an error", "error", err)
-			}
+			stop.failed = errCh
+			_, err = stop.within(-1)
 
 			return err
 		},
