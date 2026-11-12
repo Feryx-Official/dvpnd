@@ -1332,6 +1332,26 @@
         "go test -count=1 -run '^TestRunnerChecksTheImageSignature$' ./test/static/"
       ],
       "expect": "--- FAIL"
+    },
+    {
+      "name": "[RT-29] the unit leaves what its daemons make readable by every account",
+      "file": "scripts/dvpnd.service",
+      "find": "UMask=0077\n",
+      "replace": "",
+      "run": [
+        "go test -count=1 -run '^TestUnitLimitsWhatItsDaemonsMake$' ./test/static/"
+      ],
+      "expect": "want 0077 once"
+    },
+    {
+      "name": "[RT-29] the unit's tasks are not capped",
+      "file": "scripts/dvpnd.service",
+      "find": "TasksMax=4096\n",
+      "replace": "",
+      "run": [
+        "go test -count=1 -run '^TestUnitLimitsWhatItsDaemonsMake$' ./test/static/"
+      ],
+      "expect": "want one cap"
     }
   ]
 }

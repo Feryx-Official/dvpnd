@@ -26,6 +26,15 @@
 # drops to that account). System calls are limited to what a service makes plus
 # module loading; anything else fails with EPERM. /run/dvpnd is the runtime
 # directory the daemons read their configuration from.
+#
+# What the node and the daemons create is root's only unless they set its mode
+# afterwards (UMask), and the unit's tasks are capped, so a daemon that forks or starts
+# threads without bound cannot use up the host's. Left as they are, after a
+# look: ProtectSystem=strict would make /run read-only, where amneziawg-go and
+# wireguard-go keep their control sockets and legacy iptables its lock, which
+# the systemd test stage does not run; CAP_SYS_MODULE stays, since legacy
+# iptables loads its modules itself; ProtectClock adds nothing, CAP_SYS_TIME
+# being outside the bounding set already.
 [Unit]
 Description=dvpnd - dVPN node for the Sentinel network
 After=network-online.target
@@ -65,6 +74,8 @@ SystemCallFilter=@system-service @module
 SystemCallErrorNumber=EPERM
 RuntimeDirectory=dvpnd
 RuntimeDirectoryMode=0750
+UMask=0077
+TasksMax=4096
 
 [Install]
 WantedBy=multi-user.target

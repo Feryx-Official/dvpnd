@@ -138,3 +138,8 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
   by its whole name, where `docker ps --filter name=` matched any name holding it. With
   cosign installed it checks a pulled image's signature as the guide does and removes one
   that fails, and it never pulls on the way to a start.
+- **[RT-29] Under the systemd unit, what the node and its daemons create is root's only
+  unless they set its mode, and the unit's tasks are capped.** `UMask=0077` and
+  `TasksMax=4096`: with systemd's default umask, 0022, a file a daemon wrote without
+  setting its mode was readable by every account on the host, and nothing bounded the tasks
+  a daemon could start. Read from inside the unit in the systemd test stage.

@@ -17,7 +17,8 @@
 #          runs in userspace.
 # systemd  XRAY, Hysteria2 and the OpenVPN server under scripts/dvpnd.service
 #          itself (a drop-in replaces only ExecStart), in a Debian container
-#          running systemd. V2Ray is left out: the image's build is Alpine's.
+#          running systemd, and the unit's own limits read from inside it.
+#          V2Ray is left out: the image's build is Alpine's.
 #
 # Exits non-zero if any stage fails. BUILD_NETWORK sets docker build
 # --network ("host" by default, as in tools/awgcheck/check.sh).
@@ -114,8 +115,8 @@ Type=oneshot
 Restart=no
 TimeoutStartSec=900
 ExecStart=
-ExecStart=/usr/local/bin/dvpnd-it -test.v -test.count=1 -test.run 'TestProxies|TestProxyAccountChain|TestOpenVPNDaemon'
-Environment=DVPND_IT=1 DVPND_IT_PUBLIC=$TARGET_PUBLIC DVPND_IT_PRIVATE=$TARGET_PRIVATE DVPND_IT_NAME=$TARGET_NAME DVPND_IT_SELF=203.0.113.4
+ExecStart=/usr/local/bin/dvpnd-it -test.v -test.count=1 -test.run 'TestProxies|TestProxyAccountChain|TestOpenVPNDaemon|TestUnitSandbox'
+Environment=DVPND_IT=1 DVPND_IT_PUBLIC=$TARGET_PUBLIC DVPND_IT_PRIVATE=$TARGET_PRIVATE DVPND_IT_NAME=$TARGET_NAME DVPND_IT_SELF=203.0.113.4 DVPND_IT_UNIT=1
 EOF
   docker create --name dvpnd-it-systemd --privileged --cgroupns=host \
     -v /sys/fs/cgroup:/sys/fs/cgroup:rw --tmpfs /run --tmpfs /run/lock \

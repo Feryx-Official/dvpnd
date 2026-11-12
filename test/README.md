@@ -167,7 +167,7 @@ the node, not from a network that would have dropped the traffic anyway.
 |---|---|---|
 | `proxies` | V2Ray, XRAY (REALITY and TLS), Hysteria2; the proxy account's kernel chain on its own; the tunnel chains in the real iptables | a container with exactly the capabilities `scripts/runner.sh` gives a proxy node (read from the runner) |
 | `tunnels` | WireGuard, AmneziaWG (default and 3.1 tier), OpenVPN, each with a client in a network namespace | a privileged container, with the runner's sysctls |
-| `systemd` | XRAY, Hysteria2, the OpenVPN server dropping to `dvpnd-proxy` | `scripts/dvpnd.service` as shipped, in a Debian container running systemd; a drop-in replaces only `ExecStart` |
+| `systemd` | XRAY, Hysteria2, the OpenVPN server dropping to `dvpnd-proxy`; the unit's umask and task cap, read from inside it | `scripts/dvpnd.service` as shipped, in a Debian container running systemd; a drop-in replaces only `ExecStart` |
 
 Run one stage with `test/integration/run.sh <stage>`. The daemons log to the
 output; a failing case prints its client's log.
