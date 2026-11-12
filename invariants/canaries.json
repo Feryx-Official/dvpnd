@@ -1292,6 +1292,46 @@
         "go test -count=1 -run '^TestRunnerSetupKeepsTheHostsSettings$' ./test/static/"
       ],
       "expect": "setup replaced"
+    },
+    {
+      "name": "[RT-28] the runner finds a key anywhere in its table's lines",
+      "file": "scripts/runner.sh",
+      "find": "    current == table && $0 ~ \"^[[:space:]]*\" key \"[[:space:]]*=\" {",
+      "replace": "    current == table && $0 ~ key {",
+      "run": [
+        "go test -count=1 -run '^TestRunnerStartsTheGuidesContainer$' ./test/static/"
+      ],
+      "expect": "names no node type the runner knows"
+    },
+    {
+      "name": "[RT-28] the runner's node stays down after a crash or a reboot",
+      "file": "scripts/runner.sh",
+      "find": "  [[ \"${detach}\" -eq 1 ]] && mode=(--detach --restart unless-stopped)",
+      "replace": "  [[ \"${detach}\" -eq 1 ]] && mode=(--detach)",
+      "run": [
+        "go test -count=1 -run '^TestRunnerStartsTheGuidesContainer$' ./test/static/"
+      ],
+      "expect": "the operator guide with"
+    },
+    {
+      "name": "[RT-28] the runner finds its container by part of its name",
+      "file": "scripts/runner.sh",
+      "find": "  docker container inspect --format '{{ .State.Status }}' \"${CONTAINER_NAME}\" 2>/dev/null || true",
+      "replace": "  docker ps --all --filter name=\"${CONTAINER_NAME}\" --format '{{ .Names }}' | head -1 | sed 's/.*/running/'",
+      "run": [
+        "go test -count=1 -run '^TestRunnerActsOnItsOwnContainerOnly$' ./test/static/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[RT-28] the runner runs an image the release workflow did not sign",
+      "file": "scripts/runner.sh",
+      "find": "  if [[ -z \"${digest}\" ]] || ! cosign verify \"${digest}\" \\",
+      "replace": "  if false && ! cosign verify \"${digest}\" \\",
+      "run": [
+        "go test -count=1 -run '^TestRunnerChecksTheImageSignature$' ./test/static/"
+      ],
+      "expect": "--- FAIL"
     }
   ]
 }

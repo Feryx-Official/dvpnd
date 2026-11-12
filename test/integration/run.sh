@@ -83,7 +83,7 @@ stage_proxies() {
   # The capabilities scripts/runner.sh gives a proxy node, read from it so
   # the two cannot drift apart.
   local caps
-  read -r -a caps <<<"$(sed -n '/-n "${proxy_port}"/,/^  fi$/p' "$ROOT/scripts/runner.sh" |
+  read -r -a caps <<<"$(sed -n '/^    v2ray | xray | hysteria2)$/,/^      ;;$/p' "$ROOT/scripts/runner.sh" |
     grep -oE -- '--cap-(drop|add) [A-Z_]+' | tr '\n' ' ')"
   [[ ${#caps[@]} -gt 2 ]] || { echo "could not read the proxy capabilities from scripts/runner.sh"; return 1; }
   echo "   with ${caps[*]}"

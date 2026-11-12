@@ -59,7 +59,9 @@ not yet.
   and signing keys of the test's own, its `ssh_ports`, `write_config`,
   `write_protocol` and `create_key`, which run against a fake `sshd` and a
   fake `dvpnd`, and its downloads, each in a directory of its own and checked
-  against a checksum the script pins;
+  against a checksum the script pins; and the Docker runner's `setup`,
+  `start`, `stop`, `remove`, `attach` and `update`, which run against fake
+  tools, its flags held to the operator guide's `docker run` commands;
 - the same SPDX and `sentinel-go-sdk` checks as shell steps, and
   `docs/provenance/verify-fork.sh`, which also asks apache.org,
   proxy.golang.org and Software Heritage when it can reach them (an

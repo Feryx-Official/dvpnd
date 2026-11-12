@@ -2,26 +2,81 @@
 
 set -Eeou pipefail
 
+# The node's container, wrapping the commands of docs/operator.md, section 7.
 CONTAINER_NAME=dvpnd
 NODE_DIR="${HOME}/.dvpnd"
-NODE_IMAGE=ghcr.io/feryx-official/dvpnd:latest
+RELEASE_IMAGE=ghcr.io/feryx-official/dvpnd
+NODE_IMAGE="${RELEASE_IMAGE}:latest"
 DOCKER_DAEMON_CONFIG=/etc/docker/daemon.json
 
+# toml_value FILE TABLE KEY prints KEY's value in [TABLE] of FILE, unquoted;
+# TABLE "" is the top of the file, before any table. A key is matched whole,
+# at the start of its line, in its own table only: matched anywhere after
+# [node], "type" was found in a moniker holding the word, nothing started, and
+# start exited 0.
+function toml_value {
+  awk -v table="${2}" -v key="${3}" '
+    /^[[:space:]]*\[/ { current = $0; gsub(/[][[:space:]]/, "", current); next }
+    current == table && $0 ~ "^[[:space:]]*" key "[[:space:]]*=" {
+      value = $0
+      sub(/^[^=]*=[[:space:]]*/, "", value)
+      if (value ~ /^"/) {
+        sub(/^"/, "", value)
+        sub(/".*$/, "", value)
+      } else {
+        sub(/[[:space:]]*(#.*)?$/, "", value)
+      }
+      print value
+      exit
+    }' "${1}"
+}
+
+# container_state prints the node container's state (running, exited, ...), or
+# nothing when there is none. The name is matched whole: docker ps --filter
+# name= matches part of a name, so stop and remove acted on any container whose
+# name held this one.
+function container_state {
+  docker container inspect --format '{{ .State.Status }}' "${CONTAINER_NAME}" 2>/dev/null || true
+}
+
 function stop {
-  id=$(docker ps --filter name="${CONTAINER_NAME}" --quiet)
-  [[ -n "${id}" ]] && docker stop "${id}"
+  [[ "$(container_state)" == "running" ]] && docker stop "${CONTAINER_NAME}"
   return 0
 }
 
 function remove {
-  id=$(docker ps --all --filter name="${CONTAINER_NAME}" --quiet)
-  [[ -n "${id}" ]] && docker rm --force --volumes "${id}"
+  [[ -n "$(container_state)" ]] && docker rm --force --volumes "${CONTAINER_NAME}"
   return 0
 }
 
+# pull_image pulls NODE_IMAGE and, when cosign is installed, checks that this
+# repository's release workflow built and signed it, as the operator guide does
+# (section 7). An image that fails the check is removed; the node only runs
+# an image already pulled (docker run --pull never), so it is not fetched
+# again unchecked. An image of another name (an own build) is not checked.
+function pull_image {
+  docker pull "${NODE_IMAGE}" || return 1
+  [[ "${NODE_IMAGE}" == "${RELEASE_IMAGE}:"* ]] || return 0
+  if ! command -v cosign &>/dev/null; then
+    echo "Warning: cosign is not installed, so ${NODE_IMAGE} is not checked against the signature"
+    echo "of the repository's release workflow; install cosign 3 or later to check it (docs/operator.md, section 7)"
+    return 0
+  fi
+  local digest
+  digest=$(docker image inspect --format '{{ range .RepoDigests }}{{ println . }}{{ end }}' "${NODE_IMAGE}" |
+    grep -m 1 "^${RELEASE_IMAGE}@") || true
+  if [[ -z "${digest}" ]] || ! cosign verify "${digest}" \
+    --certificate-identity-regexp '^https://github.com/Feryx-Official/dvpnd/\.github/workflows/docker-publish\.yml@refs/tags/v' \
+    --certificate-oidc-issuer https://token.actions.githubusercontent.com >/dev/null; then
+    docker image rm "${NODE_IMAGE}" >/dev/null 2>&1 || true
+    echo "Error: ${NODE_IMAGE} is not signed by the repository's release workflow; it is removed"
+    return 1
+  fi
+  echo "Checked: ${digest} is signed by the repository's release workflow"
+}
+
 function cmd_attach {
-  id=$(docker ps --filter name="${CONTAINER_NAME}" --quiet)
-  [[ -n "${id}" ]] && docker attach "${id}" && return 0
+  [[ "$(container_state)" == "running" ]] && docker attach "${CONTAINER_NAME}" && return 0
   echo "Error: node is not running" && return 1
 }
 
@@ -38,7 +93,7 @@ function cmd_help {
   echo "  stop       Stop the node"
   echo "  remove     Remove the node container"
   echo "  restart    Restart the node"
-  echo "  update     Update the node to the latest version"
+  echo "  update     Pull the latest image and remove the node container; start it again after"
 }
 
 function cmd_init {
@@ -48,6 +103,7 @@ function cmd_init {
   function run {
     docker run \
       --interactive \
+      --pull never \
       --rm \
       --tty \
       --volume "${NODE_DIR}:/root/.dvpnd" \
@@ -98,7 +154,7 @@ function cmd_init {
 
   function cmd_init_config {
     function generate_moniker {
-      id=$(docker create "${NODE_IMAGE}") &&
+      id=$(docker create --pull never "${NODE_IMAGE}") &&
         name=$(docker inspect --format "{{ .Name }}" "${id}" | cut -c 2-) &&
         docker rm --force --volumes "${id}" >/dev/null 2>&1 &&
         echo "${name}"
@@ -128,7 +184,10 @@ function cmd_init {
 
     local chain_rpc_addresses="https://sentinel-rpc.publicnode.com:443,https://sentinel-rpc.polkachu.com:443,https://rpc-sentinel.busurnode.com:443,https://rpc.sentineldao.com:443"
     local handshake_enable=false
-    local keyring_backend=file
+    # The node signs unattended with the test backend, as the operator guide
+    # sets it; with file it asks for the passphrase at every start, through
+    # attach, and a container Docker restarts waits for it.
+    local keyring_backend=test
     local node_ipv4_address=
     local node_listen_on="0.0.0.0:${PORTS[0]}"
     local node_moniker && node_moniker=$(generate_moniker)
@@ -149,7 +208,7 @@ function cmd_init {
     [[ -n "${input}" ]] && handshake_enable="${input}"
     config_set "handshake.enable" "${handshake_enable}"
 
-    read -p "Enter keyring_backend [${keyring_backend}]:" -r input
+    read -p "Enter keyring_backend (test or file) [${keyring_backend}]:" -r input
     [[ -n "${input}" ]] && keyring_backend="${input}"
     config_set "keyring.backend" "${keyring_backend}"
 
@@ -483,7 +542,7 @@ function setup_host {
   install_packages curl openssl
   setup_docker_ipv6
   setup_tls
-  docker pull "${NODE_IMAGE}"
+  pull_image
 }
 
 # setup_docker_ipv6 gives containers IPv6 as the operator guide does (section
@@ -543,165 +602,156 @@ function cmd_start {
   }
 
   local detach=0
-  local rm=1
 
   [[ "${#}" -gt 0 ]] && {
     case "${1}" in
-      "-d" | "--detach") detach=1 && rm=0 ;;
+      "-d" | "--detach") detach=1 ;;
       "help") cmd_help && return 0 ;;
       *) echo "Error: invalid command or option \"${1}\"" && return 1 ;;
     esac
   }
 
-  local node_api_port=
-  local node_type=
+  local node_type api_port listen_port
+  node_type=$(toml_value "${NODE_DIR}/config.toml" node type)
+  api_port=$(toml_value "${NODE_DIR}/config.toml" node listen_on)
+  api_port="${api_port##*:}"
 
-  node_api_port=$(awk -F '[=":]' '{gsub(/ /,"")} /\[node\]/{f=1} f && /listen_on/{print $4;exit}' "${NODE_DIR}/config.toml")
-  node_type=$(awk -F '[="]' '{gsub(/ /,"")} /\[node\]/{f=1} f && /type/{print $3;exit}' "${NODE_DIR}/config.toml")
+  # run_node runs the node container with the flags every node type shares
+  # and the type's own in "$@", as docs/operator.md, section 7, does.
+  # Detached, Docker starts it again after a crash or a reboot; in the
+  # foreground, it is removed when it stops. It runs the image setup or update
+  # pulled and checked, never one fetched on the way.
+  function run_node {
+    local mode=(--rm)
+    [[ "${detach}" -eq 1 ]] && mode=(--detach --restart unless-stopped)
+    docker run "${mode[@]}" \
+      --pull never \
+      --interactive \
+      --tty \
+      --name "${CONTAINER_NAME}" \
+      --log-opt max-size=50m \
+      --log-opt max-file=3 \
+      --volume "${NODE_DIR}:/root/.dvpnd" \
+      --publish "${api_port}:${api_port}/tcp" \
+      "${@}" \
+      "${NODE_IMAGE}" process start
+  }
 
-  # Proxy node types run as a plain process on one port: no modules, no
-  # sysctls. The node starts the proxy as the dvpnd-proxy account (SETUID,
-  # SETGID; CHOWN for its runtime files; KILL to stop it) behind an OUTPUT
-  # chain for that account (NET_ADMIN, NET_RAW); every other capability is
-  # dropped.
-  local proxy_port= proxy_proto=tcp
-  [[ "${node_type}" == "v2ray" ]] &&
-    proxy_port=$(awk -F '=' '{gsub(/ /,"")} /\[vmess\]/{f=1} f && /listen_port/{print $2;exit}' "${NODE_DIR}/v2ray.toml")
-  [[ "${node_type}" == "xray" ]] &&
-    proxy_port=$(awk -F '=' '{gsub(/ /,"")} /\[vless\]/{f=1} f && /listen_port/{print $2;exit}' "${NODE_DIR}/xray.toml")
-  [[ "${node_type}" == "hysteria2" ]] && proxy_proto=udp &&
-    proxy_port=$(awk -F '=' '{gsub(/ /,"")} /\[server\]/{f=1} f && /listen_port/{print $2;exit}' "${NODE_DIR}/hysteria.toml")
-  if [[ -n "${proxy_port}" ]]; then
-    docker run \
-      --detach="${detach}" \
-      --interactive \
-      --name="${CONTAINER_NAME}" \
-      --rm="${rm}" \
-      --tty \
-      --volume "${NODE_DIR}:/root/.dvpnd" \
-      --cap-drop ALL \
-      --cap-add NET_BIND_SERVICE \
-      --cap-add NET_ADMIN \
-      --cap-add NET_RAW \
-      --cap-add SETUID \
-      --cap-add SETGID \
-      --cap-add CHOWN \
-      --cap-add KILL \
-      --publish "${node_api_port}:${node_api_port}/tcp" \
-      --publish "${proxy_port}:${proxy_port}/${proxy_proto}" \
-      "${NODE_IMAGE}" process start
-  fi
-  if [[ "${node_type}" == "amneziawg" ]]; then
-    # Userspace AmneziaWG on a tun device: no kernel module, so no SYS_MODULE
-    # and no /lib/modules, but the tun device.
-    port=$(awk -F '=' '{gsub(/ /,"")} /listen_port/{print $2;exit}' "${NODE_DIR}/amneziawg.toml")
-    # The AmneziaWG 3.1 tier ([v3]) has a port of its own, published when enabled.
-    v3_enabled=$(awk -F '=' '{gsub(/ /,"")} /^\[v3\]/{s=1} s&&/^enabled/{print $2;exit}' "${NODE_DIR}/amneziawg.toml")
-    v3_port=$(awk -F '=' '{gsub(/ /,"")} /^\[v3\]/{s=1} s&&/^listen_port/{print $2;exit}' "${NODE_DIR}/amneziawg.toml")
-    v3_publish=""
-    [[ "${v3_enabled}" == "true" && -n "${v3_port}" ]] && v3_publish="--publish ${v3_port}:${v3_port}/udp"
-    # shellcheck disable=SC2086
-    docker run \
-      --detach="${detach}" \
-      --interactive \
-      --name="${CONTAINER_NAME}" \
-      --rm="${rm}" \
-      --tty \
-      --device /dev/net/tun \
-      --volume "${NODE_DIR}:/root/.dvpnd" \
-      --cap-drop ALL \
-      --cap-add NET_ADMIN \
-      --cap-add NET_BIND_SERVICE \
-      --cap-add NET_RAW \
-      --sysctl net.ipv4.ip_forward=1 \
-      --sysctl net.ipv6.conf.all.disable_ipv6=0 \
-      --sysctl net.ipv6.conf.all.forwarding=1 \
-      --sysctl net.ipv6.conf.default.forwarding=1 \
-      --publish "${node_api_port}:${node_api_port}/tcp" \
-      --publish "${port}:${port}/udp" \
-      ${v3_publish} \
-      "${NODE_IMAGE}" process start
-  fi
-  if [[ "${node_type}" == "openvpn" ]]; then
-    # A tun device, NAT and forwarding, no kernel module. The server drops to
-    # the dvpnd-proxy account once its tunnel is up (SETUID, SETGID; CHOWN
-    # for its runtime files; KILL to stop it).
-    port=$(awk -F '=' '{gsub(/ /,"")} /listen_port/{print $2;exit}' "${NODE_DIR}/openvpn.toml")
-    proto=$(awk -F '[="]' '{gsub(/ /,"")} /^proto/{print $3;exit}' "${NODE_DIR}/openvpn.toml")
-    docker run \
-      --detach="${detach}" \
-      --interactive \
-      --name="${CONTAINER_NAME}" \
-      --rm="${rm}" \
-      --tty \
-      --device /dev/net/tun \
-      --volume "${NODE_DIR}:/root/.dvpnd" \
-      --cap-drop ALL \
-      --cap-add NET_ADMIN \
-      --cap-add NET_BIND_SERVICE \
-      --cap-add NET_RAW \
-      --cap-add SETUID \
-      --cap-add SETGID \
-      --cap-add CHOWN \
-      --cap-add KILL \
-      --sysctl net.ipv4.ip_forward=1 \
-      --sysctl net.ipv6.conf.all.disable_ipv6=0 \
-      --sysctl net.ipv6.conf.all.forwarding=1 \
-      --sysctl net.ipv6.conf.default.forwarding=1 \
-      --publish "${node_api_port}:${node_api_port}/tcp" \
-      --publish "${port}:${port}/${proto:-udp}" \
-      "${NODE_IMAGE}" process start
-  fi
-  if [[ "${node_type}" == "wireguard" ]]; then
-    port=$(awk -F '=' '{gsub(/ /,"")} /listen_port/{print $2;exit}' "${NODE_DIR}/wireguard.toml")
-    docker run \
-      --detach="${detach}" \
-      --interactive \
-      --name="${CONTAINER_NAME}" \
-      --rm="${rm}" \
-      --tty \
-      --volume /lib/modules:/lib/modules \
-      --volume "${NODE_DIR}:/root/.dvpnd" \
-      --cap-drop ALL \
-      --cap-add NET_ADMIN \
-      --cap-add NET_BIND_SERVICE \
-      --cap-add NET_RAW \
-      --cap-add SYS_MODULE \
-      --sysctl net.ipv4.ip_forward=1 \
-      --sysctl net.ipv6.conf.all.disable_ipv6=0 \
-      --sysctl net.ipv6.conf.all.forwarding=1 \
-      --sysctl net.ipv6.conf.default.forwarding=1 \
-      --publish "${node_api_port}:${node_api_port}/tcp" \
-      --publish "${port}:${port}/udp" \
-      "${NODE_IMAGE}" process start
-  fi
+  # IP forwarding for the tunnel types, set here because /proc/sys is
+  # read-only inside the container.
+  local forwarding=(
+    --sysctl net.ipv4.ip_forward=1
+    --sysctl net.ipv6.conf.all.disable_ipv6=0
+    --sysctl net.ipv6.conf.all.forwarding=1
+    --sysctl net.ipv6.conf.default.forwarding=1
+  )
+
+  case "${node_type}" in
+    v2ray | xray | hysteria2)
+      # Proxy node types run as a plain process on one port: no modules, no
+      # sysctls. The node starts the proxy as the dvpnd-proxy account (SETUID,
+      # SETGID; CHOWN for its runtime files; KILL to stop it) behind an OUTPUT
+      # chain for that account (NET_ADMIN, NET_RAW); every other capability is
+      # dropped.
+      local file table proto=tcp
+      case "${node_type}" in
+        v2ray) file=v2ray.toml table=vmess ;;
+        xray) file=xray.toml table=vless ;;
+        hysteria2) file=hysteria.toml table=server proto=udp ;;
+      esac
+      listen_port=$(toml_value "${NODE_DIR}/${file}" "${table}" listen_port)
+      run_node \
+        --cap-drop ALL \
+        --cap-add NET_BIND_SERVICE \
+        --cap-add NET_ADMIN \
+        --cap-add NET_RAW \
+        --cap-add SETUID \
+        --cap-add SETGID \
+        --cap-add CHOWN \
+        --cap-add KILL \
+        --publish "${listen_port}:${listen_port}/${proto}"
+      ;;
+    amneziawg)
+      # Userspace AmneziaWG on a tun device: no kernel module, so no SYS_MODULE
+      # and no /lib/modules, but the tun device. The 3.1 tier ([v3]) has a port
+      # of its own, published when it is enabled.
+      listen_port=$(toml_value "${NODE_DIR}/amneziawg.toml" "" listen_port)
+      local v3=()
+      if [[ "$(toml_value "${NODE_DIR}/amneziawg.toml" v3 enabled)" == "true" ]]; then
+        local v3_port
+        v3_port=$(toml_value "${NODE_DIR}/amneziawg.toml" v3 listen_port)
+        v3=(--publish "${v3_port}:${v3_port}/udp")
+      fi
+      run_node \
+        --device /dev/net/tun \
+        --cap-drop ALL \
+        --cap-add NET_ADMIN \
+        --cap-add NET_BIND_SERVICE \
+        --cap-add NET_RAW \
+        "${forwarding[@]}" \
+        --publish "${listen_port}:${listen_port}/udp" \
+        "${v3[@]}"
+      ;;
+    openvpn)
+      # A tun device, NAT and forwarding, no kernel module. The server drops to
+      # the dvpnd-proxy account once its tunnel is up (SETUID, SETGID; CHOWN
+      # for its runtime files; KILL to stop it).
+      local proto
+      listen_port=$(toml_value "${NODE_DIR}/openvpn.toml" "" listen_port)
+      proto=$(toml_value "${NODE_DIR}/openvpn.toml" "" proto)
+      run_node \
+        --device /dev/net/tun \
+        --cap-drop ALL \
+        --cap-add NET_ADMIN \
+        --cap-add NET_BIND_SERVICE \
+        --cap-add NET_RAW \
+        --cap-add SETUID \
+        --cap-add SETGID \
+        --cap-add CHOWN \
+        --cap-add KILL \
+        "${forwarding[@]}" \
+        --publish "${listen_port}:${listen_port}/${proto:-udp}"
+      ;;
+    wireguard)
+      listen_port=$(toml_value "${NODE_DIR}/wireguard.toml" "" listen_port)
+      run_node \
+        --volume /lib/modules:/lib/modules:ro \
+        --cap-drop ALL \
+        --cap-add NET_ADMIN \
+        --cap-add NET_BIND_SERVICE \
+        --cap-add NET_RAW \
+        --cap-add SYS_MODULE \
+        "${forwarding[@]}" \
+        --publish "${listen_port}:${listen_port}/udp"
+      ;;
+    *)
+      echo "Error: ${NODE_DIR}/config.toml names no node type the runner knows (\"${node_type}\")" && return 1
+      ;;
+  esac
 }
 
 function cmd_status {
-  id=$(docker ps --all --filter name="${CONTAINER_NAME}" --quiet)
-  if [[ -n "${id}" ]]; then
-    running=$(docker container inspect --format "{{ .State.Running }}" "${CONTAINER_NAME}")
-    if [[ "${running}" == "true" ]]; then
-      echo "Node is running..."
-    else
-      exit_code=$(docker container inspect --format "{{ .State.ExitCode }}" "${CONTAINER_NAME}")
-      echo "Node is not running and has exited with code ${exit_code}"
-    fi
-    docker logs --tail 20 "${CONTAINER_NAME}"
-  else
+  local state
+  state=$(container_state)
+  if [[ -z "${state}" ]]; then
     echo "Error: node container does not exist" && return 1
   fi
+  if [[ "${state}" == "running" ]]; then
+    echo "Node is running..."
+  else
+    exit_code=$(docker container inspect --format "{{ .State.ExitCode }}" "${CONTAINER_NAME}")
+    echo "Node is not running and has exited with code ${exit_code}"
+  fi
+  docker logs --tail 20 "${CONTAINER_NAME}"
 }
 
 function cmd_stop {
-  id=$(docker ps --filter name="${CONTAINER_NAME}" --quiet)
-  [[ -n "${id}" ]] && docker stop "${id}" && return 0
+  [[ "$(container_state)" == "running" ]] && docker stop "${CONTAINER_NAME}" && return 0
   echo "Error: node is not running" && return 1
 }
 
 function cmd_remove {
-  id=$(docker ps --all --filter name="${CONTAINER_NAME}" --quiet)
-  [[ -n "${id}" ]] && docker rm --force --volumes "${id}" && return 0
+  [[ -n "$(container_state)" ]] && docker rm --force --volumes "${CONTAINER_NAME}" && return 0
   echo "Error: node container does not exist" && return 1
 }
 
@@ -729,11 +779,13 @@ function cmd_restart {
   cmd_start "${@}"
 }
 
+# cmd_update pulls and checks the image first, so an image that fails the
+# check leaves the running node as it is.
 function cmd_update {
+  pull_image
   stop
   remove
-  docker rmi --force "${NODE_IMAGE}"
-  docker pull "${NODE_IMAGE}"
+  echo "Start the node on the new image: ${0} start --detach"
 }
 
 # Sourced, as the tests do, the script defines its functions and runs nothing.

@@ -603,8 +603,12 @@ pins hysteria app/v2.10.0 and checks its sha256 at build time.
 
 The `--log-opt` flags cap the container's log at three files of 50 MB; Docker's default
 json-file log grows without bound. `scripts/runner.sh` wraps these commands (`init`, `start`,
-`stop`, `status`, `update`) for every node type; its `NODE_IMAGE` is the published
-`ghcr.io/feryx-official/dvpnd:latest`, so edit it only to pin a version or to use your own build.
+`stop`, `status`, `update`) for every node type, with the same flags; a test holds the two
+together. Its `NODE_IMAGE` is the published `ghcr.io/feryx-official/dvpnd:latest`, so edit it
+only to pin a version or to use your own build. `setup` and `update` check the pulled image
+with cosign as above when cosign is installed, and remove an image that fails; `start` runs
+only an image already pulled. Its `init` sets the `test` keyring backend: with `file`, the
+node asks for the passphrase at every start, through `scripts/runner.sh attach`.
 
 The WireGuard path is exercised by an end-to-end test that builds the image, registers a
 node, buys a session and connects a client from a second container — a WireGuard node served

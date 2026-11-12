@@ -129,3 +129,12 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
   rewrote the file, dropping the host's settings, and the restart restarted every
   container. It keeps an existing TLS certificate, which clients pin, and installs no
   package that replaces the firewall: the iptables-persistent it installed removes ufw.
+- **[RT-28] The Docker runner starts each node type as the operator guide's `docker run`
+  does, acts on its own container only, and runs only an image it checked when it can.**
+  Its capabilities, devices, sysctls, modules volume, restart policy and log caps are the
+  guide's; they had drifted to no restart policy, no log caps and a writable
+  `/lib/modules`. It reads each setting from its own table, matched whole: a moniker
+  holding "type" was read as the node type, and nothing started. It finds its container
+  by its whole name, where `docker ps --filter name=` matched any name holding it. With
+  cosign installed it checks a pulled image's signature as the guide does and removes one
+  that fails, and it never pulls on the way to a start.
