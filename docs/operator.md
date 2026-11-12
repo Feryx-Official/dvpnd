@@ -140,6 +140,10 @@ it is wrapped:
   server name and `fingerprint` in the handshake. Only change the keys with a fresh
   `config init --force`.
 
+There is no third choice: VLESS has no cipher of its own, so without TLS or REALITY the
+traffic would cross the network in cleartext. `xray config set` refuses any other value,
+and the node refuses to start with one.
+
 `flow = true` enables XTLS Vision, which current clients support and expect. The node drives
 xray over loopback `[api] port`; nothing else may bind it. Clients cannot reach that port, or
 anything else on the host, through the proxy (§5). The node needs the `xray` binary on `PATH`

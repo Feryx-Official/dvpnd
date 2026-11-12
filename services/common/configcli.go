@@ -31,6 +31,9 @@ type ConfigSpec struct {
 	// points at the file; the value returned must be a pointer so that
 	// "config set" can unmarshal into it.
 	Read func(v *viper.Viper) (ConfigFile, error)
+	// Check, when set, vets the configuration "config set" produced before
+	// it is saved; a refused value leaves the file as it was.
+	Check func(c ConfigFile) error
 }
 
 // ConfigCommand builds the "<use> config init|show|set" subtree every
@@ -129,6 +132,11 @@ func configSet(spec ConfigSpec) *cobra.Command {
 
 			if err = types.SetConfigKey(v, config, args[0], args[1]); err != nil {
 				return err
+			}
+			if spec.Check != nil {
+				if err = spec.Check(config); err != nil {
+					return err
+				}
 			}
 
 			return config.SaveToPath(path)

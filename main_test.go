@@ -80,6 +80,12 @@ func TestFailingCommandExitsNonZero(t *testing.T) {
 // setKey is a key a script sets with config set, and the line that sets it.
 type setKey struct{ key, at string }
 
+// setValue is what TestConfigSetRefusesAnUnknownKey sets a key to when "1"
+// is not a value config set accepts for it; every other key gets "1".
+var setValue = map[string]string{
+	"vless.security": "tls", // tls or reality only
+}
+
 // installerSet matches a config set in the installer: the protocol named, or
 // the node type in a case arm, or none for the node's own file; then the key.
 // runnerSet matches one in the Docker runner, through its <protocol>_config_set
@@ -206,8 +212,12 @@ func TestConfigSetRefusesAnUnknownKey(t *testing.T) {
 			}
 
 			for _, k := range known {
-				if status, out := dvpnd("config", "set", k.key, "1"); status != 0 {
-					t.Errorf("config set %s 1, as %s does, exited %d:\n%s", k.key, k.at, status, out)
+				value := "1"
+				if v, ok := setValue[k.key]; ok {
+					value = v
+				}
+				if status, out := dvpnd("config", "set", k.key, value); status != 0 {
+					t.Errorf("config set %s %s, as %s does, exited %d:\n%s", k.key, value, k.at, status, out)
 				}
 			}
 			if name == "" {
@@ -217,5 +227,46 @@ func TestConfigSetRefusesAnUnknownKey(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestXRayConfigSetRefusesCleartext holds xray config set to refusing a
+// vless.security the node would refuse at start. VLESS has no cipher of its
+// own, so any value but tls or reality would leave the proxy hop cleartext;
+// saved, it surfaced only at the next start, after the installer had moved
+// on. The two values the node accepts are the control.
+//
+// Rules: [PV-9].
+func TestXRayConfigSetRefusesCleartext(t *testing.T) {
+	home := t.TempDir()
+	xray := func(args ...string) (int, string) {
+		return runDvpnd(t, append(append([]string{"xray"}, args...), "--home", home)...)
+	}
+	if status, out := xray("config", "init"); status != 0 {
+		t.Fatalf("xray config init exited %d:\n%s", status, out)
+	}
+
+	before := files(t, home)
+	for _, value := range []string{"none", ""} {
+		status, out := xray("config", "set", "vless.security", value)
+		if status == 0 || !strings.Contains(out, "Error:") || !strings.Contains(out, "security must be") {
+			t.Errorf("xray config set vless.security %q exited %d; want the security error:\n%s", value, status, out)
+		}
+	}
+	if !maps.Equal(files(t, home), before) {
+		t.Error("a refused xray config set changed the files")
+	}
+
+	for _, value := range []string{"reality", "tls"} {
+		if status, out := xray("config", "set", "vless.security", value); status != 0 {
+			t.Errorf("xray config set vless.security %s exited %d:\n%s", value, status, out)
+		}
+	}
+	b, err := os.ReadFile(filepath.Join(home, "xray.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `security = "tls"`) {
+		t.Errorf("xray config set vless.security tls did not store the value:\n%s", b)
 	}
 }

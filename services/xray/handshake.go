@@ -4,6 +4,7 @@ package xray
 
 import (
 	"encoding/binary"
+	"fmt"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -27,7 +28,19 @@ func Command() *cobra.Command {
 		FileName: xraytypes.ConfigFileName,
 		Default:  func() common.ConfigFile { return xraytypes.NewConfig().WithDefaultValues() },
 		Read:     func(v *viper.Viper) (common.ConfigFile, error) { return xraytypes.ReadInConfig(v) },
+		Check:    checkSet,
 	})
+}
+
+// checkSet refuses at "config set" the [vless] values the node would refuse
+// at start, a cleartext security among them. The [reality] section is left
+// to start: a key pair set one key at a time is mismatched in between.
+func checkSet(c common.ConfigFile) error {
+	if err := c.(*xraytypes.Config).VLESS.Validate(); err != nil {
+		return fmt.Errorf("invalid section vless: %w", err)
+	}
+
+	return nil
 }
 
 func (s *XRay) Name() string {

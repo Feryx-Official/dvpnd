@@ -68,6 +68,16 @@
       "expect": "--- FAIL"
     },
     {
+      "name": "[PV-9] config set saves a value without the protocol's check",
+      "file": "services/common/configcli.go",
+      "find": "\t\t\tif spec.Check != nil {",
+      "replace": "\t\t\tif false {",
+      "run": [
+        "go test -count=1 -run '^(TestXRayConfigSetRefusesCleartext)$' ."
+      ],
+      "expect": "--- FAIL"
+    },
+    {
       "name": "[SL-1] XRAY reports a peer under a key other than its session key",
       "file": "services/xray/xray.go",
       "find": "\t\t\tKey:      key,",
