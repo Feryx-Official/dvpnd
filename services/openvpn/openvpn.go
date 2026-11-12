@@ -73,7 +73,6 @@ type OpenVPN struct {
 	config     *ovpntypes.Config
 	pki        *pki
 	process    *common.Process
-	mgmt       *management
 	nat        common.NAT
 	egress     common.TunnelEgress
 	configPath string
@@ -81,6 +80,7 @@ type OpenVPN struct {
 	done       <-chan struct{} // closed once the server or the management channel has ended
 
 	mu     sync.Mutex
+	mgmt   *management         // nil before Start and after Stop
 	byCN   map[string]string   // certificate common name → session key
 	closed map[string]*traffic // session key → traffic of ended connections
 	peers  *common.PeerSet
@@ -221,17 +221,20 @@ func (s *OpenVPN) Start() (err error) {
 
 		return err
 	}
-	s.mgmt = newManagement(conn, s.admit, s.disconnected)
+	mgmt := newManagement(conn, s.admit, s.disconnected)
+	s.mu.Lock()
+	s.mgmt = mgmt
+	s.mu.Unlock()
 
 	if err = s.nat.Up(); err != nil {
-		_ = s.mgmt.Close()
+		_ = s.detach()
 		_ = s.process.Stop(stopTimeout)
 		s.nat.Down()
 		s.egress.Down()
 
 		return err
 	}
-	s.done = common.EitherDone(s.process.Done(), s.mgmt.done)
+	s.done = common.EitherDone(s.process.Done(), mgmt.done)
 
 	return nil
 }
@@ -249,15 +252,37 @@ func (s *OpenVPN) Stop() error {
 		return errors.New("openvpn was not started")
 	}
 
-	if s.mgmt != nil {
-		_ = s.mgmt.Close()
-		s.mgmt = nil
-	}
+	_ = s.detach()
 	err := s.process.Stop(stopTimeout)
 	s.nat.Down()
 	s.egress.Down()
 
 	return err
+}
+
+// attached returns the connection to the management interface, nil before
+// Start and after Stop. The jobs use it while Stop may drop it.
+func (s *OpenVPN) attached() *management {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.mgmt
+}
+
+// detach drops the management connection and closes it. It is closed
+// outside the lock: the reader it waits for may be delivering a disconnect,
+// which takes the lock.
+func (s *OpenVPN) detach() error {
+	s.mu.Lock()
+	m := s.mgmt
+	s.mgmt = nil
+	s.mu.Unlock()
+
+	if m == nil {
+		return nil
+	}
+
+	return m.Close()
 }
 
 // admit is the management-client-auth decision: only a registered peer's
@@ -360,19 +385,20 @@ func (s *OpenVPN) RemovePeer(data []byte) error {
 	s.mu.Unlock()
 	s.peers.Delete(key)
 
-	if s.mgmt == nil {
+	m := s.attached()
+	if m == nil {
 		return nil
 	}
 
-	return s.mgmt.kill(cn)
+	return m.kill(cn)
 }
 
 // Peers reports every registered peer: what its ended connections used plus
 // the live connection's counters from the status table.
 func (s *OpenVPN) Peers() ([]types.Peer, error) {
 	live := map[string]clientStatus{}
-	if s.mgmt != nil {
-		rows, err := s.mgmt.status()
+	if m := s.attached(); m != nil {
+		rows, err := m.status()
 		if err != nil {
 			return nil, err
 		}

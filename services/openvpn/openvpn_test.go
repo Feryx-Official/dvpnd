@@ -394,3 +394,63 @@ func TestTunnelIPv4(t *testing.T) {
 		t.Fatalf("tunnel IPv4: %s", got)
 	}
 }
+
+// startOpenVPN starts the service on the stub binary, attached to a fake
+// management server, with the firewall calls faked.
+func startOpenVPN(t *testing.T) (*OpenVPN, *fakeServer) {
+	t.Helper()
+
+	stubBinary(t)
+	dir, _ := home(t, ovpntypes.ProtoUDP, false)
+
+	saved, savedQuiet := common.RunCommand, common.RunQuiet
+	common.RunCommand = func(_ string, args ...string) error {
+		if args[0] == "-C" { // no jump in place yet
+			return os.ErrNotExist
+		}
+		return nil
+	}
+	common.RunQuiet = common.RunCommand
+	t.Cleanup(func() { common.RunCommand, common.RunQuiet = saved, savedQuiet })
+	savedFwd := ensureForwarding
+	ensureForwarding = func() error { return nil }
+	t.Cleanup(func() { ensureForwarding = savedFwd })
+
+	s := NewOpenVPN()
+	if err := s.Init(dir); err != nil {
+		t.Fatal(err)
+	}
+	f := startFakeServerOn(t, s.socketPath)
+	if err := s.Start(); err != nil {
+		t.Fatal(err)
+	}
+
+	return s, f
+}
+
+// TestStopWhileThePeersAreRead: the jobs read the usage and remove peers
+// while the node stops; Stop drops the management connection under the
+// lock those calls take it under, so none of them finds it half gone.
+func TestStopWhileThePeersAreRead(t *testing.T) {
+	s, f := startOpenVPN(t)
+	data := []byte("0123456789abcdef")
+	if _, err := s.AddPeer(data); err != nil {
+		t.Fatal(err)
+	}
+	f.mu.Lock()
+	f.clients = []clientStatus{{commonName: "30313233-3435-3637-3839-616263646566", received: 1, sent: 2, cid: "4"}}
+	f.mu.Unlock()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 50; i++ {
+			_, _ = s.Peers()
+			_ = s.RemovePeer(data)
+		}
+	}()
+	if err := s.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	<-done
+}
