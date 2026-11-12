@@ -598,6 +598,16 @@
       "expect": "--- FAIL"
     },
     {
+      "name": "[RT-2] a stop signal while the node starts kills it with the service up",
+      "file": "cmd/start.go",
+      "find": "\t\t\tsignal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)",
+      "replace": "\t\t\tsignal.Reset(syscall.SIGINT, syscall.SIGTERM)",
+      "run": [
+        "go test -count=1 -run '^TestStartCatchesAStopSignalOnceTheServiceRuns$' ./test/static/"
+      ],
+      "expect": "never catches a stop signal"
+    },
+    {
       "name": "[RT-2] the start command leaves the service running when it ends",
       "file": "cmd/start.go",
       "find": [

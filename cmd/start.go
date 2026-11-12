@@ -382,6 +382,13 @@ func StartCmd() *cobra.Command {
 				}
 			}
 
+			// The stop signals are caught from here on: left to their default
+			// action they end the process at once, with no deferred call run,
+			// so the service started below would outlive the node.
+			sigCh := make(chan os.Signal, 1)
+			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+			defer signal.Stop(sigCh)
+
 			log.Info("Starting the VPN service", "type", service.Type())
 			if err = service.Start(); err != nil {
 				return err
@@ -445,10 +452,6 @@ func StartCmd() *cobra.Command {
 			// arrives; the deferred stop above then takes the service down.
 			errCh := make(chan error, 1)
 			go func() { errCh <- n.Start(home) }()
-
-			sigCh := make(chan os.Signal, 1)
-			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-			defer signal.Stop(sigCh)
 
 			select {
 			case sig := <-sigCh:

@@ -96,6 +96,38 @@ func unstoppedReturns(fset *token.FileSet, stmts []ast.Stmt, stopped bool, defer
 //
 // Rules: [RT-2].
 func TestStartStopsTheServiceOnEveryExit(t *testing.T) {
+	fset, body, start := startCommand(t)
+	deferred := false
+	for _, pos := range unstoppedReturns(fset, body.List[start+1:], false, &deferred) {
+		t.Errorf("%s returns after service.Start() without stopping the service", pos)
+	}
+}
+
+// TestStartCatchesAStopSignalOnceTheServiceRuns reads the start command: the
+// stop signals are caught from before service.Start(). Left to their default
+// action, a SIGTERM while the node still started (opening the database, going
+// active on the chain, reconciling the sessions) ended the process at once,
+// with no deferred call run, and the tunnel and the firewall rules stayed.
+//
+// Rules: [RT-2].
+func TestStartCatchesAStopSignalOnceTheServiceRuns(t *testing.T) {
+	_, body, start := startCommand(t)
+	for i, s := range body.List {
+		if callsOn(s, "signal", "Notify") {
+			if i > start {
+				t.Errorf("signal.Notify comes after service.Start(): a stop signal in between kills the node without stopping the service")
+			}
+
+			return
+		}
+	}
+	t.Error("the start command never catches a stop signal (no signal.Notify in RunE)")
+}
+
+// startCommand returns the body of the start command's RunE and the index of
+// the statement in it that calls service.Start().
+func startCommand(t *testing.T) (*token.FileSet, *ast.BlockStmt, int) {
+	t.Helper()
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, filepath.Join(root(t), "cmd", "start.go"), nil, 0)
 	if err != nil {
@@ -129,10 +161,7 @@ func TestStartStopsTheServiceOnEveryExit(t *testing.T) {
 		t.Fatal("no service.Start() in the start command: re-aim this test")
 	}
 
-	deferred := false
-	for _, pos := range unstoppedReturns(fset, body.List[start+1:], false, &deferred) {
-		t.Errorf("%s returns after service.Start() without stopping the service", pos)
-	}
+	return fset, body, start
 }
 
 // caseNames returns the name of each element of the slice literal the named

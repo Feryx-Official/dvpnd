@@ -11,7 +11,8 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
 - **[RT-2] However the node stops after its service has started, the service is stopped
   first.** A stop signal, a job that panics, or a step that fails after `Start` all take
   the tunnel down, remove the firewall rules and stop the daemon, so none of it outlives
-  the node.
+  the node. The stop signals are caught from before `Start`: a SIGTERM while the node was
+  still starting ended it at once, with the tunnel and the firewall rules left up.
 - **[RT-3] A daemon is stopped with SIGTERM and killed if it doesn't exit in time; a
   daemon that exits on its own is reaped.**
 - **[RT-4] IP forwarding is switched on from the node, read before it is written.**
