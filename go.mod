@@ -3,7 +3,6 @@ module github.com/Feryx-Official/dvpnd/v9
 go 1.26.10
 
 require (
-	github.com/avast/retry-go/v4 v4.7.0
 	github.com/cosmos/cosmos-sdk v0.47.17
 	github.com/cosmos/go-bip39 v1.0.0
 	github.com/gin-contrib/cors v1.7.10

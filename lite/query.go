@@ -41,7 +41,9 @@ func (c *Client) query(name string, fn func(ctx client.Context) error) error {
 // eachRemote calls fn with each RPC remote in turn until one succeeds. A
 // remote that fails is logged with failed and keyvals, and the next one is
 // tried: one that redirects or refuses must not stop the node while another
-// works. When all fail, the error names every remote with its own error.
+// works. When all fail, the error names every remote with its own error. A
+// transaction's settled answer ends the loop: another remote cannot change
+// what a block included or a mempool took.
 func (c *Client) eachRemote(failed string, fn func(remote string) error, keyvals ...interface{}) error {
 	var errs []error
 	for _, remote := range c.remotes {
@@ -52,6 +54,9 @@ func (c *Client) eachRemote(failed string, fn func(remote string) error, keyvals
 
 		c.log.Info(failed, append(append([]interface{}{}, keyvals...), "remote", remote, "error", err)...)
 		errs = append(errs, fmt.Errorf("%s: %w", remote, err))
+		if settled(err) {
+			break
+		}
 	}
 
 	return errors.Join(errs...)

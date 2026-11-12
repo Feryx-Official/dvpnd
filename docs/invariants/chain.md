@@ -34,3 +34,10 @@ signs transactions unattended, so its key lives on the server. IDs as in
 - **[CH-10] Queries to a remote reuse its connection.** The node keeps one RPC client
   per remote. One per query opened a new connection, with its TLS handshake, every time,
   and a client handshake costs the node up to three queries.
+- **[CH-11] One transaction call pays for one transaction at most.** A transaction a
+  block included is never sent again, whatever its code. One a remote took but no block
+  included within `rpc_tx_timeout` is left to land, and the session report does not send
+  its sessions again. A lost reply is answered by sending the same bytes again. Only a
+  refusal at CheckTx for a sequence another transaction used builds a new transaction;
+  any other refusal is not sent again. Before, every error was retried with a new
+  transaction up to five times, so a failure the chain recorded could be paid five times.

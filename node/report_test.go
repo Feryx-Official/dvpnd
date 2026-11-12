@@ -4,6 +4,7 @@ package node
 
 import (
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -22,6 +23,7 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/Feryx-Official/dvpnd/v9/context"
+	"github.com/Feryx-Official/dvpnd/v9/lite"
 	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
@@ -150,6 +152,40 @@ func (r *refusing) UpdateSessions(items ...types.Session) error {
 	}
 
 	return r.fakeChain.UpdateSessions(items...)
+}
+
+// TestReportWaitsForABatchThatMayStillLand: a batch a remote took but no
+// block included in time may still land. Sending its sessions again, alone
+// or in a smaller batch, would pay for their reports twice, so the report
+// waits for the next pass, which sees what the chain then holds.
+//
+// Rules: [CH-11].
+func TestReportWaitsForABatchThatMayStillLand(t *testing.T) {
+	chain := &fakeChain{sessions: map[uint64]v1base.Status{1: v1base.StatusActive, 2: v1base.StatusActive}}
+	n := testNode(chain)
+	n.chain = &unconfirmed{fakeChain: chain}
+
+	if err := n.reportSessions(sessions(1, 2)); !errors.Is(err, lite.ErrUnconfirmed) {
+		t.Fatalf("err = %v, want the batch's ErrUnconfirmed", err)
+	}
+	if len(chain.sent) != 1 {
+		t.Fatalf("sent %v: the batch only, then wait for the next pass", chain.sent)
+	}
+}
+
+// unconfirmed takes every report and never sees it in a block.
+type unconfirmed struct{ *fakeChain }
+
+func (u *unconfirmed) UpdateSessions(items ...types.Session) error {
+	var ids []uint64
+	for _, item := range items {
+		ids = append(ids, item.ID)
+	}
+	u.mu.Lock()
+	u.sent = append(u.sent, ids)
+	u.mu.Unlock()
+
+	return fmt.Errorf("https://rpc.example:443: %w: after 30 seconds", lite.ErrUnconfirmed)
 }
 
 // TestReportDuringAnOutage: with the chain unreachable the report is left

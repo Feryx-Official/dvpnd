@@ -856,6 +856,52 @@
         "go test -count=1 -run '^TestStartBindsThePortBeforeGoingActive$' ./test/static/"
       ],
       "expect": "comes after n.Initialize"
+    },
+    {
+      "name": "[CH-11] a failure a block recorded is sent again as a new transaction",
+      "file": "lite/tx.go",
+      "find": [
+        "\t\tcase settled(err):",
+        "\t\t\treturn nil, err"
+      ],
+      "replace": [
+        "\t\tcase settled(err):",
+        "\t\t\ttxBytes = nil"
+      ],
+      "run": [
+        "go test -count=1 -run '^TestOneCallPaysForOneTransactionAtMost$' ./lite/"
+      ],
+      "expect": "one call got \\d+ transactions into blocks, want 1"
+    },
+    {
+      "name": "[CH-11] a lost reply is answered with a new transaction",
+      "file": "lite/tx.go",
+      "find": [
+        "\t\tcase refused == nil:",
+        "\t\t\t// No remote answered, and one may hold the transaction."
+      ],
+      "replace": [
+        "\t\tcase refused == nil:",
+        "\t\t\ttxBytes = nil"
+      ],
+      "run": [
+        "go test -count=1 -run '^TestOneCallPaysForOneTransactionAtMost$/lost' ./lite/"
+      ],
+      "expect": "one call got 2 transactions into blocks, want 1"
+    },
+    {
+      "name": "[CH-11] the session report sends a batch that may still land again",
+      "file": "node/jobs.go",
+      "find": [
+        "\tif errors.Is(err, lite.ErrUnconfirmed) {"
+      ],
+      "replace": [
+        "\tif errors.Is(err, lite.ErrUnconfirmed) && false {"
+      ],
+      "run": [
+        "go test -count=1 -run '^TestReportWaitsForABatchThatMayStillLand$' ./node/"
+      ],
+      "expect": "the batch only, then wait for the next pass"
     }
   ]
 }

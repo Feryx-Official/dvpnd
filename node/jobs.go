@@ -13,6 +13,7 @@ import (
 	v1base "github.com/sentinel-official/sentinelhub/v12/types/v1"
 	subscriptiontypes "github.com/sentinel-official/sentinelhub/v12/x/subscription/types/v3"
 
+	"github.com/Feryx-Official/dvpnd/v9/lite"
 	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
@@ -270,6 +271,11 @@ func (n *Node) reportSessions(items []types.Session) error {
 	err := n.chain.UpdateSessions(items...)
 	if err == nil {
 		return nil
+	}
+	if errors.Is(err, lite.ErrUnconfirmed) {
+		// The batch may still land: sending its sessions again would pay
+		// for their reports twice. The next pass sees what the chain holds.
+		return err
 	}
 	n.Log().Info("Session report failed; checking each session again", "count", len(items), "error", err)
 

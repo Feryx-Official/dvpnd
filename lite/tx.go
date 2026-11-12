@@ -4,17 +4,89 @@
 package lite
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
-	"github.com/avast/retry-go/v4"
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
-	"github.com/pkg/errors"
+)
+
+// ErrUnconfirmed: a remote took the transaction but no block included it
+// within rpc_tx_timeout. It may still land, so it is neither sent again nor
+// replaced by a new one.
+var ErrUnconfirmed = errors.New("the transaction was taken but no block included it")
+
+// FailedTxError is a transaction a block included with a non-zero code: its
+// fee is paid and its messages had no effect.
+type FailedTxError struct {
+	Hash      string
+	Code      uint32
+	Codespace string
+	Log       string
+}
+
+func (e *FailedTxError) Error() string {
+	return fmt.Sprintf("transaction %s failed with code %d (%s): %s", e.Hash, e.Code, e.Codespace, e.Log)
+}
+
+// RefusedTxError is a transaction a remote refused at CheckTx, before any
+// block: nothing was spent.
+type RefusedTxError struct {
+	Code      uint32
+	Codespace string
+	Log       string
+}
+
+func (e *RefusedTxError) Error() string { return e.Log }
+
+// staleSequence reports a refusal because another transaction already used
+// the sequence the transaction was signed at.
+func (e *RefusedTxError) staleSequence() bool {
+	return e.Codespace == sdkerrors.ErrWrongSequence.Codespace() && e.Code == sdkerrors.ErrWrongSequence.ABCICode()
+}
+
+// settled reports an answer another remote cannot change: a block included
+// the transaction, or a remote took it and it may still land.
+func settled(err error) bool {
+	var failed *FailedTxError
+
+	return errors.Is(err, ErrUnconfirmed) || errors.As(err, &failed)
+}
+
+// refusal is the refusal every remote gave the transaction, or nil when one
+// of them may hold it: a remote that did not answer may have taken it.
+func refusal(err error) *RefusedTxError {
+	var refused *RefusedTxError
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		for _, e := range joined.Unwrap() {
+			if !errors.As(e, &refused) {
+				return nil
+			}
+		}
+
+		return refused
+	}
+	if errors.As(err, &refused) {
+		return refused
+	}
+
+	return nil
+}
+
+// txAttempts is how many times Tx sends a transaction before it gives up.
+const txAttempts = 5
+
+var (
+	// txPollInterval is how often the client asks whether a block included
+	// the transaction.
+	txPollInterval = 2 * time.Second
+	// txRetryDelay is the pause before a transaction is sent again.
+	txRetryDelay = 500 * time.Millisecond
 )
 
 // waitForTx polls for the transaction until it is included in a block or the
@@ -26,16 +98,16 @@ func (c *Client) waitForTx(ctx client.Context, hash string) (*sdk.TxResponse, er
 		res, err := authtx.QueryTx(ctx, hash)
 		if err == nil {
 			if res.Code != abcitypes.CodeTypeOK {
-				return nil, errors.New(res.RawLog)
+				return nil, &FailedTxError{Hash: hash, Code: res.Code, Codespace: res.Codespace, Log: res.RawLog}
 			}
 
 			return res, nil
 		}
 		if time.Now().After(deadline) {
-			return nil, fmt.Errorf("transaction %s was not included within %d seconds", hash, c.txTimeout)
+			return nil, fmt.Errorf("%w: transaction %s, after %d seconds", ErrUnconfirmed, hash, c.txTimeout)
 		}
 
-		time.Sleep(2 * time.Second)
+		time.Sleep(txPollInterval)
 	}
 }
 
@@ -58,10 +130,12 @@ func (c *Client) broadcastTx(remote string, txBytes []byte) (*sdk.TxResponse, er
 	case abcitypes.CodeTypeOK, sdkerrors.ErrTxInMempoolCache.ABCICode():
 		return c.waitForTx(ctx, resp.TxHash)
 	default:
-		return nil, errors.New(resp.RawLog)
+		return nil, &RefusedTxError{Code: resp.Code, Codespace: resp.Codespace, Log: resp.RawLog}
 	}
 }
 
+// BroadcastTx sends txBytes to each remote in turn until a block includes
+// it, and stops early once the chain's answer is settled.
 func (c *Client) BroadcastTx(txBytes []byte) (res *sdk.TxResponse, err error) {
 	defer func() {
 		if err != nil {
@@ -144,7 +218,9 @@ func (c *Client) PrepareTxFactory(messages ...sdk.Msg) (txf tx.Factory, err erro
 	return txf, nil
 }
 
-func (c *Client) tx(messages ...sdk.Msg) (res *sdk.TxResponse, err error) {
+// signedTx builds the transaction at the account's current sequence and
+// signs it.
+func (c *Client) signedTx(messages ...sdk.Msg) ([]byte, error) {
 	c.log.Info("Preparing the transaction", "messages", len(messages))
 	txf, err := c.PrepareTxFactory(messages...)
 	if err != nil {
@@ -161,42 +237,59 @@ func (c *Client) tx(messages ...sdk.Msg) (res *sdk.TxResponse, err error) {
 		return nil, err
 	}
 
-	txBytes, err := c.TxConfig().TxEncoder()(txb.GetTx())
-	if err != nil {
-		return nil, err
-	}
-
-	c.log.Info("Broadcasting the transaction", "size", len(txBytes))
-	res, err = c.BroadcastTx(txBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return res, nil
+	return c.TxConfig().TxEncoder()(txb.GetTx())
 }
 
-func (c *Client) Tx(messages ...sdk.Msg) (res *sdk.TxResponse, err error) {
+// Tx signs the messages into one transaction and sends it until a block
+// includes it, paying for one transaction at most. A transaction a block
+// included is never sent again, whatever its code, and one a remote took is
+// left to land. When no remote answers, the same bytes go again: a remote
+// may have taken them, and a new transaction would be a second one. Only a
+// refusal for a sequence another transaction used builds a new one.
+func (c *Client) Tx(messages ...sdk.Msg) (*sdk.TxResponse, error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
 	messages = c.execMessages(messages)
 
-	err = retry.Do(
-		func() error {
-			res, err = c.tx(messages...)
+	var (
+		txBytes []byte // the transaction sent last, while a remote may hold it
+		errs    []error
+	)
+	for attempt := 0; attempt < txAttempts; attempt++ {
+		if attempt > 0 {
+			time.Sleep(txRetryDelay)
+		}
+		if txBytes == nil {
+			b, err := c.signedTx(messages...)
 			if err != nil {
-				return err
+				errs = append(errs, err) // nothing was sent
+				continue
 			}
+			txBytes = b
+		}
 
+		c.log.Info("Broadcasting the transaction", "size", len(txBytes))
+		res, err := c.BroadcastTx(txBytes)
+		if err == nil {
 			c.log.Info("Transaction result", "code", res.Code,
 				"codespace", res.Codespace, "height", res.Height, "tx_hash", res.TxHash)
-			return nil
-		},
-		retry.Attempts(5),
-	)
-	if err != nil {
-		return nil, err
+			return res, nil
+		}
+		errs = append(errs, err)
+
+		refused := refusal(err)
+		switch {
+		case settled(err):
+			return nil, err
+		case refused == nil:
+			// No remote answered, and one may hold the transaction.
+		case refused.staleSequence():
+			txBytes = nil
+		default:
+			return nil, err
+		}
 	}
 
-	return res, nil
+	return nil, fmt.Errorf("after %d attempts: %w", txAttempts, errors.Join(errs...))
 }
