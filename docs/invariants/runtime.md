@@ -151,3 +151,8 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
   written twice by hand, hnsd's commit was checked by a 12-character prefix, hnsd was built
   on one Alpine release and run on another, and two Dockerfiles took whatever their tag
   pointed at.
+- **[RT-31] CI, the installer and the node image build with one Go toolchain.** `go.mod`
+  names it on its `toolchain` line, the image's build stage is that Go release, and the
+  installer installs it when the host has no Go recent enough. `go.mod` named only the
+  minimum language version: CI tested on 1.26.10 and installer builds used it, with a
+  reachable `net/http` advisory, while the image was compiled with 1.27.4.

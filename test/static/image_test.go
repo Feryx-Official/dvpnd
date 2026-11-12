@@ -144,3 +144,34 @@ func TestBaseImagesArePinned(t *testing.T) {
 		}
 	}
 }
+
+// TestOneGoToolchain holds CI, the installer and the node image to one Go
+// toolchain: go.mod named only the minimum language version, so CI tested
+// and raced on 1.26.10, the installer built nodes with 1.26.10, which
+// carries a reachable net/http advisory, and the image was compiled with
+// 1.27.4. go.mod's toolchain line, the image's Go and the Go the installer
+// installs are the same release.
+//
+// Rules: [RT-31].
+func TestOneGoToolchain(t *testing.T) {
+	var toolchain string
+	for _, line := range strings.Split(string(read(t, "go.mod")), "\n") {
+		if v, ok := strings.CutPrefix(strings.TrimSpace(line), "toolchain go"); ok {
+			toolchain = v
+		}
+	}
+	if toolchain == "" {
+		t.Fatal("go.mod names no toolchain: CI and an installer build take whatever Go they find")
+	}
+	installer := shellValues(string(read(t, "scripts/install.sh")))["GO_VERSION"]
+	if installer != toolchain {
+		t.Errorf("scripts/install.sh installs Go %q, go.mod's toolchain is %s", installer, toolchain)
+	}
+	m := regexp.MustCompile(`(?m)^FROM golang:(\d+\.\d+\.\d+)-`).FindStringSubmatch(string(read(t, "Dockerfile")))
+	if m == nil {
+		t.Fatal("the Dockerfile builds on no golang image of an exact release")
+	}
+	if m[1] != toolchain {
+		t.Errorf("the image is built with Go %s, go.mod's toolchain is %s", m[1], toolchain)
+	}
+}

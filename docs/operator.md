@@ -79,7 +79,8 @@ binary release yet):
 
 ```sh
 sudo apt-get update && sudo apt-get install -y git build-essential
-# Go 1.26 or newer: https://go.dev/dl/  (apt's may be too old)
+# Go 1.26 or newer: https://go.dev/dl/  (apt's may be too old); the build fetches the
+# toolchain go.mod names (Go 1.27.4), checked against Go's checksum database
 git clone <this repository> dvpnd && cd dvpnd      # or copy the source tree over
 make build && sudo install -m 0755 bin/dvpnd /usr/local/bin/dvpnd
 dvpnd version

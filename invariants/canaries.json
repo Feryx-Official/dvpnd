@@ -1392,6 +1392,16 @@
         "go test -count=1 -run '^TestBaseImagesArePinned$' ./test/static/"
       ],
       "expect": "not pinned by digest"
+    },
+    {
+      "name": "[RT-31] the installer installs another Go than the image builds with",
+      "file": "scripts/install.sh",
+      "find": "GO_VERSION=\"1.27.4\"",
+      "replace": "GO_VERSION=\"1.26.10\"",
+      "run": [
+        "go test -count=1 -run '^TestOneGoToolchain$' ./test/static/"
+      ],
+      "expect": "scripts/install.sh installs Go"
     }
   ]
 }

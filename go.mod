@@ -2,6 +2,8 @@ module github.com/Feryx-Official/dvpnd/v9
 
 go 1.26.10
 
+toolchain go1.27.4
+
 require (
 	github.com/cosmos/cosmos-sdk v0.47.17
 	github.com/cosmos/go-bip39 v1.0.0
