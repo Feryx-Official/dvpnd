@@ -76,6 +76,65 @@ func TestLogRefusals(t *testing.T) {
 	}
 }
 
+// TestScansStayAtDebug: a request for a path the node does not serve, which
+// scanners send by the thousand, is logged at debug only; a refusal on a
+// route the node serves, a 404 included, still reaches the error log. The
+// path and the User-Agent, both written by the client, are cut short in
+// every line.
+//
+// Rules: [HS-12].
+func TestScansStayAtDebug(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	var buf bytes.Buffer
+	ctx := context.NewContext().WithLogger(cmtlog.NewTMLogger(&buf))
+
+	r := gin.New()
+	r.Use(logRefusals(ctx))
+	r.GET("/sessions/:id", func(c *gin.Context) {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": gin.H{"code": 5, "message": "session does not exist"}})
+	})
+
+	serve := func(method, path, agent string) []string {
+		buf.Reset()
+		req := httptest.NewRequest(method, path, nil)
+		req.Header.Set("User-Agent", agent)
+		r.ServeHTTP(httptest.NewRecorder(), req)
+		return strings.Split(strings.TrimSpace(buf.String()), "\n")
+	}
+
+	for _, path := range []string{"/wp-login.php", "/.env", "/sessions"} {
+		lines := serve(http.MethodGet, path, "scanner/1.0")
+		for _, line := range lines {
+			if !strings.HasPrefix(line, "D[") {
+				t.Errorf("GET %s: a path the node does not serve is logged above debug: %s", path, line)
+			}
+		}
+		if !strings.Contains(lines[0], "status=404") || !strings.Contains(lines[0], "path="+path) {
+			t.Errorf("GET %s: the debug line lacks the status or the path: %s", path, lines[0])
+		}
+	}
+
+	lines := serve(http.MethodGet, "/sessions/7", "probe/1.0")
+	refused := false
+	for _, line := range lines {
+		refused = refused || (strings.HasPrefix(line, "E[") && strings.Contains(line, "Request refused") &&
+			strings.Contains(line, "session does not exist"))
+	}
+	if !refused {
+		t.Errorf("a refusal on a served route is not logged at error: %q", lines)
+	}
+
+	long := strings.Repeat("a", 5000)
+	for _, path := range []string{"/" + long, "/sessions/" + long} {
+		for _, line := range serve(http.MethodGet, path, long) {
+			if len(line) > 1000 {
+				t.Errorf("GET of a %d-byte path: a %d-byte log line", len(path), len(line))
+			}
+		}
+	}
+}
+
 // Rules: [CT-2].
 func TestServerHeader(t *testing.T) {
 	gin.SetMode(gin.TestMode)

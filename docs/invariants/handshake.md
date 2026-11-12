@@ -45,7 +45,10 @@ node must keep doing. IDs as in `test/README.md`.
   WireGuard-only client could not use a Hysteria2 node.
 - **[HS-12] Every refused request is logged with what was asked and the reason given.**
   An operator otherwise has no way to see why a client or an aggregator's probe was
-  turned away. Rate-limited attempts stay at debug, so a flood can't fill the log.
+  turned away. Rate-limited attempts stay at debug, so a flood can't fill the log; so do
+  requests for a path the node does not serve, which scanners send by the thousand. A
+  refusal on a route the node serves reaches the error log. The path and the User-Agent
+  are clipped, since the client writes both.
 - **[HS-13] V2Ray accepts AEAD VMess headers only.** The legacy VMess header
   authenticates with MD5; client apps send AEAD headers (`alterId: 0`).
 - **[HS-14] A client app in a browser can send the handshake.** The preflight before a

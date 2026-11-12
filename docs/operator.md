@@ -590,7 +590,8 @@ real traffic this way and reported it on chain.
   transaction logs its hash and code.
 - **What the log keeps about clients:** at the default level, no client IP addresses. A
   refused request is logged with its path, status, user agent and the reason the client was
-  given. Peer keys appear as a short tag, because a proxy key is the client's password.
+  given; a request for a path the node does not serve (a scanner's `/wp-login.php`) is
+  logged at debug only. Peer keys appear as a short tag, because a proxy key is the client's password.
   Session ids and wallet addresses are logged, since the chain already shows them for this
   node. The OpenVPN, XRAY and Hysteria2 daemons log errors only. Run the node with
   `--log_level debug` to chase a fault: request lines then carry the client's address, and
