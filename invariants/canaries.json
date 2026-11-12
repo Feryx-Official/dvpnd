@@ -48,6 +48,26 @@
       "expect": "--- FAIL"
     },
     {
+      "name": "[PV-9] XRAY starts without checking vless.security",
+      "file": "services/xray/xray.go",
+      "find": "\tif err = s.config.Validate(); err != nil {",
+      "replace": "\tif err = error(nil); err != nil {",
+      "run": [
+        "go test -count=1 -run '^(TestInitRefusesCleartextVLESS)$' ./services/xray/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[PV-9] V2Ray serves a VLESS inbound",
+      "file": "services/v2ray/config.go",
+      "find": "\"protocol\": \"vmess\"",
+      "replace": "\"protocol\": \"vless\"",
+      "run": [
+        "go test -count=1 -run '^(TestInitRendersOnlyVMess)$' ./services/v2ray/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
       "name": "[SL-1] XRAY reports a peer under a key other than its session key",
       "file": "services/xray/xray.go",
       "find": "\t\t\tKey:      key,",

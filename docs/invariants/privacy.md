@@ -27,3 +27,7 @@ passwords) must not pile up on the node either. IDs as in `test/README.md`.
   address only and keeps no log.** On every address it would be an open resolver anyone
   could use against third parties, and its log would be a record of every name clients
   looked up.
+- **[PV-9] A node never serves VLESS without TLS or REALITY.** VLESS has no cipher of its
+  own; without them the proxy hop between client and node is cleartext. The V2Ray type
+  renders only a VMess inbound, and the XRAY type refuses to start with a
+  `vless.security` other than `tls` or `reality`.

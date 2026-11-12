@@ -220,6 +220,24 @@ func TestInitRequiresBinary(t *testing.T) {
 	}
 }
 
+// TestInitRefusesCleartextVLESS: VLESS has no cipher of its own, so with a
+// security other than TLS or REALITY the proxy hop would be cleartext. The
+// node refuses to start instead, before it renders a config for xray.
+//
+// Rules: [PV-9].
+func TestInitRefusesCleartextVLESS(t *testing.T) {
+	stubBinary(t)
+	dir, _ := home(t, "none")
+
+	err := NewXRay().Init(dir)
+	if err == nil || !strings.Contains(err.Error(), "security must be") {
+		t.Fatalf("Init with security none: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "xray_config.json")); !os.IsNotExist(err) {
+		t.Fatalf("a config for xray was rendered: %v", err)
+	}
+}
+
 // Rules: [SL-1], [CT-10].
 func TestPeersOverTheAPI(t *testing.T) {
 	api, port := startFakeAPI(t)

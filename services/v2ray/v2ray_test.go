@@ -212,6 +212,65 @@ func TestInitRendersEgressPolicy(t *testing.T) {
 	}
 }
 
+// TestInitRendersOnlyVMess: with TLS on or off, the inbound clients reach is
+// VMess, which has a cipher of its own. VLESS has none, so a VLESS inbound
+// without TLS would carry the proxy hop in cleartext.
+//
+// Rules: [PV-9].
+func TestInitRendersOnlyVMess(t *testing.T) {
+	stub(t, "trap 'exit 0' TERM")
+
+	for _, tls := range []bool{false, true} {
+		dir := t.TempDir()
+		t.Setenv("TMPDIR", dir)
+		certPEM, keyPEM, err := common.SelfSignedCertificate("dvpnd", time.Hour)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "tls.crt"), certPEM, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "tls.key"), keyPEM, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		cfg := v2raytypes.NewConfig().WithDefaultValues()
+		cfg.VMess.TLS = tls
+		if err := cfg.SaveToPath(filepath.Join(dir, v2raytypes.ConfigFileName)); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := NewV2Ray().Init(dir); err != nil {
+			t.Fatalf("tls=%v: %v", tls, err)
+		}
+		raw, err := os.ReadFile(filepath.Join(dir, "v2ray_config.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var doc struct {
+			Inbounds []struct {
+				Tag      string `json:"tag"`
+				Protocol string `json:"protocol"`
+			} `json:"inbounds"`
+		}
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatalf("rendered config is not JSON: %v\n%s", err, raw)
+		}
+		served := 0
+		for _, in := range doc.Inbounds {
+			if in.Tag == "api" {
+				continue
+			}
+			served++
+			if in.Protocol != "vmess" {
+				t.Errorf("tls=%v: inbound %q serves %q, want vmess", tls, in.Tag, in.Protocol)
+			}
+		}
+		if served == 0 {
+			t.Errorf("tls=%v: no inbound for clients", tls)
+		}
+	}
+}
+
 // TestConfigWithoutAPISection: a v2ray.toml written before [api] existed
 // still starts, on a random API port.
 //
