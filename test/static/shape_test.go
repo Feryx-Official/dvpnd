@@ -124,6 +124,26 @@ func TestStartCatchesAStopSignalOnceTheServiceRuns(t *testing.T) {
 	t.Error("the start command never catches a stop signal (no signal.Notify in RunE)")
 }
 
+// TestStartRemovesTheDaemonsFiles reads the start command: the deferred call
+// that stops the service also removes the files the node wrote for its
+// daemons, a REALITY private key, the stats secret and a copy of the TLS key
+// among them.
+//
+// Rules: [PV-10].
+func TestStartRemovesTheDaemonsFiles(t *testing.T) {
+	_, body, start := startCommand(t)
+	for _, s := range body.List[start+1:] {
+		if d, ok := s.(*ast.DeferStmt); ok && calls(d, "service", "Stop", true) {
+			if !calls(d, "rt", "RemoveFiles", true) {
+				t.Error("the deferred service.Stop() leaves the daemons' runtime files behind: call rt.RemoveFiles() after it")
+			}
+
+			return
+		}
+	}
+	t.Fatal("no deferred service.Stop() after service.Start(): re-aim this test")
+}
+
 // startCommand returns the body of the start command's RunE and the index of
 // the statement in it that calls service.Start().
 func startCommand(t *testing.T) (*token.FileSet, *ast.BlockStmt, int) {

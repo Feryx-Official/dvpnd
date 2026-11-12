@@ -153,3 +153,46 @@ func TestProxyAttr(t *testing.T) {
 		t.Fatalf("a port below 1024 needs CAP_NET_BIND_SERVICE: %+v", attr)
 	}
 }
+
+// TestRemoveFilesTakesWhatTheDaemonsRead: the files the node wrote for its
+// daemons (a configuration holding a REALITY private key or the stats secret,
+// the copy of the TLS key) go when the node stops, and nothing else in the
+// directory does.
+//
+// Rules: [PV-10].
+func TestRemoveFilesTakesWhatTheDaemonsRead(t *testing.T) {
+	rt := Runtime{Dir: t.TempDir()}
+	home := t.TempDir()
+	for _, name := range []string{"tls.crt", "tls.key"} {
+		if err := os.WriteFile(filepath.Join(home, name), []byte(name), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	config, err := rt.WriteFile("xray_config.json", []byte(`{"privateKey":"not for the disk"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cert, key, err := rt.TLSFiles(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := filepath.Join(rt.Dir, "not-ours")
+	if err := os.WriteFile(other, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := rt.RemoveFiles(); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{config, cert, key} {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Errorf("%s is still there after RemoveFiles: %v", filepath.Base(path), err)
+		}
+	}
+	if _, err := os.Stat(other); err != nil {
+		t.Errorf("RemoveFiles took a file the node did not write: %v", err)
+	}
+	if err := rt.RemoveFiles(); err != nil {
+		t.Errorf("a second RemoveFiles: %v", err)
+	}
+}

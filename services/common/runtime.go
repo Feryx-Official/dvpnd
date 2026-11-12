@@ -3,6 +3,7 @@
 package common
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/user"
@@ -133,6 +134,13 @@ func (rt Runtime) WriteFile(name string, data []byte) (string, error) {
 		mode = 0o640
 	}
 
+	written.Lock()
+	if written.paths == nil {
+		written.paths = map[string]bool{}
+	}
+	written.paths[path] = true
+	written.Unlock()
+
 	if err := os.WriteFile(path, data, mode); err != nil {
 		return "", err
 	}
@@ -210,4 +218,32 @@ func StartProxy(name string, args, extraEnv []string, listenPort uint16, loopbac
 	p.onStop = egress.Down
 
 	return p, nil
+}
+
+// written holds the paths WriteFile wrote, for RemoveFiles.
+var written struct {
+	sync.Mutex
+	paths map[string]bool
+}
+
+// RemoveFiles removes the files WriteFile wrote into the directory: a node
+// stops its daemons first, and a REALITY private key, the stats secret or a
+// copy of the TLS key has no reason to stay on disk.
+func (rt Runtime) RemoveFiles() error {
+	written.Lock()
+	defer written.Unlock()
+
+	var errs []error
+	for path := range written.paths {
+		if filepath.Dir(path) != filepath.Clean(rt.Dir) {
+			continue
+		}
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			errs = append(errs, err)
+			continue
+		}
+		delete(written.paths, path)
+	}
+
+	return errors.Join(errs...)
 }

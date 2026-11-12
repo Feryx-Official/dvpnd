@@ -619,6 +619,12 @@
         "\t\t\t\t\t\terr = stopErr",
         "\t\t\t\t\t}",
         "\t\t\t\t}",
+        "\t\t\t\t// The files the node wrote for the daemon go with it: its",
+        "\t\t\t\t// configuration can hold a REALITY private key or the stats",
+        "\t\t\t\t// secret, and one is a copy of the TLS key.",
+        "\t\t\t\tif rmErr := rt.RemoveFiles(); rmErr != nil {",
+        "\t\t\t\t\tlog.Error(\"failed to remove the daemons' runtime files\", \"error\", rmErr)",
+        "\t\t\t\t}",
         "\t\t\t}()"
       ],
       "replace": "",
@@ -751,6 +757,43 @@
         "go test -count=1 -run '^TestServeEndsWhenTheListenerCloses$' ./utils/"
       ],
       "expect": "panic: mux: server closed"
+    },
+    {
+      "name": "[PV-10] the daemons' runtime files outlive the node",
+      "file": "cmd/start.go",
+      "find": [
+        "\t\t\t\t// The files the node wrote for the daemon go with it: its",
+        "\t\t\t\t// configuration can hold a REALITY private key or the stats",
+        "\t\t\t\t// secret, and one is a copy of the TLS key.",
+        "\t\t\t\tif rmErr := rt.RemoveFiles(); rmErr != nil {",
+        "\t\t\t\t\tlog.Error(\"failed to remove the daemons' runtime files\", \"error\", rmErr)",
+        "\t\t\t\t}"
+      ],
+      "replace": "",
+      "run": [
+        "go test -count=1 -run '^TestStartRemovesTheDaemonsFiles$' ./test/static/"
+      ],
+      "expect": "leaves the daemons' runtime files behind"
+    },
+    {
+      "name": "[PV-10] a daemon gets the node's whole environment",
+      "file": "services/common/process.go",
+      "find": "\tcmd.Env = childEnv(extraEnv)",
+      "replace": "\tcmd.Env = append(os.Environ(), extraEnv...)",
+      "run": [
+        "go test -count=1 -run '^TestChildGetsOnlyTheEnvironmentItRunsOn$' ./services/common/"
+      ],
+      "expect": "not its to read"
+    },
+    {
+      "name": "[RT-3] a daemon outlives a node killed outright",
+      "file": "services/common/process.go",
+      "find": "\tcmd.SysProcAttr.Pdeathsig = syscall.SIGTERM\n",
+      "replace": "",
+      "run": [
+        "go test -count=1 -run '^TestChildEndsWithAKilledNode$' ./services/common/"
+      ],
+      "expect": "still runs 5 s after its node was killed"
     }
   ]
 }

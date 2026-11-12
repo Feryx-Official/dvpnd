@@ -32,3 +32,8 @@ passwords) must not pile up on the node either. IDs as in `test/README.md`.
   renders only a VMess inbound, and the XRAY type refuses to start with a
   `vless.security` other than `tls` or `reality`. `xray config set` refuses one too, so
   the value is refused when it is set rather than at the next start.
+- **[PV-10] A protocol daemon gets only what it runs on.** Its environment is the node's
+  PATH, locale, time zone and temporary directory, the daemons' own tuning variables and
+  what its service adds, not whatever the operator or the container passed the node. The
+  files the node writes for it (a configuration that can hold a REALITY private key or the
+  stats secret, a copy of the TLS key) are removed when the node stops.

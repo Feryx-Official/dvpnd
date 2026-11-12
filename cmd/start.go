@@ -405,6 +405,12 @@ func StartCmd() *cobra.Command {
 						err = stopErr
 					}
 				}
+				// The files the node wrote for the daemon go with it: its
+				// configuration can hold a REALITY private key or the stats
+				// secret, and one is a copy of the TLS key.
+				if rmErr := rt.RemoveFiles(); rmErr != nil {
+					log.Error("failed to remove the daemons' runtime files", "error", rmErr)
+				}
 			}()
 
 			// From here the node also stops when the protocol daemon exits, and

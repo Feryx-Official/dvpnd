@@ -14,7 +14,10 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
   the node. The stop signals are caught from before `Start`: a SIGTERM while the node was
   still starting ended it at once, with the tunnel and the firewall rules left up.
 - **[RT-3] A daemon is stopped with SIGTERM and killed if it doesn't exit in time; a
-  daemon that exits on its own is reaped.**
+  daemon that exits on its own is reaped.** A node killed outright runs no `Stop`, so the
+  kernel sends its daemons SIGTERM when it dies; outside systemd or Docker they outlived
+  it. Every daemon is forked from one thread that lives as long as the node, since the
+  signal follows the forking thread, not the process.
 - **[RT-4] IP forwarding is switched on from the node, read before it is written.**
   `/proc/sys` is read-only in an unprivileged container, where the runner sets the sysctl
   instead; reading first lets that node start.
