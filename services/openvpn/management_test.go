@@ -26,6 +26,7 @@ type fakeServer struct {
 	conn     net.Conn
 	commands []string
 	clients  []clientStatus
+	failKill bool
 	ready    chan struct{}
 }
 
@@ -69,6 +70,7 @@ func (f *fakeServer) serve() {
 		f.mu.Lock()
 		f.commands = append(f.commands, cmd)
 		clients := append([]clientStatus(nil), f.clients...)
+		failKill := f.failKill
 		f.mu.Unlock()
 
 		switch {
@@ -82,6 +84,8 @@ func (f *fakeServer) serve() {
 			}
 			b.WriteString("GLOBAL_STATS\tMax bcast/mcast queue length\t0\nEND\n")
 			_, _ = conn.Write([]byte(b.String()))
+		case strings.HasPrefix(cmd, "client-kill ") && failKill:
+			_, _ = conn.Write([]byte("ERROR: client-kill command failed\n"))
 		case strings.HasPrefix(cmd, "client-kill "):
 			cid := strings.Fields(cmd)[1]
 			found := false

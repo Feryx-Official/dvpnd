@@ -54,7 +54,9 @@ reported, a report refused) or gives clients service nobody pays for. IDs as in
   zero values, which would leave an old figure in place.
 - **[SL-16] A removed peer is cut off at once and can't come back.** OpenVPN kills the
   client's connection and denies its reconnect; Hysteria kicks it; WireGuard and the
-  other proxies drop the peer.
+  other proxies drop the peer. When the kill or the kick fails, the peer is refused at
+  its next connection but stays registered, and its open connection counted, until a
+  later pass cuts it off.
 - **[SL-17] An hourly session's peer is cut off when the hours it paid for are used.**
   The chain pays such a session for the duration the node reports, up to the hours the
   client deposited for, so time served beyond them is never paid. Admission refuses a

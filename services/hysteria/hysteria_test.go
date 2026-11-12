@@ -24,13 +24,14 @@ import (
 )
 
 // fakeStats stands in for the server's statistics API: it serves a traffic
-// table once (clear=1 semantics) and records kicks.
+// table once (clear=1 semantics) and records kicks; failKick fails them.
 type fakeStats struct {
-	mu      sync.Mutex
-	secret  string
-	traffic map[string]map[string]int64
-	kicked  [][]string
-	reads   int
+	mu       sync.Mutex
+	secret   string
+	traffic  map[string]map[string]int64
+	kicked   [][]string
+	reads    int
+	failKick bool
 }
 
 func (f *fakeStats) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -50,6 +51,8 @@ func (f *fakeStats) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("clear") == "1" {
 			f.traffic = map[string]map[string]int64{}
 		}
+	case r.Method == http.MethodPost && r.URL.Path == "/kick" && f.failKick:
+		http.Error(w, "busy", http.StatusInternalServerError)
 	case r.Method == http.MethodPost && r.URL.Path == "/kick":
 		var ids []string
 		_ = json.NewDecoder(r.Body).Decode(&ids)
@@ -299,6 +302,66 @@ func TestPeersAndKick(t *testing.T) {
 
 	if _, err := s.AddPeer([]byte{1, 2}); err == nil {
 		t.Fatal("short peer data accepted")
+	}
+}
+
+// TestAFailedKickKeepsThePeerCounted: a removal whose kick fails refuses the
+// peer's next connection at once, but keeps it registered and its open
+// connection counted until a later removal kicks it.
+//
+// Rules: [SL-16].
+func TestAFailedKickKeepsThePeerCounted(t *testing.T) {
+	s := NewHysteria()
+	s.config = hysteriatypes.NewConfig().WithDefaultValues()
+	s.statsSecret = "shh"
+	stats, port := startFakeStats(t, s.statsSecret)
+	s.config.API.StatsPort = port
+
+	uuid := "01020304-0506-0708-090a-0b0c0d0e0f10"
+	data, _ := s.ParsePeerRequest([]byte(`{"uuid":"` + uuid + `"}`))
+	if _, err := s.AddPeer(data); err != nil {
+		t.Fatal(err)
+	}
+	key := base64.StdEncoding.EncodeToString(data)
+
+	stats.mu.Lock()
+	stats.failKick = true
+	stats.mu.Unlock()
+	if err := s.RemovePeer(data); err == nil {
+		t.Fatal("a failed kick reported success")
+	}
+	if !s.HasPeer(data) || s.PeerCount() != 1 {
+		t.Fatal("the peer was forgotten before its kick succeeded")
+	}
+	if _, err := s.AddPeer(data); err == nil {
+		t.Fatal("the peer was added again before its removal finished")
+	}
+	rec := httptest.NewRecorder()
+	s.handleAuth(rec, httptest.NewRequest(http.MethodPost, "/auth",
+		bytes.NewBufferString(`{"addr":"203.0.113.9:5000","auth":"`+uuid+`","tx":0}`)))
+	if strings.Contains(rec.Body.String(), `"ok":true`) {
+		t.Fatalf("a removed peer may connect again: %s", rec.Body.String())
+	}
+
+	stats.mu.Lock()
+	stats.traffic[key] = map[string]int64{"tx": 40, "rx": 400}
+	stats.mu.Unlock()
+	peers, err := s.Peers()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(peers) != 1 || peers[0].Key != key || peers[0].Upload != 40 || peers[0].Download != 400 {
+		t.Fatalf("want the open connection counted, got %+v", peers)
+	}
+
+	stats.mu.Lock()
+	stats.failKick = false
+	stats.mu.Unlock()
+	if err := s.RemovePeer(data); err != nil {
+		t.Fatal(err)
+	}
+	if s.HasPeer(data) || s.PeerCount() != 0 || len(stats.kicked) != 1 || stats.kicked[0][0] != key {
+		t.Fatalf("not removed once the kick worked: kicked %v", stats.kicked)
 	}
 }
 

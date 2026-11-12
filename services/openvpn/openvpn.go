@@ -83,6 +83,9 @@ type OpenVPN struct {
 	mgmt   *management         // nil before Start and after Stop
 	byCN   map[string]string   // certificate common name → session key
 	closed map[string]*traffic // session key → traffic of ended connections
+	// revoked holds the common names of peers being removed: denied at
+	// once, still counted until their connection is killed.
+	revoked map[string]struct{}
 	// banked holds the client ids of ended connections whose traffic is in
 	// closed, until a status table no longer lists them.
 	banked map[string]struct{}
@@ -91,12 +94,13 @@ type OpenVPN struct {
 
 func NewOpenVPN() *OpenVPN {
 	return &OpenVPN{
-		info:   make([]byte, InfoLen),
-		config: ovpntypes.NewConfig(),
-		byCN:   map[string]string{},
-		closed: map[string]*traffic{},
-		banked: map[string]struct{}{},
-		peers:  common.NewPeerSet(),
+		info:    make([]byte, InfoLen),
+		config:  ovpntypes.NewConfig(),
+		byCN:    map[string]string{},
+		closed:  map[string]*traffic{},
+		revoked: map[string]struct{}{},
+		banked:  map[string]struct{}{},
+		peers:   common.NewPeerSet(),
 	}
 }
 
@@ -290,13 +294,14 @@ func (s *OpenVPN) detach() error {
 }
 
 // admit is the management-client-auth decision: only a registered peer's
-// certificate may connect.
+// certificate may connect, and not once its removal has begun.
 func (s *OpenVPN) admit(commonName string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	_, ok := s.byCN[commonName]
+	_, revoked := s.revoked[commonName]
 
-	return ok
+	return ok && !revoked
 }
 
 // disconnected banks the traffic of a connection that ended, so a
@@ -353,12 +358,17 @@ func (s *OpenVPN) AddPeer(data []byte) ([]byte, error) {
 	}
 
 	s.mu.Lock()
-	s.byCN[cn] = key
-	if _, ok := s.closed[key]; !ok {
-		s.closed[key] = &traffic{}
+	// A peer still registered here is one whose kill failed: its open
+	// connection is counted until the next pass removes it.
+	if s.peers.Has(key) {
+		s.mu.Unlock()
+
+		return nil, errors.New("the peer is still registered: its removal has not finished")
 	}
-	s.mu.Unlock()
+	s.byCN[cn] = key
+	s.closed[key] = &traffic{}
 	s.peers.Put(key)
+	s.mu.Unlock()
 
 	result := make([]byte, 4, 4+len(certDER)+len(keyDER))
 	binary.BigEndian.PutUint32(result, uint32(len(certDER)))
@@ -372,8 +382,10 @@ func (s *OpenVPN) HasPeer(data []byte) bool {
 	return s.peers.Has(peerKey(data))
 }
 
-// RemovePeer forgets the peer, so its certificate is denied from now on, and
-// kills its connection if it has one.
+// RemovePeer denies the peer's certificate from now on and kills its
+// connection if it has one. The peer stays registered, and its traffic
+// counted, until the kill succeeds: a connection the kill missed keeps
+// working, and the next pass removes the peer again.
 func (s *OpenVPN) RemovePeer(data []byte) error {
 	if err := checkPeerData(data); err != nil {
 		return err
@@ -385,17 +397,24 @@ func (s *OpenVPN) RemovePeer(data []byte) error {
 	key := peerKey(data)
 
 	s.mu.Lock()
-	delete(s.byCN, cn)
-	delete(s.closed, key)
+	s.revoked[cn] = struct{}{}
+	m := s.mgmt
 	s.mu.Unlock()
-	s.peers.Delete(key)
 
-	m := s.attached()
-	if m == nil {
-		return nil
+	if m != nil {
+		if err := m.kill(cn); err != nil {
+			return err
+		}
 	}
 
-	return m.kill(cn)
+	s.mu.Lock()
+	delete(s.byCN, cn)
+	delete(s.closed, key)
+	delete(s.revoked, cn)
+	s.peers.Delete(key)
+	s.mu.Unlock()
+
+	return nil
 }
 
 // Peers reports every registered peer: what its ended connections used plus

@@ -493,3 +493,52 @@ func TestAConnectionThatEndsDuringAPassCountsOnce(t *testing.T) {
 		t.Fatalf("want 101 up and 2002 down, got %+v, %v", peers, err)
 	}
 }
+
+// TestAFailedKillKeepsThePeerCounted: a removal whose kill fails denies the
+// peer's next connection at once, but keeps it registered and its open
+// connection counted until a later removal kills it.
+//
+// Rules: [SL-16].
+func TestAFailedKillKeepsThePeerCounted(t *testing.T) {
+	s, f := startOpenVPN(t)
+	t.Cleanup(func() { _ = s.Stop() })
+	data := []byte("0123456789abcdef")
+	cn := "30313233-3435-3637-3839-616263646566"
+	if _, err := s.AddPeer(data); err != nil {
+		t.Fatal(err)
+	}
+
+	f.mu.Lock()
+	f.clients = []clientStatus{{commonName: cn, received: 10, sent: 20, cid: "4"}}
+	f.failKill = true
+	f.mu.Unlock()
+	if err := s.RemovePeer(data); err == nil {
+		t.Fatal("a failed kill reported success")
+	}
+	if !s.HasPeer(data) || s.PeerCount() != 1 {
+		t.Fatal("the peer was forgotten before its kill succeeded")
+	}
+	if _, err := s.AddPeer(data); err == nil {
+		t.Fatal("the peer was added again before its removal finished")
+	}
+	if s.admit(cn) {
+		t.Fatal("a removed peer may connect again")
+	}
+	peers, err := s.Peers()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(peers) != 1 || peers[0].Upload != 10 || peers[0].Download != 20 {
+		t.Fatalf("want the open connection counted, got %+v", peers)
+	}
+
+	f.mu.Lock()
+	f.failKill = false
+	f.mu.Unlock()
+	if err := s.RemovePeer(data); err != nil {
+		t.Fatal(err)
+	}
+	if s.HasPeer(data) || s.PeerCount() != 0 || s.admit(cn) {
+		t.Fatal("not removed once the kill worked")
+	}
+}

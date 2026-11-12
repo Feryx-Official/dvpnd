@@ -336,11 +336,14 @@ func (s *Hysteria) AddPeer(data []byte) ([]byte, error) {
 	key := peerKey(data)
 
 	s.mu.Lock()
-	s.byAuth[common.FormatUUID(id)] = key
-	if _, ok := s.traffic[key]; !ok {
-		s.traffic[key] = &counters{}
+	defer s.mu.Unlock()
+	// A peer still registered here is one whose kick failed: its open
+	// connection is counted until the next pass removes it.
+	if s.peers.Has(key) {
+		return nil, errors.New("the peer is still registered: its removal has not finished")
 	}
-	s.mu.Unlock()
+	s.byAuth[common.FormatUUID(id)] = key
+	s.traffic[key] = &counters{}
 	s.peers.Put(key)
 
 	return nil, nil
@@ -350,8 +353,10 @@ func (s *Hysteria) HasPeer(data []byte) bool {
 	return s.peers.Has(peerKey(data))
 }
 
-// RemovePeer forgets the peer, so the server refuses its next connection,
-// and kicks any connection it has open.
+// RemovePeer makes the server refuse the peer's next connection at once and
+// kicks any connection it has open. The peer stays registered, and its
+// traffic counted, until the kick succeeds: a connection the kick missed
+// keeps working, and the next pass removes the peer again.
 func (s *Hysteria) RemovePeer(data []byte) error {
 	if err := checkPeerData(data); err != nil {
 		return err
@@ -363,9 +368,7 @@ func (s *Hysteria) RemovePeer(data []byte) error {
 
 	s.mu.Lock()
 	delete(s.byAuth, common.FormatUUID(id))
-	delete(s.traffic, key)
 	s.mu.Unlock()
-	s.peers.Delete(key)
 
 	body, _ := json.Marshal([]string{key})
 	res, err := s.statsAPI(http.MethodPost, "/kick", body)
@@ -376,6 +379,11 @@ func (s *Hysteria) RemovePeer(data []byte) error {
 	if res.StatusCode != http.StatusOK {
 		return fmt.Errorf("kick: status %d", res.StatusCode)
 	}
+
+	s.mu.Lock()
+	delete(s.traffic, key)
+	s.peers.Delete(key)
+	s.mu.Unlock()
 
 	return nil
 }

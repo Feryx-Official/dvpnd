@@ -912,6 +912,26 @@
         "go test -count=1 -run '^TestAConnectionThatEndsDuringAPassCountsOnce$' ./services/openvpn/"
       ],
       "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-16] Hysteria forgets a peer before its kick succeeds",
+      "file": "services/hysteria/hysteria.go",
+      "find": "\tdelete(s.byAuth, common.FormatUUID(id))\n\ts.mu.Unlock()\n",
+      "replace": "\tdelete(s.byAuth, common.FormatUUID(id))\n\tdelete(s.traffic, key)\n\ts.peers.Delete(key)\n\ts.mu.Unlock()\n",
+      "run": [
+        "go test -count=1 -run '^TestAFailedKickKeepsThePeerCounted$' ./services/hysteria/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-16] OpenVPN forgets a peer before its kill succeeds",
+      "file": "services/openvpn/openvpn.go",
+      "find": "\ts.revoked[cn] = struct{}{}\n",
+      "replace": "\ts.revoked[cn] = struct{}{}\n\tdelete(s.byCN, cn)\n\ts.peers.Delete(key)\n",
+      "run": [
+        "go test -count=1 -run '^TestAFailedKillKeepsThePeerCounted$' ./services/openvpn/"
+      ],
+      "expect": "--- FAIL"
     }
   ]
 }
