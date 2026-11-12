@@ -68,7 +68,7 @@ func TestConfigTemplateForwardRules(t *testing.T) {
 	if lines["Jc"] != "4" || lines["H1"] != "12345" {
 		t.Fatalf("extra interface lines missing:\n%s", out)
 	}
-	if !strings.HasPrefix(out, "[Interface]\n") || strings.Contains(out, "\n\n[") {
+	if !strings.HasPrefix(out, marker+"\n[Interface]\n") || strings.Contains(out, "\n\n[") {
 		t.Fatalf("layout:\n%s", out)
 	}
 

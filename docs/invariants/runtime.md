@@ -80,3 +80,10 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
   handshake. iptables exits at once when another program (Docker, ufw, firewalld) holds
   the lock unless told to wait, and the node drops a failed removal without a word; every
   call, the ones in wg-quick's PostUp too, waits up to five seconds.
+- **[RT-19] The node overwrites no tunnel configuration and takes down no interface that is
+  not its own.** The WireGuard and AmneziaWG configuration it writes starts with a marker
+  line; a file without it is the node's only when it holds the node's private key (a
+  release before the marker wrote it), and is then rewritten with the marker, readable by
+  root only. An interface left up is recreated only when `wg show` gives the node's private
+  key for it. On a host with its own `wg0`, the administrator's file, key and peers were
+  replaced, an existing file kept its mode, and an interface of that name was taken down.

@@ -7,7 +7,9 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"os"
 	"path/filepath"
@@ -21,10 +23,16 @@ import (
 	"github.com/Feryx-Official/dvpnd/v9/services/common"
 	wgtypes "github.com/Feryx-Official/dvpnd/v9/services/wireguard/types"
 	"github.com/Feryx-Official/dvpnd/v9/types"
+	"github.com/Feryx-Official/dvpnd/v9/utils"
 )
 
 const (
 	InfoLen = 2 + 32
+
+	// marker is the first line of every interface configuration the node
+	// writes; a file at the same path without it is not overwritten
+	// (ownsConfig).
+	marker = "# Written by dvpnd at every start; edit the node's configuration instead."
 )
 
 var (
@@ -39,6 +47,10 @@ var (
 	// kernelHasIPv6 says whether the kernel has IPv6; a variable so tests
 	// can take it away.
 	kernelHasIPv6 = common.KernelHasIPv6
+
+	// sysClassNet lists the host's interfaces; a variable so tests can
+	// point it elsewhere.
+	sysClassNet = "/sys/class/net"
 )
 
 // Variant is one implementation of the WireGuard family: the tools that
@@ -212,7 +224,14 @@ func (s *WireGuard) Init(home string) (err error) {
 		return err
 	}
 	path := filepath.Join(s.variant.ConfigDir, s.config.Interface+".conf")
-	if err = os.WriteFile(path, conf, 0600); err != nil {
+	if own, err := ownsConfig(path, s.config.PrivateKey); err != nil || !own {
+		if err == nil {
+			err = fmt.Errorf("%s was not written by dvpnd and is left alone: move it away, "+
+				"or set another interface in the node's configuration", path)
+		}
+		return err
+	}
+	if err = utils.WritePrivateFile(path, conf); err != nil {
 		return err
 	}
 
@@ -225,6 +244,37 @@ func (s *WireGuard) Init(home string) (err error) {
 	copy(s.info[2:], key.Public().Bytes())
 
 	return nil
+}
+
+// ownsConfig says whether the node may write the interface configuration
+// at path: there is none, it carries the marker, or it is one a release
+// before the marker wrote, which holds the node's own private key.
+func ownsConfig(path, privateKey string) (bool, error) {
+	raw, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	for _, line := range strings.Split(string(raw), "\n") {
+		key, value, _ := strings.Cut(line, "=")
+		if strings.TrimSpace(line) == marker ||
+			(strings.TrimSpace(key) == "PrivateKey" && sameKey(strings.TrimSpace(value), privateKey)) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// sameKey says whether two base64 keys are the same key.
+func sameKey(a, b string) bool {
+	ka, errA := wgtypes.KeyFromString(a)
+	kb, errB := wgtypes.KeyFromString(b)
+
+	return errA == nil && errB == nil && *ka == *kb
 }
 
 func (s *WireGuard) Info() []byte {
@@ -255,8 +305,10 @@ func (s *WireGuard) Start() error {
 // packet is forwarded unfiltered. An earlier instance that died without Stop
 // leaves the interface behind and wg-quick refuses to create it again; in
 // that case it is torn down and recreated so a restart needs no manual
-// cleanup. IP forwarding is the caller's: Start turns it on, and a variant
-// with two interfaces turns it on once.
+// cleanup, but only when it holds the node's private key: an interface of
+// the same name that is not the node's is left up. IP forwarding is the
+// caller's: Start turns it on, and a variant with two interfaces turns it on
+// once.
 func (s *WireGuard) Up() (err error) {
 	if err = s.egress().Up(); err != nil {
 		s.egress().Down()
@@ -273,8 +325,12 @@ func (s *WireGuard) Up() (err error) {
 		return nil
 	}
 
-	if _, statErr := os.Stat(filepath.Join("/sys/class/net", s.config.Interface)); statErr != nil {
+	if _, statErr := os.Stat(filepath.Join(sysClassNet, s.config.Interface)); statErr != nil {
 		return err
+	}
+	if out, keyErr := common.ToolOutput(common.ToolTimeout, s.variant.Tool, "show", s.config.Interface, "private-key"); keyErr != nil ||
+		!sameKey(strings.TrimSpace(string(out)), s.config.PrivateKey) {
+		return fmt.Errorf("interface %s exists and is not the node's; it is left up: %w", s.config.Interface, err)
 	}
 
 	fmt.Fprintf(os.Stderr, "interface %s already exists; recreating it\n", s.config.Interface)

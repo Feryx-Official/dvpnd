@@ -1122,6 +1122,36 @@
         "go test -count=1 -run '^(TestIPv6OffMeansNoIPv6|TestKernelWithoutIPv6RunsIPv4Only)$' ./services/wireguard/"
       ],
       "expect": "--- FAIL"
+    },
+    {
+      "name": "[RT-19] the node overwrites a configuration it did not write",
+      "file": "services/wireguard/wireguard.go",
+      "find": "\treturn false, nil\n}\n\n// sameKey",
+      "replace": "\treturn true, nil\n}\n\n// sameKey",
+      "run": [
+        "go test -count=1 -run '^(TestAForeignConfigurationIsLeftAlone)$' ./services/wireguard/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[RT-19] the node takes down an interface that is not its own",
+      "file": "services/wireguard/wireguard.go",
+      "find": "\t\t!sameKey(strings.TrimSpace(string(out)), s.config.PrivateKey) {",
+      "replace": "\t\tlen(out) < 0 {",
+      "run": [
+        "go test -count=1 -run '^(TestAForeignInterfaceIsNotTakenDown)$' ./services/wireguard/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[PV-6] a configuration taken over keeps its old mode",
+      "file": "services/wireguard/wireguard.go",
+      "find": "\tif err = utils.WritePrivateFile(path, conf); err != nil {",
+      "replace": "\tif err = func() error { _ = utils.WritePrivateFile; return os.WriteFile(path, conf, 0600) }(); err != nil {",
+      "run": [
+        "go test -count=1 -run '^(TestAForeignConfigurationIsLeftAlone)$' ./services/wireguard/"
+      ],
+      "expect": "--- FAIL"
     }
   ]
 }

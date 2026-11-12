@@ -11,7 +11,7 @@ import (
 // masquerading rules, rendered from the rule set OpenVPN installs itself
 // (services/common/nat.go).
 var (
-	configTemplate = strings.TrimSpace(`
+	configTemplate = marker + "\n" + strings.TrimSpace(`
 [Interface]
 Address = {{ .Address }}
 ListenPort = {{ .ListenPort }}

@@ -5,6 +5,7 @@ package wireguard
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -241,5 +242,95 @@ func TestKernelWithoutIPv6RunsIPv4Only(t *testing.T) {
 	}
 	if !wgtypes.NewIPv6FromIP(result[4:]).Empty() {
 		t.Errorf("the peer got an IPv6 tunnel address: %x", result[4:])
+	}
+}
+
+// TestAForeignConfigurationIsLeftAlone: a file at the interface's path
+// that the node did not write is never overwritten. One an earlier release
+// wrote, without the marker but with the node's own private key, is taken
+// over: rewritten with the marker, and readable by root only even when it
+// was not before.
+//
+// Rules: [RT-19], [PV-6].
+func TestAForeignConfigurationIsLeftAlone(t *testing.T) {
+	init := func(t *testing.T, existing func(cfg *wgtypes.Config) string) (string, error) {
+		dir := t.TempDir()
+		cfg := wgtypes.NewConfig().WithDefaultValues()
+		cfg.Uplink = "eth0"
+		path := filepath.Join(dir, cfg.Interface+".conf")
+		if err := os.WriteFile(path, []byte(existing(cfg)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		v4, _ := wgtypes.NewIPv4PoolFromCIDR("10.8.0.2/24")
+		v6, _ := wgtypes.NewIPv6PoolFromCIDR("fd86:ea04:1115::2/120")
+		variant := Default
+		variant.ConfigDir = dir
+
+		return path, NewVariant(variant, wgtypes.NewIPPool(v4, v6)).WithConfig(cfg, nil).Init(dir)
+	}
+
+	other, _ := wgtypes.NewPrivateKey()
+	foreign := "[Interface]\nAddress = 192.168.77.1/24\nPrivateKey = " + other.String() + "\nListenPort = 51820\n"
+	path, err := init(t, func(*wgtypes.Config) string { return foreign })
+	if err == nil {
+		t.Error("Init took over a configuration it did not write")
+	}
+	if raw, _ := os.ReadFile(path); string(raw) != foreign {
+		t.Errorf("the administrator's configuration was replaced:\n%s", raw)
+	}
+
+	path, err = init(t, func(cfg *wgtypes.Config) string {
+		return "[Interface]\nAddress = 10.8.0.1/24\nListenPort = 51820\nPrivateKey = " + cfg.PrivateKey + "\n"
+	})
+	if err != nil {
+		t.Fatalf("a configuration an earlier release wrote: %v", err)
+	}
+	raw, _ := os.ReadFile(path)
+	if !strings.HasPrefix(string(raw), marker+"\n") {
+		t.Errorf("rewritten without the marker:\n%s", raw)
+	}
+	if fi, err := os.Stat(path); err != nil || fi.Mode().Perm() != 0o600 {
+		t.Errorf("mode %v, want 0600: %v", fi.Mode().Perm(), err)
+	}
+
+	if _, err = init(t, func(*wgtypes.Config) string { return string(raw) }); err != nil {
+		t.Errorf("a configuration the node wrote: %v", err)
+	}
+}
+
+// TestAForeignInterfaceIsNotTakenDown: when wg-quick cannot bring the
+// interface up because it exists, the node tears it down and recreates it
+// only when it is the node's own, left by a node that died: wg gives the
+// node's private key for it.
+//
+// Rules: [RT-19].
+func TestAForeignInterfaceIsNotTakenDown(t *testing.T) {
+	for _, own := range []bool{false, true} {
+		s, calls := startRig(t, "wgtest4", true)
+
+		net := t.TempDir()
+		if err := os.Mkdir(filepath.Join(net, "wgtest4"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		saved := sysClassNet
+		sysClassNet = net
+		t.Cleanup(func() { sysClassNet = saved })
+
+		key := s.config.PrivateKey
+		if !own {
+			other, _ := wgtypes.NewPrivateKey()
+			key = other.String()
+		}
+		tool := filepath.Join(t.TempDir(), "wg")
+		if err := os.WriteFile(tool, []byte("#!/bin/sh\n[ \"$*\" = \"show wgtest4 private-key\" ] && echo "+key+"\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		s.variant.Tool = tool
+
+		_ = s.Up()
+		down := slices.Contains(calls(), "wg-quick down wgtest4")
+		if down != own {
+			t.Errorf("own interface %v: taken down %v\n%s", own, down, strings.Join(calls(), "\n"))
+		}
 	}
 }
