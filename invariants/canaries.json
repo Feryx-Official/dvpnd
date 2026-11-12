@@ -741,6 +741,16 @@
         "go test -count=1 -run '^TestDoneWhenTheServerOrTheManagementChannelEnds$' ./services/openvpn/"
       ],
       "expect": "Done is still open 5 s after the management channel closed"
+    },
+    {
+      "name": "[RT-2] the API's plain-HTTP server panics when the port closes",
+      "file": "utils/http.go",
+      "find": "\tgo func() { ended <- newServer(handler, logger).Serve(anyMux) }()",
+      "replace": "\tgo func() {\n\t\tif err := newServer(handler, logger).Serve(anyMux); err != nil {\n\t\t\tpanic(err)\n\t\t}\n\t}()",
+      "run": [
+        "go test -count=1 -run '^TestServeEndsWhenTheListenerCloses$' ./utils/"
+      ],
+      "expect": "panic: mux: server closed"
     }
   ]
 }

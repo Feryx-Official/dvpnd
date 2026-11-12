@@ -65,6 +65,13 @@ func ListenAndServeTLS(address, certFile, keyFile string, handler http.Handler, 
 		return err
 	}
 
+	return serve(l, cert, handler, logger)
+}
+
+// serve answers TLS and plain HTTP on l, telling them apart by the first
+// bytes of each connection. It returns the first error of the three servers
+// once all three have ended: the node then stops, its service first.
+func serve(l net.Listener, cert tls.Certificate, handler http.Handler, logger cmtlog.Logger) error {
 	var (
 		mux    = cmux.New(l)
 		tlsMux = mux.Match(cmux.TLS())
@@ -72,27 +79,25 @@ func ListenAndServeTLS(address, certFile, keyFile string, handler http.Handler, 
 	)
 	mux.SetReadTimeout(firstBytesTimeout)
 
-	go func() {
-		if err := newServer(handler, logger).Serve(
-			tls.NewListener(
-				tlsMux,
-				&tls.Config{
-					Certificates: []tls.Certificate{
-						cert,
-					},
-					Rand: rand.Reader,
-				},
-			),
-		); err != nil {
-			panic(err)
-		}
-	}()
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{
+			cert,
+		},
+		MinVersion: tls.VersionTLS12,
+		Rand:       rand.Reader,
+	}
 
-	go func() {
-		if err := newServer(handler, logger).Serve(anyMux); err != nil {
-			panic(err)
-		}
-	}()
+	ended := make(chan error, 3)
+	go func() { ended <- newServer(handler, logger).Serve(tls.NewListener(tlsMux, tlsConfig)) }()
+	go func() { ended <- newServer(handler, logger).Serve(anyMux) }()
+	go func() { ended <- mux.Serve() }()
 
-	return mux.Serve()
+	// Closing the port ends mux.Serve, which closes the two listeners it
+	// feeds, so the first to end takes the others with it.
+	err := <-ended
+	_ = l.Close()
+	<-ended
+	<-ended
+
+	return err
 }

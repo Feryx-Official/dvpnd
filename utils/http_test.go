@@ -4,6 +4,12 @@ package utils
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -78,4 +84,67 @@ func TestServerMessagesGoToTheDebugLog(t *testing.T) {
 			t.Fatalf("the server's own messages are debug lines only: %q", line)
 		}
 	}
+}
+
+// selfSigned is a throwaway certificate for 127.0.0.1.
+func selfSigned(t *testing.T) tls.Certificate {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+		IPAddresses:  []net.IP{net.IPv4(127, 0, 0, 1)},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}
+}
+
+// TestServeEndsWhenTheListenerCloses: once the port's listener ends, serve
+// returns its error and the TLS and plain servers on it have ended too. They
+// panicked, which ended the process before the start command could stop the
+// service.
+//
+// Rules: [RT-2].
+func TestServeEndsWhenTheListenerCloses(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	served := make(chan error, 1)
+	go func() { served <- serve(l, selfSigned(t), http.NotFoundHandler(), cmtlog.NewNopLogger()) }()
+
+	client := &http.Client{
+		Timeout:   5 * time.Second,
+		Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}, //nolint:gosec // a throwaway certificate
+	}
+	for _, scheme := range []string{"https", "http"} {
+		res, err := client.Get(scheme + "://" + l.Addr().String() + "/")
+		if err != nil {
+			t.Fatalf("%s: %v", scheme, err)
+		}
+		res.Body.Close()
+		if res.StatusCode != http.StatusNotFound {
+			t.Fatalf("%s: status %d, want 404 from the handler", scheme, res.StatusCode)
+		}
+	}
+	client.CloseIdleConnections()
+
+	_ = l.Close()
+	select {
+	case err := <-served:
+		if err == nil {
+			t.Error("serve returned no error when its listener closed")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("serve still runs 5 s after its listener closed")
+	}
+	time.Sleep(200 * time.Millisecond) // a server that outlived serve and panics does so here
 }
