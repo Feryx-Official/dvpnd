@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // Rules: [CT-4].
@@ -84,4 +85,38 @@ func decodeFirstPEM(data []byte) []byte {
 	// base64 decode via the pem package would be simpler, but keep the test free of it
 	dec, _ := base64Decode(string(bytes.ReplaceAll(body, []byte("\n"), nil)))
 	return append(out, dec...)
+}
+
+// TestClientCertificateOutlivesTheSession: a session on the chain has no
+// fixed end, and OpenVPN checks the client certificate's dates at every
+// connect and renegotiation, so the certificate is valid for as long as the
+// node's authority. Who may connect is the management interface's decision
+// (TestManagementAdmitStatusKill), not the certificate's expiry.
+//
+// Rules: [SL-19].
+func TestClientCertificateOutlivesTheSession(t *testing.T) {
+	p, err := loadOrCreatePKI(filepath.Join(t.TempDir(), "openvpn"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	certDER, _, err := p.issueClient("01020304-0506-0708-090a-0b0c0d0e0f10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cert.NotAfter.Equal(p.caCert.NotAfter) {
+		t.Fatalf("client certificate valid until %s, the authority until %s", cert.NotAfter, p.caCert.NotAfter)
+	}
+	roots := x509.NewCertPool()
+	roots.AddCert(p.caCert)
+	for _, at := range []time.Time{time.Now().Add(30 * 24 * time.Hour), p.caCert.NotAfter.Add(-time.Hour)} {
+		_, err := cert.Verify(x509.VerifyOptions{Roots: roots, CurrentTime: at,
+			KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}})
+		if err != nil {
+			t.Errorf("at %s the client certificate does not verify: %v", at.Format(time.DateOnly), err)
+		}
+	}
 }

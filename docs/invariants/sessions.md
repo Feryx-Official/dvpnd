@@ -72,3 +72,9 @@ reported, a report refused) or gives clients service nobody pays for. IDs as in
   pass, and the node runs one more usage pass before it stops the service; the next
   pass, or the next start, reports it. The usage pass reads the counters under the
   admission lock, so figures read before an eviction never overwrite what it stored.
+- **[SL-19] An OpenVPN client certificate is valid for as long as the node's authority.**
+  A session the node keeps reporting stays active until its bytes, its hours or its
+  subscription run out, and OpenVPN checks a certificate's dates at every connect, so the
+  seven days a certificate used to last could cut off a session still paid for. Who may
+  connect is decided over the management interface at every connect and renegotiation
+  (SL-16), not by the certificate's dates.

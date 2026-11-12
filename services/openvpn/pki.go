@@ -26,7 +26,6 @@ import (
 const (
 	caValidity     = 10 * 365 * 24 * time.Hour
 	serverValidity = 10 * 365 * 24 * time.Hour
-	clientValidity = 7 * 24 * time.Hour
 
 	// tlsCryptKeyLen is an OpenVPN static key V1: 2048 bits.
 	tlsCryptKeyLen = 256
@@ -100,7 +99,7 @@ func (p *pki) create() error {
 		return err
 	}
 	serverDER, err := issue(caCert, caKey, &serverKey.PublicKey, "dvpnd OpenVPN server",
-		serverValidity, x509.ExtKeyUsageServerAuth)
+		now.Add(serverValidity), x509.ExtKeyUsageServerAuth)
 	if err != nil {
 		return err
 	}
@@ -174,13 +173,17 @@ func (p *pki) load() error {
 }
 
 // issueClient makes a certificate and key for one peer, both DER: the
-// certificate's common name carries the peer's identity.
+// certificate's common name carries the peer's identity. It is valid until
+// the authority expires: a session has no fixed end, and OpenVPN checks the
+// dates at every connect, so an earlier expiry would cut off a session that
+// is still paid for. Who may connect is decided over the management
+// interface (admit), not by the certificate's dates.
 func (p *pki) issueClient(commonName string) (certDER, keyDER []byte, err error) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, nil, err
 	}
-	certDER, err = issue(p.caCert, p.caKey, &key.PublicKey, commonName, clientValidity, x509.ExtKeyUsageClientAuth)
+	certDER, err = issue(p.caCert, p.caKey, &key.PublicKey, commonName, p.caCert.NotAfter, x509.ExtKeyUsageClientAuth)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -192,13 +195,13 @@ func (p *pki) issueClient(commonName string) (certDER, keyDER []byte, err error)
 	return certDER, keyDER, nil
 }
 
-func issue(ca *x509.Certificate, caKey *ecdsa.PrivateKey, pub *ecdsa.PublicKey, cn string, validity time.Duration, eku x509.ExtKeyUsage) ([]byte, error) {
+func issue(ca *x509.Certificate, caKey *ecdsa.PrivateKey, pub *ecdsa.PublicKey, cn string, notAfter time.Time, eku x509.ExtKeyUsage) ([]byte, error) {
 	now := time.Now()
 	tmpl := &x509.Certificate{
 		SerialNumber:          serial(),
 		Subject:               pkix.Name{CommonName: cn},
 		NotBefore:             now.Add(-time.Hour),
-		NotAfter:              now.Add(validity),
+		NotAfter:              notAfter,
 		KeyUsage:              x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{eku},
 		BasicConstraintsValid: true,
