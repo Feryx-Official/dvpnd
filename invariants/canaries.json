@@ -942,6 +942,16 @@
         "go test -count=1 -run '^TestSetSessionsCutsOffIdlePeers$' ./node/"
       ],
       "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-8] a handshake evicts only the account's peers of the same subscription",
+      "file": "api/session/admit.go",
+      "find": "Where(\"address = ?\", req.AccAddress.String()).\n\t\tFind(&items).Error",
+      "replace": "Where(&types.Session{Subscription: a.subscriptionID, Address: req.AccAddress.String()}).\n\t\tFind(&items).Error",
+      "run": [
+        "go test -count=1 -run '^TestAnAccountKeepsOnePeerAcrossItsSessions$' ./api/session/"
+      ],
+      "expect": "--- FAIL"
     }
   ]
 }

@@ -143,13 +143,12 @@ func admit(ctx *context.Context, chain chainQuerier, req admitRequest) (*admitRe
 		}
 	}
 
-	// One peer per account per (subscription or node) session set: drop any
-	// earlier peer of this account before adding the new one.
+	// One peer per account, whatever its sessions: drop the account's
+	// earlier peers, of node and plan sessions alike, before adding the new
+	// one. A struct condition would skip a node session's zero subscription.
 	var items []types.Session
-	err := ctx.Database().Model(&types.Session{}).Where(&types.Session{
-		Subscription: a.subscriptionID,
-		Address:      req.AccAddress.String(),
-	}).Find(&items).Error
+	err := ctx.Database().Model(&types.Session{}).Where("address = ?", req.AccAddress.String()).
+		Find(&items).Error
 	if err != nil {
 		return nil, newAPIError(http.StatusInternalServerError, 9, err)
 	}

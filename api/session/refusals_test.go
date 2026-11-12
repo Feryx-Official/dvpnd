@@ -231,3 +231,50 @@ func TestAnAccountKeepsOnePeer(t *testing.T) {
 		t.Error("the new peer, or another account's, is gone")
 	}
 }
+
+// sessionsChain answers each session id with its own session; subscriptions
+// are active and allocations hold room.
+type sessionsChain struct {
+	sessions map[uint64]sessiontypes.Session
+}
+
+func (c *sessionsChain) QuerySession(id uint64) (sessiontypes.Session, error) {
+	return c.sessions[id], nil
+}
+func (c *sessionsChain) QuerySubscription(id uint64) (*subscriptiontypes.Subscription, error) {
+	return &subscriptiontypes.Subscription{ID: id, Status: v1base.StatusActive}, nil
+}
+func (c *sessionsChain) QueryAllocation(uint64, sdk.AccAddress) (*v2subscriptiontypes.Allocation, error) {
+	return allocation(1<<40, 0), nil
+}
+
+// TestAnAccountKeepsOnePeerAcrossItsSessions: the account's earlier peer is
+// evicted whatever session it served, a node session or a plan session on
+// this subscription or another.
+//
+// Rules: [SL-8].
+func TestAnAccountKeepsOnePeerAcrossItsSessions(t *testing.T) {
+	ctx, service, _, account := admissionRig(t, 50)
+	node, acct := ctx.Address().String(), account.String()
+	chain := &sessionsChain{sessions: map[uint64]sessiontypes.Session{
+		1: nodeSession(baseSession(1, acct, node)),
+		2: planSession(baseSession(2, acct, node), 5),
+		3: planSession(baseSession(3, acct, node), 7),
+		4: planSession(baseSession(4, acct, node), 7),
+		5: nodeSession(baseSession(5, acct, node)),
+	}}
+
+	var peers [][]byte
+	for id := uint64(1); id <= 5; id++ {
+		data := randomBytes(t, 32)
+		if _, apiErr := admit(ctx, chain, admitRequest{AccAddress: account, ID: id, PeerData: data}); apiErr != nil {
+			t.Fatalf("session %d: %v", id, apiErr)
+		}
+		peers = append(peers, data)
+		for i, p := range peers {
+			if connected, latest := service.HasPeer(p), i == len(peers)-1; connected != latest {
+				t.Fatalf("after session %d: the peer of session %d connected %v", id, i+1, connected)
+			}
+		}
+	}
+}

@@ -28,7 +28,8 @@ reported, a report refused) or gives clients service nobody pays for. IDs as in
   allocation counts what this node has served on it but not yet reported, so a client
   can't start session after session on usage the chain hasn't seen yet.
 - **[SL-8] An account has one peer at a time.** A new handshake from the account evicts
-  its earlier peer.
+  its earlier peer, whatever session either serves: a node session, or a plan session
+  on the same subscription or another.
 - **[SL-9] A connected peer the node holds no session for, or that has used its
   allocation, is removed.**
 - **[SL-10] A session the chain has ended loses its peer, and its row once the chain
