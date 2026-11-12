@@ -83,3 +83,58 @@ func TestHandshakeReplyIsSigned(t *testing.T) {
 		t.Fatal("the reply's signature does not verify against the request and the reply")
 	}
 }
+
+// requestAwareService is handshakeService for a protocol whose peer request
+// asks for more than the peer data, as AmneziaWG's tier: it records the
+// request admission hands it.
+type requestAwareService struct {
+	handshakeService
+	requests *[]string
+}
+
+func (s requestAwareService) AddPeerForRequest(request, data []byte) ([]byte, error) {
+	*s.requests = append(*s.requests, string(request))
+
+	return s.AddPeer(data)
+}
+
+// TestHandshakeHandsTheRequestToAdmission: a handshake passes the client's
+// peer request through admission to the service with the peer data, so a
+// choice such as AmneziaWG's tier travels with its request and the service
+// keeps nothing between parsing and admission.
+//
+// Rules: [CT-7].
+func TestHandshakeHandsTheRequestToAdmission(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ctx, service, _, _ := admissionRig(t, 50)
+	var requests []string
+	ctx.WithService(requestAwareService{handshakeService{service}, &requests})
+	ctx.Config().Node.IPv4Address = "203.0.113.1"
+
+	key := secp256k1.GenPrivKey()
+	account := sdk.AccAddress(key.PubKey().Address())
+	chain := &fakeChain{node: ctx.Address().String(), account: func(uint64) string { return account.String() }}
+
+	request := []byte(`{"public_key":"abc","awg_version":3}`)
+	sig, err := key.Sign(append(sdk.Uint64ToBigEndian(7), request...))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := json.Marshal(HandshakeBody{
+		Data:      base64.StdEncoding.EncodeToString(request),
+		ID:        7,
+		PubKey:    pubKeyPrefix + base64.StdEncoding.EncodeToString(key.PubKey().Bytes()),
+		Signature: base64.StdEncoding.EncodeToString(sig),
+	})
+
+	r := gin.New()
+	r.POST("/", handshake(ctx, chain, nodeSigner(t)))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("handshake: %d %s", rec.Code, rec.Body)
+	}
+	if len(requests) != 1 || requests[0] != string(request) {
+		t.Fatalf("the service was handed %q, want the client's request", requests)
+	}
+}

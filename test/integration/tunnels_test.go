@@ -139,7 +139,7 @@ func runTunnel(t *testing.T, tc tunnelCase, tier tunnelTier, allowSMTP bool) {
 	if err != nil {
 		t.Fatal("ParsePeerRequest:", err)
 	}
-	result, err := svc.AddPeer(data)
+	result, err := types.AddPeer(svc, req, data)
 	if err != nil {
 		t.Fatal("AddPeer:", err)
 	}

@@ -22,6 +22,7 @@ import (
 	"github.com/Feryx-Official/dvpnd/v9/services/amneziawg"
 	awgtypes "github.com/Feryx-Official/dvpnd/v9/services/amneziawg/types"
 	wgtypes "github.com/Feryx-Official/dvpnd/v9/services/wireguard/types"
+	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
 func main() {
@@ -96,7 +97,7 @@ func run(home, out, endpoint string, v3 bool) error {
 		if err != nil {
 			return err
 		}
-		res, err := s.AddPeer(data)
+		res, err := types.AddPeer(s, []byte(req), data)
 		if err != nil {
 			return err
 		}

@@ -42,6 +42,25 @@ type Supervised interface {
 	Done() <-chan struct{}
 }
 
+// RequestAware is a service whose peer request asks for more than the peer
+// data carries, such as AmneziaWG's tier. Admission hands it the request
+// with the peer data, so the choice travels with the request and nothing is
+// kept between ParsePeerRequest and the admission. AddPeer alone, which the
+// legacy endpoint uses, takes the defaults.
+type RequestAware interface {
+	AddPeerForRequest(request, data []byte) ([]byte, error)
+}
+
+// AddPeer adds the peer a handshake asked for: with its request when the
+// service reads one, from the peer data alone otherwise or without one.
+func AddPeer(s Service, request, data []byte) ([]byte, error) {
+	if r, ok := s.(RequestAware); ok && request != nil {
+		return r.AddPeerForRequest(request, data)
+	}
+
+	return s.AddPeer(data)
+}
+
 type Peer struct {
 	Key      string `json:"key"`
 	Upload   int64  `json:"upload"`

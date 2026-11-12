@@ -15,13 +15,11 @@
 package amneziawg
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net"
 	"os/exec"
 	"path/filepath"
-	"sync"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -64,7 +62,6 @@ type AmneziaWG struct {
 	v3     *wireguard.WireGuard
 	v3Net  *net.IPNet
 	config *awgtypes.Config
-	asked  *tierRequests
 	// preset pools, when set, replace the tunnel networks Init would take
 	// from amneziawg.toml.
 	pool, poolV3 *wgtypes.IPPool
@@ -78,7 +75,6 @@ func NewAmneziaWG(pool, poolV3 *wgtypes.IPPool) *AmneziaWG {
 		WireGuard: wireguard.NewVariant(Variant, pool),
 		v3:        wireguard.NewVariant(Variant, poolV3),
 		config:    awgtypes.NewConfig(),
-		asked:     newTierRequests(),
 		pool:      pool,
 		poolV3:    poolV3,
 	}
@@ -205,20 +201,29 @@ func (s *AmneziaWG) Stop() error {
 
 // ParsePeerRequest reads WireGuard's {"public_key"} plus an optional
 // "awg_version": absent or 2 asks for the default tier, 3 for the 3.1 tier.
-// The answer is remembered for the key until AddPeer, which follows in the
-// same handshake; the peer data, and so the session key, stays the 32-byte
-// public key exactly as for WireGuard.
+// A tier this node does not offer is refused here, before admission. The
+// peer data, and so the session key, stays the 32-byte public key exactly
+// as for WireGuard; the tier travels with the request to AddPeerForRequest.
 func (s *AmneziaWG) ParsePeerRequest(raw []byte) ([]byte, error) {
 	key, err := s.WireGuard.ParsePeerRequest(raw)
 	if err != nil {
 		return nil, err
 	}
+	if _, err := s.tier(raw); err != nil {
+		return nil, err
+	}
 
+	return key, nil
+}
+
+// tier is the tier a peer request asks for, refused when this node does not
+// offer it.
+func (s *AmneziaWG) tier(raw []byte) (int, error) {
 	var req struct {
 		Version *int `json:"awg_version"`
 	}
 	if err := json.Unmarshal(raw, &req); err != nil {
-		return nil, fmt.Errorf("invalid %s peer request: %w", Name, err)
+		return 0, fmt.Errorf("invalid %s peer request: %w", Name, err)
 	}
 
 	tier := awgtypes.VersionDefault
@@ -230,12 +235,10 @@ func (s *AmneziaWG) ParsePeerRequest(raw []byte) ([]byte, error) {
 	case tier == awgtypes.VersionDefault:
 	case tier == awgtypes.Version3 && s.v3On():
 	default:
-		return nil, fmt.Errorf("unsupported awg_version %d; this node offers %s", tier, s.offered())
+		return 0, fmt.Errorf("unsupported awg_version %d; this node offers %s", tier, s.offered())
 	}
 
-	s.asked.set(identity(key), tier)
-
-	return key, nil
+	return tier, nil
 }
 
 // offered lists the awg_version values this node answers to.
@@ -247,12 +250,22 @@ func (s *AmneziaWG) offered() string {
 	return fmt.Sprintf("%d only", awgtypes.VersionDefault)
 }
 
-// AddPeer adds the peer to the tier its request asked for.
-func (s *AmneziaWG) AddPeer(data []byte) ([]byte, error) {
-	if s.asked.take(identity(data)) == awgtypes.Version3 && s.v3On() {
+// AddPeerForRequest adds the peer to the tier its request asked for.
+func (s *AmneziaWG) AddPeerForRequest(request, data []byte) ([]byte, error) {
+	tier, err := s.tier(request)
+	if err != nil {
+		return nil, err
+	}
+	if tier == awgtypes.Version3 {
 		return s.v3.AddPeer(data)
 	}
 
+	return s.WireGuard.AddPeer(data)
+}
+
+// AddPeer adds a peer that came without a request, from the legacy
+// endpoint, to the default tier.
+func (s *AmneziaWG) AddPeer(data []byte) ([]byte, error) {
 	return s.WireGuard.AddPeer(data)
 }
 
@@ -292,43 +305,6 @@ func (s *AmneziaWG) PeerCount() int {
 	}
 
 	return count
-}
-
-// identity is the session key form of the peer data.
-func identity(data []byte) string {
-	return base64.StdEncoding.EncodeToString(data)
-}
-
-// tierRequests remembers, per peer key, the tier the peer request asked for
-// between ParsePeerRequest and AddPeer.
-type tierRequests struct {
-	mu sync.Mutex
-	m  map[string]int
-}
-
-func newTierRequests() *tierRequests {
-	return &tierRequests{m: make(map[string]int)}
-}
-
-func (t *tierRequests) set(key string, tier int) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.m[key] = tier
-}
-
-// take returns the tier asked for the key, the default when none was, and
-// forgets it.
-func (t *tierRequests) take(key string) int {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	tier, ok := t.m[key]
-	delete(t.m, key)
-	if !ok {
-		return awgtypes.VersionDefault
-	}
-
-	return tier
 }
 
 // PublicInbound is one AmneziaWG entry of the root document: everything a

@@ -139,7 +139,7 @@ func handshake(ctx *context.Context, chain chainQuerier, signer replySigner) gin
 			return
 		}
 
-		res, apiErr := admit(ctx, chain, admitRequest{AccAddress: accAddr, ID: body.ID, PeerData: peerData})
+		res, apiErr := admit(ctx, chain, admitRequest{AccAddress: accAddr, ID: body.ID, PeerData: peerData, Request: data})
 		if apiErr != nil {
 			replyError(ctx, c, apiErr.Status, apiErr.Code, apiErr.Err)
 			return

@@ -48,13 +48,15 @@ func replyError(ctx *context.Context, c *gin.Context, status, code int, err erro
 }
 
 // admitRequest is a session admission that has already been authenticated:
-// AccAddress is the account proven to hold the key, ID the on-chain session and
+// AccAddress is the account proven to hold the key, ID the on-chain session,
 // PeerData the service-specific peer material (WireGuard public key, or proxy
-// byte + UUID for V2Ray).
+// byte + UUID for V2Ray) and Request the peer request it was parsed from,
+// nil from the legacy endpoint.
 type admitRequest struct {
 	AccAddress sdk.AccAddress
 	ID         uint64
 	PeerData   []byte
+	Request    []byte
 }
 
 // PeerKey is the identity the service and the local database use for the peer.
@@ -165,7 +167,7 @@ func admit(ctx *context.Context, chain chainQuerier, req admitRequest) (*admitRe
 		}
 	}
 
-	peer, err := ctx.Service().AddPeer(req.PeerData)
+	peer, err := types.AddPeer(ctx.Service(), req.Request, req.PeerData)
 	if err != nil {
 		return nil, newAPIError(http.StatusInternalServerError, 10, err)
 	}

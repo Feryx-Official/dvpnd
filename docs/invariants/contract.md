@@ -25,7 +25,9 @@ leaves users unable to connect, or shows them a wrong fact. IDs as in `test/READ
 - **[CT-7] AmneziaWG's default tier never changes, and only a client that asks with
   `awg_version: 3` gets the 3.1 tier.** Current apps bundle the 2.0 engine and must
   keep working against every node. The default tier keeps single-value headers and `s3`
-  and `s4` at 0; a node without a `[v3]` section runs the default tier only.
+  and `s4` at 0; a node without a `[v3]` section runs the default tier only. The tier
+  travels with its request through admission, so the node keeps nothing for a request
+  that never reaches it, and a peer added without a request gets the default tier.
 - **[CT-8] AmneziaWG tunnel subnets are the node's own, derived from each tier's key.**
   A node whose clients all got `10.8.0.x` failed the network's health probe. The subnets
   survive restarts, keep clear of 10.0–10.10, never overlap between tiers, and an

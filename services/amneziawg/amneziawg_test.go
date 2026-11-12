@@ -15,6 +15,7 @@ import (
 
 	awgtypes "github.com/Feryx-Official/dvpnd/v9/services/amneziawg/types"
 	wgtypes "github.com/Feryx-Official/dvpnd/v9/services/wireguard/types"
+	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
 // fakeAwg stands in for the awg tool on PATH: it records every call and
@@ -253,11 +254,12 @@ func TestInitDerivesTunnelNetworks(t *testing.T) {
 		{`{"public_key":"%s","awg_version":3}`, v3, "3.1"},
 	} {
 		key := newKey(t)
-		data, err := s.ParsePeerRequest([]byte(fmt.Sprintf(tc.req, key.String())))
+		req := []byte(fmt.Sprintf(tc.req, key.String()))
+		data, err := s.ParsePeerRequest(req)
 		if err != nil {
 			t.Fatal(err)
 		}
-		res, err := s.AddPeer(data)
+		res, err := types.AddPeer(s, req, data)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -345,11 +347,12 @@ func TestPeersGoToTheTierTheyAskedFor(t *testing.T) {
 
 	// No awg_version: the default tier and its subnet.
 	key := newKey(t)
-	data, err := s.ParsePeerRequest([]byte(`{"public_key":"` + key.String() + `"}`))
+	req := []byte(`{"public_key":"` + key.String() + `"}`)
+	data, err := s.ParsePeerRequest(req)
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := s.AddPeer(data)
+	res, err := types.AddPeer(s, req, data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -359,14 +362,15 @@ func TestPeersGoToTheTierTheyAskedFor(t *testing.T) {
 
 	// awg_version 3: the second interface and its subnet, and the 3.1 entry.
 	key3 := newKey(t)
-	data3, err := s.ParsePeerRequest([]byte(`{"public_key":"` + key3.String() + `","awg_version":3}`))
+	req3 := []byte(`{"public_key":"` + key3.String() + `","awg_version":3}`)
+	data3, err := s.ParsePeerRequest(req3)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(data3, key3.Bytes()) {
 		t.Fatal("the peer data must stay the 32-byte key")
 	}
-	res3, err := s.AddPeer(data3)
+	res3, err := types.AddPeer(s, req3, data3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -493,4 +497,45 @@ func TestInitRequiresTools(t *testing.T) {
 func itoa(v uint64) string {
 	b, _ := json.Marshal(v)
 	return string(b)
+}
+
+// TestARequestLeavesNoTierBehind: the tier a request asks for travels with
+// that request. A request that never reached admission, as when the chain
+// refuses its session, leaves nothing behind: the same key added later
+// without a request, as the legacy endpoint adds it, gets the default tier.
+// Two requests in flight for one key each get the tier they asked for.
+//
+// Rules: [CT-7].
+func TestARequestLeavesNoTierBehind(t *testing.T) {
+	withFakeAwg(t)
+	_, cfg, s := setup(t)
+	if err := s.Init(home(t, cfg)); err != nil {
+		t.Fatal(err)
+	}
+
+	key := newKey(t)
+	if _, err := s.ParsePeerRequest([]byte(`{"public_key":"` + key.String() + `","awg_version":3}`)); err != nil {
+		t.Fatal(err)
+	}
+	res, err := s.AddPeer(key.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := res[:4]; !reflect.DeepEqual(got, []byte{10, 8, 0, 2}) {
+		t.Fatalf("a peer added without asking for a tier got %v, not a default tier address", got)
+	}
+
+	other := newKey(t)
+	v3 := []byte(`{"public_key":"` + other.String() + `","awg_version":3}`)
+	for _, req := range [][]byte{v3, []byte(`{"public_key":"` + other.String() + `"}`)} {
+		if _, err := s.ParsePeerRequest(req); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if res, err = types.AddPeer(s, v3, other.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+	if got := res[:4]; !reflect.DeepEqual(got, []byte{10, 9, 0, 2}) {
+		t.Fatalf("a 3.1 request parsed before a default one for the same key got %v", got)
+	}
 }
