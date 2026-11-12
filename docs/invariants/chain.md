@@ -31,3 +31,6 @@ signs transactions unattended, so its key lives on the server. IDs as in
 - **[CH-9] The granter's fee allowance is found on whichever page the chain lists it.**
   Anyone can grant an allowance to any address. Read from the first page only, a hundred
   dust grants that sort before the granter's made a hot-key node refuse to start.
+- **[CH-10] Queries to a remote reuse its connection.** The node keeps one RPC client
+  per remote. One per query opened a new connection, with its TLS handshake, every time,
+  and a client handshake costs the node up to three queries.

@@ -5,9 +5,13 @@ package lite
 
 import (
 	"io"
+	"net/http"
 	"sync"
+	"time"
 
 	cmtlog "github.com/cometbft/cometbft/libs/log"
+	rpchttp "github.com/cometbft/cometbft/rpc/client/http"
+	jsonrpcclient "github.com/cometbft/cometbft/rpc/jsonrpc/client"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/client/tx"
@@ -27,12 +31,61 @@ type Client struct {
 	remotes      []string
 	txf          tx.Factory
 	txTimeout    uint
+
+	rpcs *rpcClients
 }
+
+// rpcClients holds one RPC client per remote and timeout, built on first use
+// and kept: a client per call opened a connection, and a TLS handshake, for
+// every query.
+type rpcClients struct {
+	sync.Mutex
+	m map[rpcKey]*rpchttp.HTTP
+}
+
+type rpcKey struct {
+	remote  string
+	timeout uint
+}
+
+// rpcIdleTimeout closes a remote's connection after a quiet spell, so a
+// remote the node stopped asking holds none open.
+const rpcIdleTimeout = 90 * time.Second
 
 func NewClient() *Client {
 	return &Client{
 		mutex: &sync.Mutex{},
+		rpcs:  &rpcClients{m: map[rpcKey]*rpchttp.HTTP{}},
 	}
+}
+
+// rpc returns the client for remote whose calls time out after timeout
+// seconds.
+func (c *Client) rpc(remote string, timeout uint) (*rpchttp.HTTP, error) {
+	c.rpcs.Lock()
+	defer c.rpcs.Unlock()
+
+	key := rpcKey{remote, timeout}
+	if r, ok := c.rpcs.m[key]; ok {
+		return r, nil
+	}
+
+	hc, err := jsonrpcclient.DefaultHTTPClient(remote)
+	if err != nil {
+		return nil, err
+	}
+	hc.Timeout = time.Duration(timeout) * time.Second
+	if t, ok := hc.Transport.(*http.Transport); ok {
+		t.IdleConnTimeout = rpcIdleTimeout
+	}
+
+	r, err := rpchttp.NewWithClient(remote, "/websocket", hc)
+	if err != nil {
+		return nil, err
+	}
+	c.rpcs.m[key] = r
+
+	return r, nil
 }
 
 func NewDefaultClient() *Client {

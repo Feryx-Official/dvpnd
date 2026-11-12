@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	cmtlog "github.com/cometbft/cometbft/libs/log"
@@ -46,4 +47,34 @@ func TestEveryRemoteIsTried(t *testing.T) {
 			t.Fatalf("every remote failed: the error must name each with its own error, got %v", err)
 		}
 	}
+}
+
+// TestARemoteConnectionIsReused: queries to a remote reuse one connection
+// rather than open a new one, and a TLS handshake, each. A handshake costs
+// the node up to three queries and a report pass one per session.
+//
+// Rules: [CH-10].
+func TestARemoteConnectionIsReused(t *testing.T) {
+	chain, c := newFakeChain(t)
+	for i := 0; i < 10; i++ {
+		if _, err := c.QueryAccount(c.FromAddress()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := chain.conns.Load(); n != 1 {
+		t.Fatalf("10 queries opened %d connections, want 1", n)
+	}
+
+	// Handshakes query at the same time; they share the remote's client.
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := c.QueryAccount(c.FromAddress()); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
 }

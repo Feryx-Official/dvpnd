@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	abci "github.com/cometbft/cometbft/abci/types"
@@ -29,10 +31,11 @@ import (
 // fakeChain is a CometBFT RPC endpoint in front of a small model of the
 // chain: the client's account, and the fee allowances granted to it. It
 // answers the gRPC queries the client sends through abci_query, the way a
-// node does.
+// node does, and counts the connections it accepts.
 type fakeChain struct {
-	t   *testing.T
-	srv *httptest.Server
+	t     *testing.T
+	srv   *httptest.Server
+	conns atomic.Int32
 
 	mu         sync.Mutex
 	account    *authtypes.BaseAccount
@@ -44,7 +47,13 @@ type fakeChain struct {
 func newFakeChain(t *testing.T) (*fakeChain, *Client) {
 	t.Helper()
 	f := &fakeChain{t: t}
-	f.srv = httptest.NewServer(f)
+	f.srv = httptest.NewUnstartedServer(f)
+	f.srv.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+		if state == http.StateNew {
+			f.conns.Add(1)
+		}
+	}
+	f.srv.Start()
 	t.Cleanup(f.srv.Close)
 
 	kr := keyring.NewInMemory(DefaultEncodingConfig().Codec)

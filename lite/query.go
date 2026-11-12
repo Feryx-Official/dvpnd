@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 
-	rpchttp "github.com/cometbft/cometbft/rpc/client/http"
 	"github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkquery "github.com/cosmos/cosmos-sdk/types/query"
@@ -30,7 +29,7 @@ import (
 // redirecting endpoint is visible instead of hiding behind the last one tried.
 func (c *Client) query(name string, fn func(ctx client.Context) error) error {
 	return c.eachRemote("Query failed", func(remote string) error {
-		rpc, err := rpchttp.NewWithTimeout(remote, "/websocket", c.queryTimeout)
+		rpc, err := c.rpc(remote, c.queryTimeout)
 		if err != nil {
 			return err
 		}

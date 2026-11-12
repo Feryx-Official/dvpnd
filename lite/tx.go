@@ -9,7 +9,6 @@ import (
 
 	"github.com/avast/retry-go/v4"
 	abcitypes "github.com/cometbft/cometbft/abci/types"
-	rpchttp "github.com/cometbft/cometbft/rpc/client/http"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -43,7 +42,7 @@ func (c *Client) waitForTx(ctx client.Context, hash string) (*sdk.TxResponse, er
 func (c *Client) broadcastTx(remote string, txBytes []byte) (*sdk.TxResponse, error) {
 	c.log.Debug("Broadcasting the transaction", "remote", remote, "size", len(txBytes))
 
-	client, err := rpchttp.NewWithTimeout(remote, "/websocket", c.txTimeout)
+	client, err := c.rpc(remote, c.txTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +83,7 @@ func (c *Client) BroadcastTx(txBytes []byte) (res *sdk.TxResponse, err error) {
 func (c *Client) calculateGas(remote string, txf tx.Factory, messages ...sdk.Msg) (uint64, error) {
 	c.log.Debug("Calculating the gas", "remote", remote, "messages", len(messages))
 
-	client, err := rpchttp.NewWithTimeout(remote, "/websocket", c.txTimeout)
+	client, err := c.rpc(remote, c.txTimeout)
 	if err != nil {
 		return 0, err
 	}
