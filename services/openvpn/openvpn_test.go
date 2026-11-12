@@ -45,6 +45,9 @@ func home(t *testing.T, proto string, ipv6 bool) (string, *ovpntypes.Config) {
 		t.Fatal(err)
 	}
 	t.Setenv("TMPDIR", dir)
+	saved := kernelHasIPv6
+	kernelHasIPv6 = func() bool { return true }
+	t.Cleanup(func() { kernelHasIPv6 = saved })
 
 	return dir, cfg
 }
@@ -233,7 +236,7 @@ func TestPeersAndHandshake(t *testing.T) {
 // Rules: [EG-7], [RT-3].
 func TestStartStop(t *testing.T) {
 	stubBinary(t)
-	dir, _ := home(t, ovpntypes.ProtoUDP, false)
+	dir, _ := home(t, ovpntypes.ProtoUDP, true)
 
 	var rules []string
 	saved, savedQuiet := common.RunCommand, common.RunQuiet
@@ -635,5 +638,62 @@ func TestNATRulesAreScopedAndAddedOnce(t *testing.T) {
 		if !strings.Contains(joined, "iptables -t nat -A POSTROUTING -s 10.9.0.0/24 -o eth0 -j MASQUERADE") {
 			t.Errorf("the masquerade rule is not scoped to the tunnel:\n%s", joined)
 		}
+	}
+}
+
+// TestIPv6OffMeansNoIPv6: with enable_ipv6 = false, or on a kernel booted
+// without IPv6, the server offers no IPv6 and the node calls no ip6tables
+// for its forwarding and NAT rules.
+//
+// Rules: [EG-11].
+func TestIPv6OffMeansNoIPv6(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		setting, has bool
+	}{
+		{"setting off", false, true},
+		{"kernel without IPv6", true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stubBinary(t)
+			dir, _ := home(t, ovpntypes.ProtoUDP, tc.setting)
+			savedKernel := kernelHasIPv6
+			kernelHasIPv6 = func() bool { return tc.has }
+			t.Cleanup(func() { kernelHasIPv6 = savedKernel })
+
+			var rules []string
+			saved, savedQuiet := common.RunCommand, common.RunQuiet
+			common.RunCommand = func(name string, args ...string) error {
+				rules = append(rules, name+" "+strings.Join(args, " "))
+				if slices.Contains(args, "-C") {
+					return os.ErrNotExist
+				}
+				return nil
+			}
+			common.RunQuiet = common.RunCommand
+			t.Cleanup(func() { common.RunCommand, common.RunQuiet = saved, savedQuiet })
+			savedFwd := ensureForwarding
+			ensureForwarding = func() error { return nil }
+			t.Cleanup(func() { ensureForwarding = savedFwd })
+
+			s := NewOpenVPN()
+			if err := s.Init(dir); err != nil {
+				t.Fatal(err)
+			}
+			raw, _ := os.ReadFile(filepath.Join(dir, "openvpn_server.conf"))
+			if strings.Contains(string(raw), "server-ipv6") || s.info[3] != 0 {
+				t.Errorf("IPv6 offered: info %x\n%s", s.info, raw)
+			}
+			startFakeServerOn(t, s.socketPath)
+			if err := s.Start(); err != nil {
+				t.Fatal(err)
+			}
+			_ = s.Stop()
+			for _, rule := range rules {
+				if strings.HasPrefix(rule, "ip6tables") && !strings.Contains(rule, "DVPND-") {
+					t.Errorf("an ip6tables forwarding or NAT rule: %s", rule)
+				}
+			}
+		})
 	}
 }

@@ -1112,6 +1112,16 @@
         "go test -count=1 -run '^(TestPostUpAddsScopedRulesOnce|TestNATRulesAreScopedAndAddedOnce)$' ./services/wireguard/ ./services/openvpn/"
       ],
       "expect": "--- FAIL"
+    },
+    {
+      "name": "[EG-11] a WireGuard tunnel without IPv6 still gets ip6tables rules",
+      "file": "services/wireguard/wireguard.go",
+      "find": "\tif cfg.EnableIPv6 {\n\t\tnetworks = append(networks, pool.V6.Net)",
+      "replace": "\tif true {\n\t\tnetworks = append(networks, pool.V6.Net)",
+      "run": [
+        "go test -count=1 -run '^(TestIPv6OffMeansNoIPv6|TestKernelWithoutIPv6RunsIPv4Only)$' ./services/wireguard/"
+      ],
+      "expect": "--- FAIL"
     }
   ]
 }

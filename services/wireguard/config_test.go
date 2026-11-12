@@ -31,8 +31,11 @@ func renderConfig(t *testing.T, cfg *wgtypes.Config) string {
 func TestTunnelAddress(t *testing.T) {
 	v4, _ := wgtypes.NewIPv4PoolFromCIDR("10.9.0.2/24")
 	v6, _ := wgtypes.NewIPv6PoolFromCIDR("fd86:ea04:1116::2/120")
-	if got := TunnelAddress(wgtypes.NewIPPool(v4, v6)); got != "10.9.0.1/24,fd86:ea04:1116::1/120" {
+	if got := TunnelAddress(wgtypes.NewIPPool(v4, v6), true); got != "10.9.0.1/24,fd86:ea04:1116::1/120" {
 		t.Fatalf("tunnel address: %s", got)
+	}
+	if got := TunnelAddress(wgtypes.NewIPPool(v4, v6), false); got != "10.9.0.1/24" {
+		t.Fatalf("tunnel address without IPv6: %s", got)
 	}
 	// The Handshake resolver listens on the same IPv4 address the interface gets.
 	if got := NewVariant(Default, wgtypes.NewIPPool(v4, v6)).TunnelIPv4().String(); got != "10.9.0.1" {
@@ -165,5 +168,26 @@ func TestPostUpAddsScopedRulesOnce(t *testing.T) {
 	removed := strings.Join(runHook(t, hookLine(t, out, "PostDown"), "wg0", 0), "\n")
 	if !strings.Contains(removed, "iptables -w 5 -t nat -D POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE") {
 		t.Errorf("PostDown leaves the masquerade rule:\n%s", removed)
+	}
+}
+
+// TestIPv6OffMeansNoIPv6: with enable_ipv6 = false the interface gets no
+// IPv6 address and PostUp calls no ip6tables, which fails on a kernel
+// without IPv6.
+//
+// Rules: [EG-11].
+func TestIPv6OffMeansNoIPv6(t *testing.T) {
+	cfg := wgtypes.NewConfig().WithDefaultValues()
+	cfg.Uplink = "eth0"
+	cfg.EnableIPv6 = false
+	out := renderConfig(t, cfg)
+
+	if a := hookLine(t, out, "Address"); a != "10.8.0.1/24" {
+		t.Errorf("Address = %q, want the IPv4 address only", a)
+	}
+	for _, key := range []string{"PostUp", "PostDown"} {
+		if line := hookLine(t, out, key); strings.Contains(line, "ip6tables") || !strings.Contains(line, "iptables") {
+			t.Errorf("%s = %s", key, line)
+		}
 	}
 }

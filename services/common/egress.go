@@ -135,11 +135,18 @@ type family struct {
 	blocked []string
 }
 
+// KernelHasIPv6 says whether the kernel was booted with IPv6.
+func KernelHasIPv6() bool {
+	_, err := os.Stat(ipv6Present)
+
+	return err == nil
+}
+
 // families are the address families the kernel has: IPv4 always, IPv6
 // unless the kernel was booted without it.
 func families() []family {
 	list := []family{{tool: "iptables", blocked: BlockedNetworksV4}}
-	if _, err := os.Stat(ipv6Present); err == nil {
+	if KernelHasIPv6() {
 		list = append(list, family{tool: "ip6tables", v6: true, blocked: BlockedNetworksV6})
 	}
 

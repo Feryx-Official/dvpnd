@@ -52,7 +52,10 @@ them.
 - **[EG-10] A rule the kernel refuses stops the start.** The node never serves clients
   behind a partly installed firewall; the error names the command that failed.
 - **[EG-11] A kernel without IPv6 still runs a tunnel node.** Only iptables is used when
-  `/proc/sys/net/ipv6` is absent; calling ip6tables there would fail the start.
+  `/proc/sys/net/ipv6` is absent; calling ip6tables there would fail the start. A tunnel
+  with `enable_ipv6 = false` gets no IPv6 address and no ip6tables forwarding or
+  masquerade rule, and `enable_ipv6 = true` on such a kernel runs the tunnel IPv4-only
+  with a warning; both got the IPv6 address and the ip6tables rules before.
 - **[EG-12] End to end, every protocol keeps its clients to the internet and the node
   API.** With the real daemon and a real client, under the default policy and with mail
   allowed, a client reaches the internet by address and by name and the node API. It

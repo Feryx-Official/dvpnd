@@ -35,6 +35,10 @@ var (
 
 	// quickTimeout bounds wg-quick, which runs ip, wg and iptables in turn.
 	quickTimeout = 2 * time.Minute
+
+	// kernelHasIPv6 says whether the kernel has IPv6; a variable so tests
+	// can take it away.
+	kernelHasIPv6 = common.KernelHasIPv6
 )
 
 // Variant is one implementation of the WireGuard family: the tools that
@@ -124,20 +128,24 @@ type interfaceConfig struct {
 }
 
 // renderInterface is the wg-quick configuration of an interface whose peers
-// get addresses from pool.
+// get addresses from pool. Without IPv6 the interface gets no IPv6 address
+// and PostUp calls no ip6tables.
 func renderInterface(cfg *wgtypes.Config, pool *wgtypes.IPPool, extra []string) ([]byte, error) {
 	t, err := template.New("wireguard_conf").Parse(configTemplate)
 	if err != nil {
 		return nil, err
 	}
 
-	nat := common.NAT{Interface: "%i", Uplink: cfg.Uplink, Networks: []*net.IPNet{pool.V4.Net, pool.V6.Net}}
-	up, down := nat.Hooks()
+	networks := []*net.IPNet{pool.V4.Net}
+	if cfg.EnableIPv6 {
+		networks = append(networks, pool.V6.Net)
+	}
+	up, down := common.NAT{Interface: "%i", Uplink: cfg.Uplink, Networks: networks}.Hooks()
 
 	var buffer bytes.Buffer
 	err = t.Execute(&buffer, interfaceConfig{
 		Config:   cfg,
-		Address:  TunnelAddress(pool),
+		Address:  TunnelAddress(pool, cfg.EnableIPv6),
 		PostUp:   up,
 		PostDown: down,
 		Extra:    extra,
@@ -147,15 +155,20 @@ func renderInterface(cfg *wgtypes.Config, pool *wgtypes.IPPool, extra []string) 
 }
 
 // TunnelAddress is the interface's own address in each of the pools it
-// hands peers addresses from: the first host of the pool's network, with the
-// network's prefix length.
-func TunnelAddress(pool *wgtypes.IPPool) string {
+// hands peers addresses from, the IPv6 one only when the tunnel carries
+// IPv6: the first host of the pool's network, with the network's prefix
+// length.
+func TunnelAddress(pool *wgtypes.IPPool, ipv6 bool) string {
 	v4bits, _ := pool.V4.Net.Mask.Size()
-	v6bits, _ := pool.V6.Net.Mask.Size()
 	v4 := wgtypes.NewIPv4FromIP(pool.V4.Net.IP).Next().IP()
-	v6 := wgtypes.NewIPv6FromIP(pool.V6.Net.IP).Next().IP()
+	address := fmt.Sprintf("%s/%d", v4, v4bits)
+	if ipv6 {
+		v6bits, _ := pool.V6.Net.Mask.Size()
+		v6 := wgtypes.NewIPv6FromIP(pool.V6.Net.IP).Next().IP()
+		address += fmt.Sprintf(",%s/%d", v6, v6bits)
+	}
 
-	return fmt.Sprintf("%s/%d,%s/%d", v4, v4bits, v6, v6bits)
+	return address
 }
 
 // TunnelIPv4 is the node's IPv4 address on the tunnel interface, the first
@@ -184,6 +197,10 @@ func (s *WireGuard) Init(home string) (err error) {
 		if s.config.Uplink, err = common.DetectUplink(); err != nil {
 			return err
 		}
+	}
+	if s.config.EnableIPv6 && !kernelHasIPv6() {
+		fmt.Fprintf(os.Stderr, "warning: enable_ipv6 is on but the kernel has no IPv6; %s carries IPv4 only\n", s.config.Interface)
+		s.config.EnableIPv6 = false
 	}
 
 	conf, err := renderInterface(s.config, s.pool, s.extra)

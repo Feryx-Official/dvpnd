@@ -210,3 +210,36 @@ func TestAHungToolIsKilled(t *testing.T) {
 		}
 	}
 }
+
+// TestKernelWithoutIPv6RunsIPv4Only: enable_ipv6 = true on a kernel booted
+// without IPv6 runs the tunnel IPv4-only, as if the setting were off: no
+// IPv6 address, no ip6tables in PostUp, no IPv6 tunnel address for a peer.
+//
+// Rules: [EG-11].
+func TestKernelWithoutIPv6RunsIPv4Only(t *testing.T) {
+	saved := kernelHasIPv6
+	kernelHasIPv6 = func() bool { return false }
+	t.Cleanup(func() { kernelHasIPv6 = saved })
+
+	s, _ := startRig(t, "wgtest3", false)
+	raw, err := os.ReadFile(filepath.Join(s.variant.ConfigDir, "wgtest3.conf"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "ip6tables") || strings.Contains(string(raw), "fd86:") {
+		t.Errorf("IPv6 in the interface configuration:\n%s", raw)
+	}
+
+	tool := filepath.Join(t.TempDir(), "wg")
+	if err := os.WriteFile(tool, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s.variant.Tool = tool
+	result, err := s.AddPeer(make([]byte, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !wgtypes.NewIPv6FromIP(result[4:]).Empty() {
+		t.Errorf("the peer got an IPv6 tunnel address: %x", result[4:])
+	}
+}

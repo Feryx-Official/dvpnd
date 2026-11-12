@@ -105,7 +105,8 @@ to connect to. `uplink` may stay empty; the interface of the default route is de
 start and used for NAT. `interface` and `uplink` take up to 15 letters, digits, `_`, `.` or
 `-`, starting with a letter or digit; the node refuses anything else. `enable_ipv6` is `true`, as on every other node: the host must then
 reach the IPv6 internet (check in §6; Docker needs extra steps, §7). Set it `false` for an
-IPv4-only tunnel; clients then exit with the node's IPv4 address only.
+IPv4-only tunnel; clients then exit with the node's IPv4 address only. On a kernel booted
+without IPv6 the node runs the tunnel IPv4-only whatever the setting, and logs a warning.
 
 ### 2b. V2Ray
 

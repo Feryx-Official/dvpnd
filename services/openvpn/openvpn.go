@@ -58,6 +58,10 @@ var (
 
 	// ensureForwarding turns IP forwarding on; a variable so tests can skip it.
 	ensureForwarding = common.EnsureForwarding
+
+	// kernelHasIPv6 says whether the kernel has IPv6; a variable so tests
+	// can take it away.
+	kernelHasIPv6 = common.KernelHasIPv6
 )
 
 // traffic is a peer's accumulated bytes from connections that have ended;
@@ -136,6 +140,10 @@ func (s *OpenVPN) Init(home string) (err error) {
 			return err
 		}
 	}
+	if s.config.EnableIPv6 && !kernelHasIPv6() {
+		fmt.Fprintf(os.Stderr, "warning: enable_ipv6 is on but the kernel has no IPv6; %s carries IPv4 only\n", s.config.Interface)
+		s.config.EnableIPv6 = false
+	}
 
 	s.pki, err = loadOrCreatePKI(filepath.Join(home, "openvpn"))
 	if err != nil {
@@ -182,7 +190,7 @@ func (s *OpenVPN) Init(home string) (err error) {
 		return err
 	}
 
-	s.nat = common.NAT{Interface: s.config.Interface, Uplink: s.config.Uplink, Networks: tunnelNetworks()}
+	s.nat = common.NAT{Interface: s.config.Interface, Uplink: s.config.Uplink, Networks: tunnelNetworks(s.config.EnableIPv6)}
 	s.egress = common.TunnelEgress{Interface: s.config.Interface}
 
 	binary.BigEndian.PutUint16(s.info[0:], s.config.ListenPort)
@@ -206,12 +214,15 @@ func (s *OpenVPN) TunnelIPv4() net.IP {
 }
 
 // tunnelNetworks are the networks the server hands addresses from, which
-// the NAT rules masquerade.
-func tunnelNetworks() []*net.IPNet {
-	v4 := &net.IPNet{IP: net.ParseIP(ipv4Network).To4(), Mask: net.IPMask(net.ParseIP(ipv4Netmask).To4())}
-	_, v6, _ := net.ParseCIDR(ipv6Network)
+// the NAT rules masquerade; the IPv6 one only when the tunnel carries IPv6.
+func tunnelNetworks(ipv6 bool) []*net.IPNet {
+	networks := []*net.IPNet{{IP: net.ParseIP(ipv4Network).To4(), Mask: net.IPMask(net.ParseIP(ipv4Netmask).To4())}}
+	if ipv6 {
+		_, v6, _ := net.ParseCIDR(ipv6Network)
+		networks = append(networks, v6)
+	}
 
-	return []*net.IPNet{v4, v6}
+	return networks
 }
 
 // Start installs the egress firewall, launches the server, attaches to its
