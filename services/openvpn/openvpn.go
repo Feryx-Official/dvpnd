@@ -26,7 +26,6 @@ import (
 
 	"github.com/Feryx-Official/dvpnd/v9/services/common"
 	ovpntypes "github.com/Feryx-Official/dvpnd/v9/services/openvpn/types"
-	"github.com/Feryx-Official/dvpnd/v9/services/wireguard"
 	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
@@ -58,7 +57,7 @@ var (
 	managementTimeout = 15 * time.Second
 
 	// ensureForwarding turns IP forwarding on; a variable so tests can skip it.
-	ensureForwarding = wireguard.EnsureForwarding
+	ensureForwarding = common.EnsureForwarding
 )
 
 // traffic is a peer's accumulated bytes from connections that have ended;
@@ -133,7 +132,7 @@ func (s *OpenVPN) Init(home string) (err error) {
 		return err
 	}
 	if s.config.Uplink == "" {
-		s.config.Uplink = wireguard.DetectUplink()
+		s.config.Uplink = common.DetectUplink()
 	}
 
 	s.pki, err = loadOrCreatePKI(filepath.Join(home, "openvpn"))

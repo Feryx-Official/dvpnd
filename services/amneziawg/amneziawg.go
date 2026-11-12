@@ -53,7 +53,7 @@ var (
 	lookPath = exec.LookPath
 
 	// ensureForwarding turns IP forwarding on; a variable so tests can skip it.
-	ensureForwarding = wireguard.EnsureForwarding
+	ensureForwarding = common.EnsureForwarding
 )
 
 // AmneziaWG is the default tier's WireGuard service plus, when the

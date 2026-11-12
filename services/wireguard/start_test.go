@@ -46,9 +46,9 @@ func startRig(t *testing.T, iface string, quickFails bool) (*WireGuard, func() [
 	common.RunQuiet = common.RunCommand
 	t.Cleanup(func() { common.RunCommand, common.RunQuiet = saved, savedQuiet })
 
-	savedSwitches := forwardingSwitches
-	forwardingSwitches = nil
-	t.Cleanup(func() { forwardingSwitches = savedSwitches })
+	savedForwarding := ensureForwarding
+	ensureForwarding = func() error { return nil }
+	t.Cleanup(func() { ensureForwarding = savedForwarding })
 
 	cfg := wgtypes.NewConfig().WithDefaultValues()
 	cfg.Interface = iface
