@@ -74,15 +74,26 @@ func (c *Config) Validate() error {
 	return nil
 }
 
+// withStaticDefaults fills the values that are the same for every node; it
+// is what a file read from disk starts from, so a file without its port or
+// key fails validation instead of getting a fresh one at every start.
+func (c *Config) withStaticDefaults() *Config {
+	c.Interface = "wg0"
+	c.EnableIPv6 = true
+
+	return c
+}
+
+// WithDefaultValues is what "config init" writes: the static defaults, a
+// random port and a fresh key.
 func (c *Config) WithDefaultValues() *Config {
 	key, err := NewPrivateKey()
 	if err != nil {
 		panic(err)
 	}
 
-	c.Interface = "wg0"
+	c.withStaticDefaults()
 	c.ListenPort = utils.RandomPort()
-	c.EnableIPv6 = true
 	c.PrivateKey = key.String()
 
 	return c
@@ -107,7 +118,7 @@ func (c *Config) String() string {
 }
 
 func ReadInConfig(v *viper.Viper) (*Config, error) {
-	config := NewConfig().WithDefaultValues()
+	config := NewConfig().withStaticDefaults()
 	if err := v.ReadInConfig(); err != nil {
 		return nil, err
 	}

@@ -50,10 +50,17 @@ func NewVMessConfig() *VMessConfig {
 	return &VMessConfig{}
 }
 
-func (c *VMessConfig) WithDefaultValues() *VMessConfig {
-	c.ListenPort = utils.RandomPort()
+// withStaticDefaults fills the values that are the same for every node.
+func (c *VMessConfig) withStaticDefaults() *VMessConfig {
 	c.TLS = false
 	c.Transport = "tcp"
+
+	return c
+}
+
+func (c *VMessConfig) WithDefaultValues() *VMessConfig {
+	c.withStaticDefaults()
+	c.ListenPort = utils.RandomPort()
 
 	return c
 }
@@ -145,8 +152,13 @@ func (c *Config) String() string {
 	return buf.String()
 }
 
+// ReadInConfig starts from the static defaults, so a file without its listen
+// port fails validation instead of getting a random one at every start. The
+// API port alone is drawn when the file has none (see APIConfig).
 func ReadInConfig(v *viper.Viper) (*Config, error) {
-	config := NewConfig().WithDefaultValues()
+	config := NewConfig()
+	config.VMess.withStaticDefaults()
+	config.API.WithDefaultValues()
 	if err := v.ReadInConfig(); err != nil {
 		return nil, err
 	}

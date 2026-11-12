@@ -105,3 +105,8 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
   add a directive. A value with a line break, which no OpenVPN quoting carries, stops the
   start. Fields the node sets itself, V2Ray's security and TLS paths, take no key from the
   file.
+- **[RT-23] Reading a protocol's file never draws a value.** A listen port or key the file
+  lacks stops the start, naming it. Filled at random as the file was read, it gave the node
+  a new port, or a new WireGuard key, at every start, while clients held the old one. Only
+  V2Ray's `[api]` port, a loopback port that files from before the section lack (RT-9), is
+  still drawn. XRAY's control port must differ from its VLESS port.

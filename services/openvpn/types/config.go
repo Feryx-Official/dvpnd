@@ -69,11 +69,20 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-func (c *Config) WithDefaultValues() *Config {
+// withStaticDefaults fills the values that are the same for every node; it
+// is what a file read from disk starts from, so a file without its port
+// fails validation instead of getting a random one at every start.
+func (c *Config) withStaticDefaults() *Config {
 	c.Interface = "ovpn0"
-	c.ListenPort = utils.RandomPort()
 	c.Proto = ProtoUDP
 	c.EnableIPv6 = true
+
+	return c
+}
+
+func (c *Config) WithDefaultValues() *Config {
+	c.withStaticDefaults()
+	c.ListenPort = utils.RandomPort()
 
 	return c
 }
@@ -97,7 +106,7 @@ func (c *Config) String() string {
 }
 
 func ReadInConfig(v *viper.Viper) (*Config, error) {
-	config := NewConfig().WithDefaultValues()
+	config := NewConfig().withStaticDefaults()
 	if err := v.ReadInConfig(); err != nil {
 		return nil, err
 	}

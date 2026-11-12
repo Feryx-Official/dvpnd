@@ -130,8 +130,10 @@ func (c *Config) String() string {
 	return buf.String()
 }
 
+// ReadInConfig starts from an empty configuration, so a file without one of
+// its ports fails validation instead of getting a random one at every start.
 func ReadInConfig(v *viper.Viper) (*Config, error) {
-	config := NewConfig().WithDefaultValues()
+	config := NewConfig()
 	if err := v.ReadInConfig(); err != nil {
 		return nil, err
 	}

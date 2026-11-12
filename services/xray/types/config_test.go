@@ -81,3 +81,16 @@ func TestRealityValidation(t *testing.T) {
 		t.Fatalf("tls must ignore the reality keys: %v", err)
 	}
 }
+
+// TestAPIPortIsNotTheListenPort: the control API and the VLESS inbound both
+// listen on TCP, so one port cannot carry both; a file that gives them the
+// same port stops the start rather than letting xray fail to bind.
+//
+// Rules: [RT-23].
+func TestAPIPortIsNotTheListenPort(t *testing.T) {
+	c := NewConfig().WithDefaultValues()
+	c.API.Port = c.VLESS.ListenPort
+	if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "listen_port") {
+		t.Fatalf("api port equal to listen_port: %v", err)
+	}
+}

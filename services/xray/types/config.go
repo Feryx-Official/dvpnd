@@ -161,28 +161,33 @@ func (c *Config) Validate() error {
 	if err := c.API.Validate(); err != nil {
 		return errors.Wrapf(err, "invalid section api")
 	}
+	if c.API.Port == c.VLESS.ListenPort {
+		return errors.New("api port must differ from the vless listen_port")
+	}
 
 	return nil
 }
 
-// withStaticDefaults fills the values that do not involve key material; it
+// withStaticDefaults fills the values that are the same for every node; it
 // is what a configuration read from disk starts from, so a file that omits a
-// key never gets a silently generated one.
+// port or a key never gets a silently drawn one.
 func (c *Config) withStaticDefaults() *Config {
-	c.VLESS.ListenPort = utils.RandomPort()
 	c.VLESS.Security = SecurityTLS
 	c.VLESS.Flow = true
 	c.Reality.ServerName = "www.apple.com"
 	c.Reality.Fingerprint = "chrome"
-	c.API.Port = utils.RandomPort()
 
 	return c
 }
 
-// WithDefaultValues is what "config init" writes: static defaults plus a
-// fresh reality key pair and short id.
+// WithDefaultValues is what "config init" writes: static defaults plus
+// random ports and a fresh reality key pair and short id.
 func (c *Config) WithDefaultValues() *Config {
 	c.withStaticDefaults()
+	c.VLESS.ListenPort = utils.RandomPort()
+	for c.API.Port == 0 || c.API.Port == c.VLESS.ListenPort {
+		c.API.Port = utils.RandomPort()
+	}
 
 	private := make([]byte, curve25519.ScalarSize)
 	if _, err := rand.Read(private); err != nil {
