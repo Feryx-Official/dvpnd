@@ -908,8 +908,8 @@
     {
       "name": "[SL-2] an OpenVPN connection that ends during a pass counts twice",
       "file": "services/openvpn/openvpn.go",
-      "find": "\t\t\t\tif _, ended := s.banked[row.cid]; !ended {",
-      "replace": "\t\t\t\tif true {",
+      "find": "\t\tif _, ended := s.banked[row.cid]; item != nil && !ended {",
+      "replace": "\t\tif item != nil {",
       "run": [
         "go test -count=1 -run '^TestAConnectionThatEndsDuringAPassCountsOnce$' ./services/openvpn/"
       ],

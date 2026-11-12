@@ -447,25 +447,24 @@ func (s *OpenVPN) Peers() ([]types.Peer, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// One pass over the peers and one over the live rows, which the
+	// admission callback waits for.
 	keys := s.peers.Keys()
-	items := make([]types.Peer, 0, len(keys))
-	for _, key := range keys {
-		item := types.Peer{Key: key}
+	items := make([]types.Peer, len(keys))
+	byKey := make(map[string]*types.Peer, len(keys))
+	for i, key := range keys {
+		items[i].Key = key
 		if c := s.closed[key]; c != nil {
-			item.Upload, item.Download = c.upload, c.download
+			items[i].Upload, items[i].Download = c.upload, c.download
 		}
-		for cn, k := range s.byCN {
-			if k != key {
-				continue
-			}
-			if row, ok := live[cn]; ok {
-				if _, ended := s.banked[row.cid]; !ended {
-					item.Upload += row.received
-					item.Download += row.sent
-				}
-			}
+		byKey[key] = &items[i]
+	}
+	for cn, row := range live {
+		item := byKey[s.byCN[cn]]
+		if _, ended := s.banked[row.cid]; item != nil && !ended {
+			item.Upload += row.received
+			item.Download += row.sent
 		}
-		items = append(items, item)
 	}
 
 	// A table read from now on no longer lists a connection that ended.

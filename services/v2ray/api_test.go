@@ -5,6 +5,7 @@ package v2ray
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -33,6 +34,8 @@ type fakeAPI struct {
 	users map[string]bool
 	stats map[string]int64
 	stall bool
+	// calls counts the stats calls by method.
+	calls map[string]int
 }
 
 // wait blocks a stalled call until its deadline and fails it then; the
@@ -83,6 +86,7 @@ func (f *fakeAPI) GetStats(ctx context.Context, req *statscommand.GetStatsReques
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.calls["GetStats"]++
 	v, ok := f.stats[req.GetName()]
 	if !ok {
 		return nil, status.Errorf(codes.Unknown, "%s not found", req.GetName())
@@ -100,6 +104,7 @@ func (f *fakeAPI) QueryStats(ctx context.Context, req *statscommand.QueryStatsRe
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.calls["QueryStats"]++
 	res := &statscommand.QueryStatsResponse{}
 	for name, value := range f.stats {
 		if strings.Contains(name, req.GetPattern()) {
@@ -120,7 +125,7 @@ func startFakeAPI(t *testing.T) (*fakeAPI, *V2Ray) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	api := &fakeAPI{users: map[string]bool{}, stats: map[string]int64{}}
+	api := &fakeAPI{users: map[string]bool{}, stats: map[string]int64{}, calls: map[string]int{}}
 	srv := grpc.NewServer()
 	proxymancommand.RegisterHandlerServiceServer(srv, api)
 	statscommand.RegisterStatsServiceServer(srv, api)
@@ -217,6 +222,52 @@ func TestAPeerAddedAgainStartsFromZero(t *testing.T) {
 	}
 }
 
+// TestPeersReadsEveryCounterInOneQuery: the usage pass asks v2ray for every
+// user's counters at once, as for XRAY, instead of twice per peer while it
+// holds the peer map's lock.
+func TestPeersReadsEveryCounterInOneQuery(t *testing.T) {
+	api, s := startFakeAPI(t)
+
+	want := map[string][2]int64{}
+	for i := int64(1); i <= 3; i++ {
+		data := append([]byte{0x01}, []byte(fmt.Sprintf("0123456789abcde%d", i))...)
+		if _, err := s.AddPeer(data); err != nil {
+			t.Fatal(err)
+		}
+		key := base64.StdEncoding.EncodeToString(data)
+		api.mu.Lock()
+		api.stats["user>>>"+key+">>>traffic>>>uplink"] = i
+		api.stats["user>>>"+key+">>>traffic>>>downlink"] = 10 * i
+		api.mu.Unlock()
+		want[key] = [2]int64{i, 10 * i}
+	}
+	api.mu.Lock()
+	api.calls = map[string]int{}
+	api.mu.Unlock()
+
+	peers, err := s.Peers()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string][2]int64{}
+	for _, p := range peers {
+		got[p.Key] = [2]int64{p.Upload, p.Download}
+	}
+	if len(got) != len(want) {
+		t.Fatalf("peers %v, want %v", got, want)
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Fatalf("peers %v, want %v", got, want)
+		}
+	}
+	api.mu.Lock()
+	defer api.mu.Unlock()
+	if api.calls["QueryStats"] != 1 || api.calls["GetStats"] != 0 {
+		t.Fatalf("stats calls %v, want one QueryStats", api.calls)
+	}
+}
+
 // TestAPICallsAreBounded: a proxy that stops answering fails the call after
 // rpcTimeout instead of holding the handshake or the job forever.
 //
@@ -268,7 +319,7 @@ func TestAPICallWaitsForTheProxy(t *testing.T) {
 		}
 	})
 
-	api := &fakeAPI{users: map[string]bool{}, stats: map[string]int64{}}
+	api := &fakeAPI{users: map[string]bool{}, stats: map[string]int64{}, calls: map[string]int{}}
 	srv := grpc.NewServer()
 	proxymancommand.RegisterHandlerServiceServer(srv, api)
 	statscommand.RegisterStatsServiceServer(srv, api)

@@ -338,65 +338,40 @@ func (s *V2Ray) RemovePeer(data []byte) error {
 	return nil
 }
 
-func (s *V2Ray) Peers() (items []types.Peer, err error) {
+// Peers reads every user's traffic counters in one query, outside the peer
+// map's lock, and reports the registered peers; a peer without counters yet
+// reports zero.
+func (s *V2Ray) Peers() ([]types.Peer, error) {
 	client, err := s.statsServiceClient()
 	if err != nil {
 		return nil, err
 	}
 
-	err = s.peers.Iterate(
-		func(key string, _ v2raytypes.Peer) (bool, error) {
-			ctx, cancel := rpcContext()
-			defer cancel()
+	ctx, cancel := rpcContext()
+	defer cancel()
 
-			req := &statscommand.GetStatsRequest{
-				Reset_: false,
-				Name:   fmt.Sprintf("user>>>%s>>>traffic>>>uplink", key),
-			}
-
-			res, err := client.GetStats(ctx, req)
-			if err != nil {
-				if !strings.Contains(err.Error(), "not found") {
-					return false, err
-				}
-			}
-
-			upLink := res.GetStat()
-			if upLink == nil {
-				upLink = &statscommand.Stat{}
-			}
-
-			req = &statscommand.GetStatsRequest{
-				Reset_: false,
-				Name:   fmt.Sprintf("user>>>%s>>>traffic>>>downlink", key),
-			}
-
-			res, err = client.GetStats(ctx, req)
-			if err != nil {
-				if !strings.Contains(err.Error(), "not found") {
-					return false, err
-				}
-			}
-
-			downLink := res.GetStat()
-			if downLink == nil {
-				downLink = &statscommand.Stat{}
-			}
-
-			items = append(
-				items,
-				types.Peer{
-					Key:      key,
-					Upload:   upLink.GetValue(),
-					Download: downLink.GetValue(),
-				},
-			)
-			return false, nil
-		},
-	)
-
+	res, err := client.QueryStats(ctx, &statscommand.QueryStatsRequest{Pattern: "user>>>"})
 	if err != nil {
 		return nil, err
+	}
+	counters := make(map[string]int64, len(res.GetStat()))
+	for _, stat := range res.GetStat() {
+		counters[stat.GetName()] = stat.GetValue()
+	}
+
+	var keys []string
+	_ = s.peers.Iterate(func(key string, _ v2raytypes.Peer) (bool, error) {
+		keys = append(keys, key)
+		return false, nil
+	})
+
+	items := make([]types.Peer, 0, len(keys))
+	for _, key := range keys {
+		items = append(items, types.Peer{
+			Key:      key,
+			Upload:   counters[fmt.Sprintf("user>>>%s>>>traffic>>>uplink", key)],
+			Download: counters[fmt.Sprintf("user>>>%s>>>traffic>>>downlink", key)],
+		})
 	}
 
 	return items, nil
