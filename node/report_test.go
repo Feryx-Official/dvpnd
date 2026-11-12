@@ -5,6 +5,7 @@ package node
 import (
 	"errors"
 	"fmt"
+	"math"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -187,6 +188,44 @@ func (u *unconfirmed) UpdateSessions(items ...types.Session) error {
 
 	return fmt.Errorf("https://rpc.example:443: %w: after 30 seconds", lite.ErrUnconfirmed)
 }
+
+// TestChainBytesPastInt64DoNotStopTheNode: the chain holds a session's bytes
+// as an integer of any size. A value past int64 is compared, not converted,
+// so the pass goes on instead of the job panicking, which stops the node.
+//
+// Rules: [SL-12].
+func TestChainBytesPastInt64DoNotStopTheNode(t *testing.T) {
+	huge := sdkmath.NewIntFromUint64(math.MaxUint64)
+	session := &nodetypes.Session{BaseSession: &sessiontypes.BaseSession{
+		ID: 1, Status: v1base.StatusActive,
+		DownloadBytes: huge, UploadBytes: huge, MaxBytes: sdkmath.ZeroInt(),
+	}}
+	n := testNode(&fakeChain{})
+	n.chain = &holding{session: session}
+	item := types.Session{ID: 1, Key: "k", Upload: 10, Download: 20}
+
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Fatalf("checking the session panicked: %v", r)
+			}
+		}()
+		if _, _, skip, err := n.checkSession(item); err != nil || skip {
+			t.Fatalf("skip %v, err %v: usage that differs from the chain's is reported", skip, err)
+		}
+		if !sessionNeedsReport(item, session) {
+			t.Fatal("usage that differs from the chain's needs a final report")
+		}
+	}()
+}
+
+// holding holds one session.
+type holding struct {
+	fakeChain
+	session sessiontypes.Session
+}
+
+func (h *holding) QuerySession(uint64) (sessiontypes.Session, error) { return h.session, nil }
 
 // TestReportDuringAnOutage: with the chain unreachable the report is left
 // for the next pass, not sent session by session.

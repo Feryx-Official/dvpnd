@@ -81,8 +81,8 @@ func sessionNeedsReport(local types.Session, onChain chainSessionView) bool {
 	if !onChain.GetStatus().Equal(v1base.StatusActive) {
 		return false
 	}
-	return local.Upload != onChain.GetUploadBytes().Int64() ||
-		local.Download != onChain.GetDownloadBytes().Int64()
+	return !onChain.GetUploadBytes().Equal(sdkmath.NewInt(local.Upload)) ||
+		!onChain.GetDownloadBytes().Equal(sdkmath.NewInt(local.Download))
 }
 
 // clearSessions removes every row from the local session table.

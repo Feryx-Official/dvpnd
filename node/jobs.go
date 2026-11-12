@@ -186,8 +186,9 @@ func (n *Node) checkSession(item types.Session) (removePeer, removeSession, skip
 		return true, true, true, nil
 	}
 
-	if item.Upload == session.GetUploadBytes().Int64() &&
-		item.Download == session.GetDownloadBytes().Int64() {
+	// Compared as the chain's integers: a value past int64 would panic.
+	if session.GetUploadBytes().Equal(sdkmath.NewInt(item.Upload)) &&
+		session.GetDownloadBytes().Equal(sdkmath.NewInt(item.Download)) {
 		skipUpdate = true
 		if item.CreatedAt.Before(session.GetStatusAt()) {
 			removePeer = true
