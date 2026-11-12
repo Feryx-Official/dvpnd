@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"net"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -21,8 +22,9 @@ import (
 )
 
 // fakeAPI stands in for v2ray's gRPC control API: it records the users on
-// the VMess inbound and answers traffic queries from a table. stall makes
-// every call hang, as a proxy that stopped answering would.
+// the VMess inbound and answers traffic queries from a table, which keeps a
+// removed user's counters, as v2ray does. stall makes every call hang, as a
+// proxy that stopped answering would.
 type fakeAPI struct {
 	proxymancommand.UnimplementedHandlerServiceServer
 	statscommand.UnimplementedStatsServiceServer
@@ -85,8 +87,30 @@ func (f *fakeAPI) GetStats(ctx context.Context, req *statscommand.GetStatsReques
 	if !ok {
 		return nil, status.Errorf(codes.Unknown, "%s not found", req.GetName())
 	}
+	if req.GetReset_() {
+		f.stats[req.GetName()] = 0
+	}
 
 	return &statscommand.GetStatsResponse{Stat: &statscommand.Stat{Name: req.GetName(), Value: v}}, nil
+}
+
+func (f *fakeAPI) QueryStats(ctx context.Context, req *statscommand.QueryStatsRequest) (*statscommand.QueryStatsResponse, error) {
+	if err := f.wait(ctx); err != nil {
+		return nil, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	res := &statscommand.QueryStatsResponse{}
+	for name, value := range f.stats {
+		if strings.Contains(name, req.GetPattern()) {
+			res.Stat = append(res.Stat, &statscommand.Stat{Name: name, Value: value})
+			if req.GetReset_() {
+				f.stats[name] = 0
+			}
+		}
+	}
+
+	return res, nil
 }
 
 func startFakeAPI(t *testing.T) (*fakeAPI, *V2Ray) {
@@ -153,6 +177,46 @@ func TestPeersOverTheAPI(t *testing.T) {
 	}
 }
 
+// TestAPeerAddedAgainStartsFromZero: v2ray keeps a user's counters once the
+// user is removed (seen with the real binary), so a later session with the
+// client's UUID would start with what the earlier one moved. The node bills
+// on the counters from the moment it adds a peer.
+//
+// Rules: [SL-2].
+func TestAPeerAddedAgainStartsFromZero(t *testing.T) {
+	api, s := startFakeAPI(t)
+
+	data := append([]byte{0x01}, []byte("0123456789abcdef")...)
+	key := base64.StdEncoding.EncodeToString(data)
+	if _, err := s.AddPeer(data); err != nil {
+		t.Fatal(err)
+	}
+	api.mu.Lock()
+	api.stats["user>>>"+key+">>>traffic>>>uplink"] = 10
+	api.stats["user>>>"+key+">>>traffic>>>downlink"] = 20
+	api.stats["user>>>other>>>traffic>>>uplink"] = 99
+	api.mu.Unlock()
+	if err := s.RemovePeer(data); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.AddPeer(data); err != nil {
+		t.Fatal(err)
+	}
+	peers, err := s.Peers()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(peers) != 1 || peers[0].Upload != 0 || peers[0].Download != 0 {
+		t.Fatalf("want the peer added again to start from zero, got %+v", peers)
+	}
+	api.mu.Lock()
+	defer api.mu.Unlock()
+	if api.stats["user>>>other>>>traffic>>>uplink"] != 99 {
+		t.Fatal("another user's counter was reset")
+	}
+}
+
 // TestAPICallsAreBounded: a proxy that stops answering fails the call after
 // rpcTimeout instead of holding the handshake or the job forever.
 //
@@ -207,6 +271,7 @@ func TestAPICallWaitsForTheProxy(t *testing.T) {
 	api := &fakeAPI{users: map[string]bool{}, stats: map[string]int64{}}
 	srv := grpc.NewServer()
 	proxymancommand.RegisterHandlerServiceServer(srv, api)
+	statscommand.RegisterStatsServiceServer(srv, api)
 	t.Cleanup(srv.Stop)
 	go func() {
 		time.Sleep(300 * time.Millisecond)

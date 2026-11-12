@@ -138,7 +138,7 @@ func runProxy(t *testing.T, pc proxyCase, allowSMTP bool) {
 
 	socksPort := freePort(t)
 	argv := pc.client(t, t.TempDir(), entry, uuid, socksPort)
-	startClient(t, argv[0], argv[1:]...)
+	client := startClient(t, argv[0], argv[1:]...)
 	dial := socks5(net.JoinHostPort("127.0.0.1", strconv.Itoa(socksPort)))
 
 	public := net.JoinHostPort(env.public, strconv.Itoa(targetPort))
@@ -165,6 +165,24 @@ func runProxy(t *testing.T, pc proxyCase, allowSMTP bool) {
 	waitBlocked(t, dial, public, 20*time.Second)
 	if n := svc.PeerCount(); n != 0 {
 		t.Errorf("PeerCount after RemovePeer: %d", n)
+	}
+
+	// The same peer added again, as a later session with the client's
+	// UUID is, starts from zero: the node bills on the counters from the
+	// moment it adds a peer, never on what an earlier session moved.
+	_ = client.Process.Kill()
+	_ = client.Wait()
+	if _, err := svc.AddPeer(data); err != nil {
+		t.Fatal("AddPeer again:", err)
+	}
+	if peers, err = svc.Peers(); err != nil {
+		t.Fatal("Peers:", err)
+	}
+	if len(peers) != 1 || peers[0].Upload != 0 || peers[0].Download != 0 {
+		t.Errorf("want the peer added again to start from zero, got %+v", peers)
+	}
+	if err := svc.RemovePeer(data); err != nil {
+		t.Fatal("RemovePeer:", err)
 	}
 
 	running = false

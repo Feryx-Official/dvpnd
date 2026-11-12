@@ -238,6 +238,10 @@ func (s *V2Ray) AddPeer(data []byte) (result []byte, err error) {
 	if err != nil {
 		return nil, err
 	}
+	stats, err := s.statsServiceClient()
+	if err != nil {
+		return nil, err
+	}
 
 	var (
 		email  = base64.StdEncoding.EncodeToString(data)
@@ -260,6 +264,17 @@ func (s *V2Ray) AddPeer(data []byte) (result []byte, err error) {
 
 	ctx, cancel := rpcContext()
 	defer cancel()
+
+	// v2ray keeps a removed user's counters, so a later session with the
+	// client's UUID would start with what an earlier one moved: they are
+	// reset first, since the node bills on them from this moment.
+	_, err = stats.QueryStats(ctx, &statscommand.QueryStatsRequest{
+		Pattern: fmt.Sprintf("user>>>%s>>>traffic>>>", email),
+		Reset_:  true,
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	_, err = client.AlterInbound(ctx, req)
 	if err != nil {

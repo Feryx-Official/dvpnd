@@ -25,7 +25,8 @@ import (
 )
 
 // fakeAPI stands in for xray's gRPC control API: it records the users added
-// and removed on the VLESS inbound and answers traffic queries from a table.
+// and removed on the VLESS inbound and answers traffic queries from a table,
+// which keeps a removed user's counters, as xray does.
 type fakeAPI struct {
 	proxymancommand.UnimplementedHandlerServiceServer
 	statscommand.UnimplementedStatsServiceServer
@@ -68,8 +69,11 @@ func (f *fakeAPI) AlterInbound(_ context.Context, req *proxymancommand.AlterInbo
 func (f *fakeAPI) QueryStats(_ context.Context, req *statscommand.QueryStatsRequest) (*statscommand.QueryStatsResponse, error) {
 	res := &statscommand.QueryStatsResponse{}
 	for name, value := range f.stats {
-		if strings.HasPrefix(name, req.GetPattern()) {
+		if strings.Contains(name, req.GetPattern()) {
 			res.Stat = append(res.Stat, &statscommand.Stat{Name: name, Value: value})
+			if req.GetReset_() {
+				f.stats[name] = 0
+			}
 		}
 	}
 
@@ -306,6 +310,54 @@ func TestPeersOverTheAPI(t *testing.T) {
 	}
 	if api.users[key].Flow != "" {
 		t.Fatalf("flow off must add a user without flow: %+v", api.users[key])
+	}
+}
+
+// TestAPeerAddedAgainStartsFromZero: xray keeps a user's counters once the
+// user is removed (seen with the real binary), so a later session with the
+// client's UUID would start with what the earlier one moved. The node bills
+// on the counters from the moment it adds a peer.
+//
+// Rules: [SL-2].
+func TestAPeerAddedAgainStartsFromZero(t *testing.T) {
+	api, port := startFakeAPI(t)
+
+	s := NewXRay()
+	s.config = xraytypes.NewConfig().WithDefaultValues()
+	s.config.API.Port = port
+	t.Cleanup(func() {
+		if s.conn != nil {
+			_ = s.conn.Close()
+		}
+	})
+
+	data, err := s.ParsePeerRequest([]byte(`{"uuid":"01020304-0506-0708-090a-0b0c0d0e0f10"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := base64.StdEncoding.EncodeToString(data)
+	if _, err := s.AddPeer(data); err != nil {
+		t.Fatal(err)
+	}
+	api.stats["user>>>"+key+">>>traffic>>>uplink"] = 10
+	api.stats["user>>>"+key+">>>traffic>>>downlink"] = 20
+	api.stats["user>>>other>>>traffic>>>uplink"] = 99
+	if err := s.RemovePeer(data); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.AddPeer(data); err != nil {
+		t.Fatal(err)
+	}
+	peers, err := s.Peers()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(peers) != 1 || peers[0].Upload != 0 || peers[0].Download != 0 {
+		t.Fatalf("want the peer added again to start from zero, got %+v", peers)
+	}
+	if api.stats["user>>>other>>>traffic>>>uplink"] != 99 {
+		t.Fatal("another user's counter was reset")
 	}
 }
 

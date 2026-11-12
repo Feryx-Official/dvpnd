@@ -91,6 +91,10 @@ key on; the name is what `GET /` reports as `service_type`.
   peer with exactly that key, or its usage is never reported.
 - `RemovePeer` is called by the node (session expired, allocation exceeded, paid hours
   used, account evicted), never by the client.
+- A peer's counters start at zero when `AddPeer` adds it: xray and v2ray keep a removed
+  user's counters (seen with both binaries), so a later session with the client's UUID
+  would start with what an earlier one moved; `AddPeer` resets them first (`QueryStats`
+  with reset).
 - Egress: a client reaches the internet and nothing on the node host or around it. One
   policy in `services/common/egress.go` (the blocked IPv4 and IPv6 networks, `localhost` by
   name, TCP 25 unless `[egress] allow_smtp`) is rendered by every service, so the protocols

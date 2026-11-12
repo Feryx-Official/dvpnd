@@ -1022,6 +1022,26 @@
         "go test -count=1 -run '^TestUnreadableCountersAreNotZero$' ./services/openvpn/"
       ],
       "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-2] XRAY adds a peer on the counters an earlier session left",
+      "file": "services/xray/xray.go",
+      "find": "queryStatsRequest(\"user>>>\"+key+\">>>traffic>>>\", true)",
+      "replace": "queryStatsRequest(\"user>>>\"+key+\">>>traffic>>>\", false)",
+      "run": [
+        "go test -count=1 -run '^TestAPeerAddedAgainStartsFromZero$' ./services/xray/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-2] V2Ray adds a peer on the counters an earlier session left",
+      "file": "services/v2ray/v2ray.go",
+      "find": "\t\tReset_:  true,\n",
+      "replace": "\t\tReset_:  false,\n",
+      "run": [
+        "go test -count=1 -run '^TestAPeerAddedAgainStartsFromZero$' ./services/v2ray/"
+      ],
+      "expect": "--- FAIL"
     }
   ]
 }

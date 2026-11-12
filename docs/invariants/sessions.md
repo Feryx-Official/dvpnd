@@ -12,7 +12,8 @@ reported, a report refused) or gives clients service nobody pays for. IDs as in
   was admitted plus what the service counted since.** A session outlives a node restart
   and the service's counters start again from zero, while the chain refuses a report
   lower than the last one. The reported duration is built the same way. A connection's
-  bytes count once, also when it ends while a pass reads them.
+  bytes count once, also when it ends while a pass reads them, and a peer's counters
+  start at zero when it is added, also when an earlier session used the same peer.
 - **[SL-3] Usage that moved in either direction is stored.** A pass that sees only the
   download grow still stores it, reports it and checks the allocation.
 - **[SL-4] Admission is checked and recorded under one lock, which the jobs share.**

@@ -251,6 +251,12 @@ func (s *XRay) AddPeer(data []byte) ([]byte, error) {
 	ctx, cancel := rpcContext()
 	defer cancel()
 
+	// xray keeps a removed user's counters, so a later session with the
+	// client's UUID would start with what an earlier one moved: they are
+	// reset first, since the node bills on them from this moment.
+	if _, err = invoke(ctx, conn, methodQueryStats, queryStatsRequest("user>>>"+key+">>>traffic>>>", true)); err != nil {
+		return nil, err
+	}
 	if _, err = invoke(ctx, conn, methodAlterInbound, addUserRequest(xraytypes.InboundTag, key, common.FormatUUID(id), flow)); err != nil {
 		return nil, err
 	}
