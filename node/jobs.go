@@ -81,21 +81,22 @@ func (n *Node) setSessions() error {
 		}
 		item := items[0]
 
+		// The checks below run for an idle peer too: it may idle past its
+		// hours, or still be connected after a removal that failed.
 		upload, download, moved := reportedUsage(item, peers[i])
-		if !moved {
+		if moved {
+			err = n.Database().Model(&types.Session{}).Where(&types.Session{ID: item.ID}).Updates(
+				map[string]interface{}{
+					"upload":   upload,
+					"download": download,
+				},
+			).Error
+			if err != nil {
+				errs = append(errs, err)
+			}
+		} else {
 			n.Log().Debug("The peer has not sent any data", "key", types.KeyTag(item.Key),
 				"update_at", item.UpdatedAt)
-			continue
-		}
-
-		err = n.Database().Model(&types.Session{}).Where(&types.Session{ID: item.ID}).Updates(
-			map[string]interface{}{
-				"upload":   upload,
-				"download": download,
-			},
-		).Error
-		if err != nil {
-			errs = append(errs, err)
 		}
 
 		var (
@@ -108,7 +109,7 @@ func (n *Node) setSessions() error {
 			if err = n.RemovePeer(item.Key); err != nil {
 				errs = append(errs, err)
 			}
-		} else if item.PaidTimeUsed(time.Now()) { // served until now: the update set updated_at
+		} else if item.PaidTimeUsed(time.Now()) { // connected until now
 			n.Log().Info("Peer paid hours used", "key", types.KeyTag(item.Key))
 			if err = n.RemovePeer(item.Key); err != nil {
 				errs = append(errs, err)

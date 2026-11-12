@@ -229,3 +229,42 @@ func TestSetSessionsCutsOffUsedHours(t *testing.T) {
 		t.Errorf("the usage of the peer cut off was not stored: upload %d download %d", got.Upload, got.Download)
 	}
 }
+
+// TestSetSessionsCutsOffIdlePeers: the checks that cut a peer off run whether
+// or not it moved data since the last pass. A peer that idles past its paid
+// hours is cut off then, not one pass after it sends again, and a peer past
+// its allocation whose removal failed is removed again while it idles.
+//
+// Rules: [SL-16], [SL-17].
+func TestSetSessionsCutsOffIdlePeers(t *testing.T) {
+	at := time.Now().Add(-61 * time.Minute)
+	since := gorm.Model{CreatedAt: at, UpdatedAt: at}
+	n, service, db := usageRig(t,
+		[]types.Session{
+			{ID: 1, Key: key(1), Address: "a", MaxDuration: int64(time.Hour), Model: since, Upload: 10, Download: 20},
+			{ID: 2, Key: key(2), Address: "b", Available: 25, Model: since, Upload: 10, Download: 20},
+			{ID: 3, Key: key(3), Address: "c", MaxDuration: int64(2 * time.Hour), Available: 100, Model: since,
+				Upload: 10, Download: 20},
+		},
+		types.Peer{Key: key(1), Upload: 10, Download: 20},
+		types.Peer{Key: key(2), Upload: 10, Download: 20},
+		types.Peer{Key: key(3), Upload: 10, Download: 20},
+	)
+
+	if err := n.setSessions(); err != nil {
+		t.Fatal(err)
+	}
+
+	if !service.wasRemoved(key(1)) {
+		t.Error("an idle peer past its paid hours was left connected")
+	}
+	if !service.wasRemoved(key(2)) {
+		t.Error("an idle peer past its allocation was left connected")
+	}
+	if service.wasRemoved(key(3)) {
+		t.Error("an idle peer with time and bytes left was removed")
+	}
+	if got := row(t, db, 1); !got.UpdatedAt.Equal(at) {
+		t.Errorf("the row of a peer that moved nothing was written: updated_at %s", got.UpdatedAt)
+	}
+}

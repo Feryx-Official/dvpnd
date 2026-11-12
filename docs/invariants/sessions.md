@@ -61,5 +61,6 @@ reported, a report refused) or gives clients service nobody pays for. IDs as in
   The chain pays such a session for the duration the node reports, up to the hours the
   client deposited for, so time served beyond them is never paid. Admission refuses a
   session that has used them and records them; the usage pass removes the peer once
-  they are served, and the pass that asks the chain removes it too, for a row written
-  before the node recorded them. The usage of a peer cut off is still reported.
+  they are served, also while it idles, and the pass that asks the chain removes it
+  too, for a row written before the node recorded them. The usage of a peer cut off is
+  still reported.

@@ -637,12 +637,12 @@
       "name": "[SL-15] the usage update is a struct update, which skips a zero",
       "file": "node/jobs.go",
       "find": [
-        "\t\t\tmap[string]interface{}{",
-        "\t\t\t\t\"upload\":   upload,",
-        "\t\t\t\t\"download\": download,",
-        "\t\t\t},"
+        "\t\t\t\tmap[string]interface{}{",
+        "\t\t\t\t\t\"upload\":   upload,",
+        "\t\t\t\t\t\"download\": download,",
+        "\t\t\t\t},"
       ],
-      "replace": "\t\t\t&types.Session{Upload: upload, Download: download},",
+      "replace": "\t\t\t\t&types.Session{Upload: upload, Download: download},",
       "run": [
         "go test -count=1 -run '^(TestUsageUpdateWritesBothColumns)$' ./node/"
       ],
@@ -930,6 +930,16 @@
       "replace": "\ts.revoked[cn] = struct{}{}\n\tdelete(s.byCN, cn)\n\ts.peers.Delete(key)\n",
       "run": [
         "go test -count=1 -run '^TestAFailedKillKeepsThePeerCounted$' ./services/openvpn/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-17] the usage pass skips the checks for a peer that moved nothing",
+      "file": "node/jobs.go",
+      "find": "\t\t\t\t\"update_at\", item.UpdatedAt)\n",
+      "replace": "\t\t\t\t\"update_at\", item.UpdatedAt)\n\t\t\tcontinue\n",
+      "run": [
+        "go test -count=1 -run '^TestSetSessionsCutsOffIdlePeers$' ./node/"
       ],
       "expect": "--- FAIL"
     }
