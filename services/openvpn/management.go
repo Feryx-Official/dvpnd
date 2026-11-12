@@ -29,9 +29,9 @@ type management struct {
 
 	// onConnect decides whether a client (identified by its certificate's
 	// common name) may connect; onDisconnect receives the final traffic of
-	// a client that left.
+	// a client's connection (cid is its client id) that ended.
 	onConnect    func(commonName string) bool
-	onDisconnect func(commonName string, received, sent int64)
+	onDisconnect func(commonName, cid string, received, sent int64)
 
 	done chan struct{}
 	err  error
@@ -59,7 +59,7 @@ func dialManagement(socket string, timeout time.Duration) (net.Conn, error) {
 	}
 }
 
-func newManagement(conn net.Conn, onConnect func(string) bool, onDisconnect func(string, int64, int64)) *management {
+func newManagement(conn net.Conn, onConnect func(string) bool, onDisconnect func(string, string, int64, int64)) *management {
 	m := &management{
 		conn:         conn,
 		writer:       bufio.NewWriter(conn),
@@ -211,7 +211,7 @@ func (m *management) finishEvent(ev *clientEvent) {
 		if m.onDisconnect != nil {
 			received, _ := strconv.ParseInt(ev.env["bytes_received"], 10, 64)
 			sent, _ := strconv.ParseInt(ev.env["bytes_sent"], 10, 64)
-			m.onDisconnect(cn, received, sent)
+			m.onDisconnect(cn, ev.cid, received, sent)
 		}
 	}
 }

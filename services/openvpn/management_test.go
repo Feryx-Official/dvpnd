@@ -165,10 +165,10 @@ func TestManagementAdmitStatusKill(t *testing.T) {
 	}
 	m := newManagement(conn,
 		func(cn string) bool { return cn == "peer-a" },
-		func(cn string, rx, tx int64) {
+		func(cn, cid string, rx, tx int64) {
 			mu.Lock()
 			defer mu.Unlock()
-			disconnected = append(disconnected, cn+":"+itoa(rx)+"/"+itoa(tx))
+			disconnected = append(disconnected, cn+"#"+cid+":"+itoa(rx)+"/"+itoa(tx))
 		})
 	t.Cleanup(func() { m.Close() })
 
@@ -194,7 +194,7 @@ func TestManagementAdmitStatusKill(t *testing.T) {
 
 	f.event("DISCONNECT", "7", "", map[string]string{"common_name": "peer-a", "bytes_received": "150", "bytes_sent": "2500"})
 	waitFor(t, "disconnect", func() bool { return len(gone()) == 1 })
-	if got := gone(); got[0] != "peer-a:150/2500" {
+	if got := gone(); got[0] != "peer-a#7:150/2500" {
 		t.Fatalf("disconnect: %v", got)
 	}
 

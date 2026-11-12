@@ -83,6 +83,9 @@ type OpenVPN struct {
 	mgmt   *management         // nil before Start and after Stop
 	byCN   map[string]string   // certificate common name → session key
 	closed map[string]*traffic // session key → traffic of ended connections
+	// banked holds the client ids of ended connections whose traffic is in
+	// closed, until a status table no longer lists them.
+	banked map[string]struct{}
 	peers  *common.PeerSet
 }
 
@@ -92,6 +95,7 @@ func NewOpenVPN() *OpenVPN {
 		config: ovpntypes.NewConfig(),
 		byCN:   map[string]string{},
 		closed: map[string]*traffic{},
+		banked: map[string]struct{}{},
 		peers:  common.NewPeerSet(),
 	}
 }
@@ -297,7 +301,7 @@ func (s *OpenVPN) admit(commonName string) bool {
 
 // disconnected banks the traffic of a connection that ended, so a
 // reconnecting client's counters start again without losing what it used.
-func (s *OpenVPN) disconnected(commonName string, received, sent int64) {
+func (s *OpenVPN) disconnected(commonName, cid string, received, sent int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -312,6 +316,7 @@ func (s *OpenVPN) disconnected(commonName string, received, sent int64) {
 	}
 	c.upload += received
 	c.download += sent
+	s.banked[cid] = struct{}{}
 }
 
 func peerKey(data []byte) string {
@@ -394,7 +399,9 @@ func (s *OpenVPN) RemovePeer(data []byte) error {
 }
 
 // Peers reports every registered peer: what its ended connections used plus
-// the live connection's counters from the status table.
+// the live connection's counters from the status table. The table is read
+// before the lock is taken, so a connection that ended in between is both
+// banked and listed; it counts once, as banked.
 func (s *OpenVPN) Peers() ([]types.Peer, error) {
 	live := map[string]clientStatus{}
 	if m := s.attached(); m != nil {
@@ -422,11 +429,24 @@ func (s *OpenVPN) Peers() ([]types.Peer, error) {
 				continue
 			}
 			if row, ok := live[cn]; ok {
-				item.Upload += row.received
-				item.Download += row.sent
+				if _, ended := s.banked[row.cid]; !ended {
+					item.Upload += row.received
+					item.Download += row.sent
+				}
 			}
 		}
 		items = append(items, item)
+	}
+
+	// A table read from now on no longer lists a connection that ended.
+	listed := map[string]bool{}
+	for _, row := range live {
+		listed[row.cid] = true
+	}
+	for cid := range s.banked {
+		if !listed[cid] {
+			delete(s.banked, cid)
+		}
 	}
 
 	return items, nil

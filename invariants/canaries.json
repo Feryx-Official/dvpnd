@@ -902,6 +902,16 @@
         "go test -count=1 -run '^TestReportWaitsForABatchThatMayStillLand$' ./node/"
       ],
       "expect": "the batch only, then wait for the next pass"
+    },
+    {
+      "name": "[SL-2] an OpenVPN connection that ends during a pass counts twice",
+      "file": "services/openvpn/openvpn.go",
+      "find": "\t\t\t\tif _, ended := s.banked[row.cid]; !ended {",
+      "replace": "\t\t\t\tif true {",
+      "run": [
+        "go test -count=1 -run '^TestAConnectionThatEndsDuringAPassCountsOnce$' ./services/openvpn/"
+      ],
+      "expect": "--- FAIL"
     }
   ]
 }

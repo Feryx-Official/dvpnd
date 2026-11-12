@@ -198,8 +198,8 @@ func TestPeersAndHandshake(t *testing.T) {
 	s.mgmt = newManagement(conn, s.admit, s.disconnected)
 	t.Cleanup(func() { s.mgmt.Close() })
 
-	s.disconnected(cn, 5, 50)
-	s.disconnected("stranger", 1, 1)
+	s.disconnected(cn, "2", 5, 50)
+	s.disconnected("stranger", "1", 1, 1)
 	peers, err := s.Peers()
 	if err != nil {
 		t.Fatal(err)
@@ -453,4 +453,43 @@ func TestStopWhileThePeersAreRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	<-done
+}
+
+// TestAConnectionThatEndsDuringAPassCountsOnce: the usage pass reads the
+// status table, then sums under the lock; a connection that ends between
+// the two has its final bytes banked and is still in the table read before.
+// It counts once.
+//
+// Rules: [SL-2].
+func TestAConnectionThatEndsDuringAPassCountsOnce(t *testing.T) {
+	s, f := startOpenVPN(t)
+	t.Cleanup(func() { _ = s.Stop() })
+	data := []byte("0123456789abcdef")
+	cn := "30313233-3435-3637-3839-616263646566"
+	if _, err := s.AddPeer(data); err != nil {
+		t.Fatal(err)
+	}
+
+	// The table the pass read still lists connection 4, which has just
+	// ended with 100 bytes up and 2000 down.
+	f.mu.Lock()
+	f.clients = []clientStatus{{commonName: cn, received: 90, sent: 1900, cid: "4"}}
+	f.mu.Unlock()
+	s.disconnected(cn, "4", 100, 2000)
+
+	peers, err := s.Peers()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(peers) != 1 || peers[0].Upload != 100 || peers[0].Download != 2000 {
+		t.Fatalf("want 100 up and 2000 down, got %+v", peers)
+	}
+
+	// The client is back on connection 5; the table no longer lists 4.
+	f.mu.Lock()
+	f.clients = []clientStatus{{commonName: cn, received: 1, sent: 2, cid: "5"}}
+	f.mu.Unlock()
+	if peers, err = s.Peers(); err != nil || peers[0].Upload != 101 || peers[0].Download != 2002 {
+		t.Fatalf("want 101 up and 2002 down, got %+v, %v", peers, err)
+	}
 }
