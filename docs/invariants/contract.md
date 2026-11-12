@@ -49,3 +49,8 @@ leaves users unable to connect, or shows them a wrong fact. IDs as in `test/READ
 - **[CT-13] The location comes from free, commercially usable sources, in a fixed
   order.** ip-api.com is used only when the operator chooses it (its free tier is
   non-commercial); each source is asked at most once per start; configured fields win.
+- **[CT-14] The address a GeoIP source returns becomes the node's address only when it
+  is a public IPv4 address.** Clients are sent it in the handshake reply. A source that
+  answers with no address, an IPv6 one or one no client can reach counts as failed: `auto`
+  asks the next source, a chosen provider fails the start. An empty or IPv6 answer once
+  reached clients as `<nil>`.

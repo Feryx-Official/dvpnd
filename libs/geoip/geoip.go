@@ -275,8 +275,24 @@ func fetch(name, url, token string) (*types.GeoIPLocation, error) {
 	if err != nil {
 		return nil, fmt.Errorf("geoip source %s: %w", p.source, err)
 	}
+	ip, err := publicIPv4(loc.IP)
+	if err != nil {
+		return nil, fmt.Errorf("geoip source %s: %w", p.source, err)
+	}
+	loc.IP = ip
 	loc.Source = p.source
 	return loc, nil
+}
+
+// publicIPv4 returns s in dotted form when it is an IPv4 address a client
+// could connect to. It becomes the address clients are sent, and an empty or
+// IPv6 one reached them as "<nil>".
+func publicIPv4(s string) (string, error) {
+	ip := net.ParseIP(s).To4()
+	if ip == nil || !ip.IsGlobalUnicast() {
+		return "", fmt.Errorf("returned %q, not a public IPv4 address", s)
+	}
+	return ip.String(), nil
 }
 
 // parse decodes one provider's response body into the common location type.

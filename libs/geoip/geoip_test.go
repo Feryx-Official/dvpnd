@@ -480,3 +480,64 @@ func TestLocationURLOverride(t *testing.T) {
 		t.Errorf("got %+v hits %v", *loc, f.hits)
 	}
 }
+
+// TestOnlyAPublicIPv4IsTheNodeAddress: the address a source returns is what
+// clients are sent as the node's address. A source that answers with no
+// address, an IPv6 address or one no client can reach counts as failed:
+// "auto" moves on to the next source, a chosen provider fails the start.
+// Without the check an empty or IPv6 answer reached clients as "<nil>".
+//
+// Rules: [CT-14].
+func TestOnlyAPublicIPv4IsTheNodeAddress(t *testing.T) {
+	for _, ip := range []string{"", "2001:db8::1", "127.0.0.1", "0.0.0.0", "255.255.255.255", "169.254.1.1", "224.0.0.1", "not-an-ip"} {
+		t.Run("ipify answers "+ip, func(t *testing.T) {
+			f := newFake(t)
+			f.set(ProviderIPify, reply{body: `{"ip":"` + ip + `"}`})
+			if loc, err := Location(Options{Provider: ProviderIPify}); err == nil {
+				t.Fatalf("a chosen provider's %q became the node address: %+v", ip, *loc)
+			}
+		})
+
+		t.Run("auto skips "+ip, func(t *testing.T) {
+			f := newFake(t)
+			f.set(ProviderIPWhois, reply{body: `{"ip":"` + ip + `","success":true,"city":"Milan","country":"Italy","country_code":"IT"}`})
+			f.set(ProviderIP2Location, reply{body: bodyIP2Location})
+			f.set(ProviderCloudflare, reply{body: "ip=" + ip + "\nloc=IT\n"})
+			f.set(ProviderIPify, reply{body: bodyIPify})
+			loc, err := Location(Options{Provider: ProviderAuto, Logger: &recorder{}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if loc.IP != "203.0.113.7" || loc.Source != "ip2location.io" {
+				t.Fatalf("got %+v, want ip2location.io's answer", *loc)
+			}
+		})
+	}
+
+	t.Run("auto falls back past cloudflare", func(t *testing.T) {
+		f := newFake(t)
+		f.set(ProviderIPWhois, reply{status: http.StatusInternalServerError, body: "{}"})
+		f.set(ProviderIP2Location, reply{status: http.StatusInternalServerError, body: "{}"})
+		f.set(ProviderCloudflare, reply{body: "ip=2001:db8::1\nloc=IT\n"})
+		f.set(ProviderIPify, reply{body: bodyIPify})
+		loc, err := Location(Options{Provider: ProviderAuto, Logger: &recorder{}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if loc.IP != "203.0.113.7" || loc.Source != "ipify" {
+			t.Fatalf("got %+v, want ipify's answer", *loc)
+		}
+	})
+
+	t.Run("an IPv4-mapped answer reads as IPv4", func(t *testing.T) {
+		f := newFake(t)
+		f.set(ProviderIPify, reply{body: `{"ip":"::ffff:203.0.113.9"}`})
+		loc, err := Location(Options{Provider: ProviderIPify})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if loc.IP != "203.0.113.9" {
+			t.Fatalf("IP %q, want 203.0.113.9", loc.IP)
+		}
+	})
+}
