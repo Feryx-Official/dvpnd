@@ -7,13 +7,21 @@ on:
     tags: ['v*']
   pull_request:
 
+# A newer push to a pull request cancels the run it supersedes. Every other
+# run is a group of its own, so a run on main or a release tag is never
+# cancelled or held back, even as pending: the release gate reads it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
   build:
     name: Build and test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -31,11 +39,14 @@ jobs:
 
   integration:
     name: Integration suite
-    # Not ubuntu-latest: Ubuntu 26.04 ships an AppArmor profile for
-    # /usr/bin/wg-quick that attaches to the privileged tunnels container and
-    # only lets it run coreutils' readlink, while the Alpine image's is
-    # BusyBox, so wg-quick exits 126 there.
+    # Every job names its runner image, so a new ubuntu-latest changes
+    # nothing unannounced, and all run on 24.04 because this one cannot move:
+    # Ubuntu 26.04 ships an AppArmor profile for /usr/bin/wg-quick that
+    # attaches to the privileged tunnels container and only lets it run
+    # coreutils' readlink, while the Alpine image's is BusyBox, so wg-quick
+    # exits 126 there.
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -50,7 +61,8 @@ jobs:
 
   docker:
     name: Docker image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -65,7 +77,8 @@ jobs:
 
   licences:
     name: Licence gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -97,7 +110,8 @@ jobs:
 
   provenance:
     name: Fork provenance
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -106,7 +120,8 @@ jobs:
 
   vulnerabilities:
     name: govulncheck
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -118,7 +133,8 @@ jobs:
 
   lint:
     name: golangci-lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0

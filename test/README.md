@@ -75,7 +75,9 @@ not yet.
   its signature, which the operator guide checks; and the Makefile's targets,
   as a dry run in a repository of the test's own: the version a build stamps
   on a release, a pre-release and the commits past them, `install`,
-  `benchmark`, and `tools` installing the golangci-lint CI runs;
+  `benchmark`, and `tools` installing the golangci-lint CI runs; and every
+  CI job on a named runner image within a time limit, with only a pull
+  request's superseded run cancelled;
 - the same SPDX and `sentinel-go-sdk` checks as shell steps, and
   `docs/provenance/verify-fork.sh`, which also asks apache.org,
   proxy.golang.org and Software Heritage when it can reach them (an

@@ -13,6 +13,13 @@ on:
 # The repository hands workflows a read-only token by default, which is enough to
 # run the queries but not to publish what they find: without security-events the
 # upload step fails and the whole run is marked failed.
+# A newer push to a pull request cancels the run it supersedes. Every other
+# run is a group of its own, so a run on main or a release tag is never
+# cancelled or held back, even as pending: the release gate reads it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   security-events: write
@@ -21,7 +28,8 @@ permissions:
 jobs:
   analyze:
     name: Analyze
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository

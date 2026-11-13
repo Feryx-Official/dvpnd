@@ -176,3 +176,10 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
   the image, and attaches it with its Sigstore bundle; `docs/operator.md` checks it with
   cosign against that workflow's identity. The installer, which runs as root, came only
   from the `main` branch or from a clone the operator checked by hand.
+- **[RT-35] Every CI job runs on a named runner image, within a time limit, and only a pull
+  request's superseded run is cancelled.** Each job names its Ubuntu release and sets
+  `timeout-minutes`; a newer push to a pull request cancels its older run, and every other
+  run is a concurrency group of its own, so one on `main` or a release tag, which the
+  release gate reads (RT-33), is neither cancelled nor held back. `ubuntu-latest` moved to
+  Ubuntu 26.04 under the jobs, which broke the integration suite's tunnels; a job that hung
+  ran for GitHub's six hours; a pull request pushed twice ran twice to the end.

@@ -5,6 +5,12 @@ on:
     types:
       - released
 
+# One release at a time, so :latest ends on the last one published, and never
+# cut short: a cancelled run could leave an image pushed and not signed.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
@@ -17,7 +23,8 @@ jobs:
   # (scripts/release-gate.sh).
   gate:
     name: Release gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
     permissions:
       contents: read
       actions: read
@@ -42,7 +49,8 @@ jobs:
   build:
     name: Build
     needs: gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     # id-token and attestations let the job sign the image keylessly and
     # publish its build provenance; both are tied to this workflow's identity.
     permissions:
@@ -113,7 +121,8 @@ jobs:
   installer:
     name: Signed installer
     needs: gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     # contents: write adds the files to the release; id-token signs them
     # keylessly, bound to this workflow run, as the image is.
     permissions:

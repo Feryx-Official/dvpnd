@@ -1472,6 +1472,26 @@
         "go test -count=1 -run '^TestMakefileTargets$' ./test/static/"
       ],
       "expect": "want \"9.5.0-rc1\""
+    },
+    {
+      "name": "[RT-35] a CI job runs on whatever ubuntu-latest is",
+      "file": ".github/workflows/ci.yml",
+      "find": "    name: Docker image\n    runs-on: ubuntu-24.04\n",
+      "replace": "    name: Docker image\n    runs-on: ubuntu-latest\n",
+      "run": [
+        "go test -count=1 -run '^TestCIJobsArePinnedAndBounded$' ./test/static/"
+      ],
+      "expect": "not a named image"
+    },
+    {
+      "name": "[RT-35] a push to main cancels the run of the one before",
+      "file": ".github/workflows/ci.yml",
+      "find": "  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}\n",
+      "replace": "  group: ${{ github.workflow }}-${{ github.ref }}\n",
+      "run": [
+        "go test -count=1 -run '^TestCIJobsArePinnedAndBounded$' ./test/static/"
+      ],
+      "expect": "cancels more than a pull request's superseded run"
     }
   ]
 }

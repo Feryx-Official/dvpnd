@@ -467,3 +467,39 @@ func TestReleaseCarriesTheSignedInstaller(t *testing.T) {
 		}
 	}
 }
+
+// TestCIJobsArePinnedAndBounded holds every workflow's jobs to a named
+// runner image and a time limit, and its runs to a concurrency group that
+// cancels only a pull request's superseded run. ubuntu-latest moved to
+// Ubuntu 26.04 under the jobs, which broke the integration suite's tunnels;
+// a job that hung ran for GitHub's six hours; a pull request pushed twice
+// ran twice to the end.
+//
+// Rules: [RT-35].
+func TestCIJobsArePinnedAndBounded(t *testing.T) {
+	image := regexp.MustCompile(`^ubuntu-\d+\.\d+$`)
+	for _, file := range files(t, ".github/workflows/*.yml") {
+		w := readWorkflow(t, file)
+		for _, j := range w.jobs {
+			if !image.MatchString(j.keys["runs-on"]) {
+				t.Errorf("%s: job %s runs on %q, not a named image", file, j.id, j.keys["runs-on"])
+			}
+			if n, err := strconv.Atoi(j.keys["timeout-minutes"]); err != nil || n < 1 || n > 60 {
+				t.Errorf("%s: job %s has timeout-minutes %q, want 1 to 60", file, j.id, j.keys["timeout-minutes"])
+			}
+		}
+		group := w.top["concurrency"]
+		if !strings.Contains(group, "group: ${{ github.workflow }}") {
+			t.Errorf("%s has no concurrency group:%s", file, group)
+			continue
+		}
+		cancels := strings.Contains(group, "cancel-in-progress: true")
+		ownGroup := strings.Contains(group, "github.event_name == 'pull_request' && github.ref || github.run_id")
+		if cancels && !ownGroup {
+			t.Errorf("%s cancels more than a pull request's superseded run:%s", file, group)
+		}
+		if w.on["pull_request"] && !(cancels && ownGroup) {
+			t.Errorf("%s runs on pull requests and does not cancel a superseded run:%s", file, group)
+		}
+	}
+}
