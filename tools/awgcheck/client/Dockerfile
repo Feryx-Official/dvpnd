@@ -11,7 +11,7 @@ RUN git clone --quiet --branch=${GO_TAG} --depth=1 https://github.com/amnezia-vp
     make -C /src/tools/src --jobs=$(nproc) && \
     make -C /src/tools/src DESTDIR=/out/tools PREFIX=/usr WITH_WGQUICK=yes WITH_BASHCOMPLETION=no WITH_SYSTEMDUNITS=no install
 
-FROM alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
 RUN apk add --no-cache bash curl iproute2 iptables
 COPY --from=build /out/amneziawg-go /usr/bin/amneziawg-go
 COPY --from=build /out/tools/usr/bin/awg /out/tools/usr/bin/awg-quick /usr/bin/
