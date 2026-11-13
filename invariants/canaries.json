@@ -1492,6 +1492,26 @@
         "go test -count=1 -run '^TestCIJobsArePinnedAndBounded$' ./test/static/"
       ],
       "expect": "cancels more than a pull request's superseded run"
+    },
+    {
+      "name": "[LIC-9] a tool's dot-directory at the root can be committed",
+      "file": ".gitignore",
+      "find": "/.*/\n!/.github/\n",
+      "replace": "/.idea/\n/.vscode/\n",
+      "run": [
+        "go test -count=1 -run '^TestLocalFilesStayOutOfCommits$' ./test/static/"
+      ],
+      "expect": "lets \\.tool/settings\\.json be committed"
+    },
+    {
+      "name": "[LIC-9] local notes and tool state go into the image's build context",
+      "file": ".dockerignore",
+      "find": "/.*\n!/.git\n/*.md\n",
+      "replace": "/.idea/\n/.github/\n/.vscode/\n",
+      "run": [
+        "go test -count=1 -run '^TestLocalFilesStayOutOfTheImageBuild$' ./test/static/"
+      ],
+      "expect": "sends NOTES\\.md into the image's build context"
     }
   ]
 }

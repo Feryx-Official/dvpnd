@@ -1,10 +1,29 @@
 # SPDX-License-Identifier: Apache-2.0
 # Modified from sentinel-official/dvpn-node @ 62bde16 (2024-01-25). See NOTICE.
 .DS_Store*
-/.idea/
-/.vscode/
 /bin/
 /vendor/
+
+# A contributor's local files stay out by pattern, never by name: Markdown at
+# the root is a local note unless it is one of the shared documents below (a
+# new one gets its line here), and a dot-directory at the root holds a tool's
+# settings or state unless it is .github/.
+/*.md
+!/README.md
+!/CONTRIBUTING.md
+!/SECURITY.md
+!/CODE_OF_CONDUCT.md
+/.*/
+!/.github/
+
+# What a node, a test or a tool run can leave in the tree: the node's
+# database, keyring, keys and secrets, coverage output, Python's cache.
+*.db
+keyring-*/
+*.key
+.env
+*.out
+__pycache__/
 
 # Rendered architecture diagram and browser-check sidecars (generated; see docs/architecture/README.md)
 /docs/architecture/*.html

@@ -1,6 +1,18 @@
 # SPDX-License-Identifier: Apache-2.0
-/.idea/
-/.github/
-/.vscode/
+# Modified from sentinel-official/dvpn-node @ 62bde16 (2024-01-25). See NOTICE.
+# The image build reads the sources, the Makefile and .git (the version
+# stamp); the rest stays out of its context, local files above all, by the
+# same patterns as .gitignore: every dot-file and dot-directory at the root
+# but .git, Markdown at the root, and what a node, a test or a tool run can
+# leave in the tree.
+/.*
+!/.git
+/*.md
 /bin/
 /vendor/
+**/*.db
+**/keyring-*
+**/*.key
+**/.env
+**/*.out
+**/__pycache__

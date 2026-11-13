@@ -37,3 +37,12 @@ unlicensed code (`NOTICE`, `CONTRIBUTING.md`). IDs as in `test/README.md`.
   path; from then on a link to it serves that code, and the install command runs it as
   root. A former home stays only on lines that record the past, each listed in the test
   with its reason.
+- **[LIC-9] A contributor's local files stay out of commits and out of the image's build
+  context, by pattern.** `.gitignore` ignores Markdown at the root other than the shared
+  documents it lists, every dot-directory at the root other than `.github/`, and what a
+  node, a test or a tool run leaves in the tree (database, keyring, keys, `.env`, coverage
+  output, Python's cache); `.dockerignore` keeps the same out of the build context, with
+  every dot-file at the root but `.git`, which the version stamp reads. Neither names a
+  real file. The local files were kept out by one clone's `.git/info/exclude` only: in a
+  fresh clone `git add -A` would have committed them, and every image build copied them
+  into its build stage.
