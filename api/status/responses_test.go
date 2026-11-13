@@ -14,8 +14,8 @@ import (
 func TestRootDocumentLayout(t *testing.T) {
 	doc := &ResponseGetRoot{
 		Addr:            "sentnode1example",
-		Downlink:        "2412376",
-		Uplink:          "88304000",
+		Downlink:        "1000000000",
+		Uplink:          "500000000",
 		HandshakeDNS:    false,
 		Location:        &RootLocation{City: "Helsinki", Country: "Finland", CountryCode: "FI", Latitude: 60.2, Longitude: 24.9},
 		Moniker:         "node",
