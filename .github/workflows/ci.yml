@@ -106,7 +106,7 @@ jobs:
             --disallowed_types=forbidden,restricted,unknown
       - name: SPDX headers present
         run: |
-          missing=$(grep -L 'SPDX-License-Identifier: Apache-2.0' $(git ls-files '*.go') || true)
+          missing=$(git ls-files -z '*.go' | xargs -0 -r grep -L 'SPDX-License-Identifier: Apache-2.0' || true)
           [ -z "$missing" ] || { echo "::error::missing SPDX header:"; echo "$missing"; exit 1; }
 
   provenance:
