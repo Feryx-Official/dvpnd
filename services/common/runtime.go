@@ -5,6 +5,7 @@ package common
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -78,6 +79,10 @@ var lookupProxyUser = func() (*ProxyUser, error) {
 	gid, err := strconv.ParseUint(u.Gid, 10, 32)
 	if err != nil {
 		return nil, err
+	}
+	// os.Chown takes the group as an int, 32 bits wide on a 32-bit host.
+	if gid > math.MaxInt {
+		return nil, fmt.Errorf("group id %d of %s is beyond what chown takes on this host", gid, u.Username)
 	}
 	g, err := user.LookupGroupId(u.Gid)
 	if err != nil {
