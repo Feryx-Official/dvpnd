@@ -48,7 +48,7 @@ RUN --mount=target=/go/pkg/mod,type=cache \
     make -C /root/amneziawg-tools/src --jobs=$(nproc) && \
     make -C /root/amneziawg-tools/src DESTDIR=/root/awg-install PREFIX=/usr WITH_WGQUICK=yes WITH_BASHCOMPLETION=no WITH_SYSTEMDUNITS=no install
 
-FROM alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
 
 COPY --from=build /go/bin/dvpnd /usr/local/bin/process
 COPY --from=build /root/hnsd/hnsd /usr/local/bin/hnsd
