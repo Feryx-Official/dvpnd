@@ -9,8 +9,11 @@
 //
 // It spends real funds (the session deposit plus gas) on the chain the node is
 // configured for. With -node it buys the session on another node instead (any
-// sentnode address, with -api pointing at that node's API); the key then only
-// pays and signs.
+// sentnode address, with -api pointing at that node's API and -api-cert at a
+// copy of its tls.crt); the key then only pays and signs.
+//
+// The node API is trusted only when it presents the certificate in -api-cert,
+// by default the tls.crt in -home.
 package main
 
 import (
@@ -21,6 +24,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -42,6 +46,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/Feryx-Official/dvpnd/v9/lite"
+	"github.com/Feryx-Official/dvpnd/v9/services/common"
 	wgtypes "github.com/Feryx-Official/dvpnd/v9/services/wireguard/types"
 	"github.com/Feryx-Official/dvpnd/v9/types"
 )
@@ -60,15 +65,16 @@ func main() {
 		nodeType   = flag.String("type", "wireguard", "node type to handshake as: wireguard and amneziawg write a client config; v2ray, xray, hysteria2 and openvpn write the decoded handshake payload")
 		nodeStr    = flag.String("node", "", "sentnode address of the node to buy the session on (default: the key's own node)")
 		awgVersion = flag.Int("awg-version", 0, "amneziawg only: the tier to ask for (0 = the default tier, 3 = the 3.1 tier)")
+		apiCert    = flag.String("api-cert", "", "the node's TLS certificate (a copy of its tls.crt); the API is trusted only when it presents this one (default <home>/tls.crt)")
 	)
 	flag.Parse()
-	if err := run(*home, *api, *gigabytes, *maxPrice, *sessionID, *out, *deactivate, *endpoint, *fullTunnel, *nodeType, *nodeStr, *awgVersion); err != nil {
+	if err := run(*home, *api, *apiCert, *gigabytes, *maxPrice, *sessionID, *out, *deactivate, *endpoint, *fullTunnel, *nodeType, *nodeStr, *awgVersion); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
 }
 
-func run(home, api string, gigabytes int64, maxPriceStr string, sessionID uint64, out string, deactivate bool, endpoint string, fullTunnel bool, nodeType, nodeStr string, awgVersion int) error {
+func run(home, api, apiCert string, gigabytes int64, maxPriceStr string, sessionID uint64, out string, deactivate bool, endpoint string, fullTunnel bool, nodeType, nodeStr string, awgVersion int) error {
 	base.GetConfig().Seal()
 
 	v := viper.New()
@@ -125,6 +131,15 @@ func run(home, api string, gigabytes int64, maxPriceStr string, sessionID uint64
 		return nil
 	}
 
+	// Before anything is spent: the node API is trusted as this certificate only.
+	if apiCert == "" {
+		apiCert = filepath.Join(home, "tls.crt")
+	}
+	tlsConfig, err := trustNodeCertificate(apiCert)
+	if err != nil {
+		return fmt.Errorf("-api-cert: %w", err)
+	}
+
 	// 1. The node must be registered and active before a session can start.
 	node, err := client.QueryNode(nodeAddr)
 	if err != nil {
@@ -139,7 +154,7 @@ func run(home, api string, gigabytes int64, maxPriceStr string, sessionID uint64
 	}
 
 	// 2. GET / — what client apps read first.
-	http.DefaultClient.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} //nolint:gosec // G402: nodes' certificates are self-signed; the handshake reply's signature is checked
+	http.DefaultClient.Transport = &http.Transport{TLSClientConfig: tlsConfig}
 	http.DefaultClient.Timeout = 15 * time.Second
 	root, err := http.Get(strings.TrimRight(api, "/") + "/")
 	if err != nil {
@@ -492,4 +507,32 @@ func replyDigest(id uint64, request, reply []byte, addrs []string) []byte {
 	digest := sha256.Sum256(msg)
 
 	return digest[:]
+}
+
+// trustNodeCertificate returns a TLS configuration that accepts the node API
+// only when it presents the certificate in path, the node's tls.crt. A node's
+// certificate is self-signed and names no address, so neither the system's
+// roots nor a host name check can vouch for it; its pin can.
+func trustNodeCertificate(path string) (*tls.Config, error) {
+	pin, err := common.CertificatePin(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		// Go runs VerifyConnection on every handshake, a resumed one too, in
+		// place of the chain and host name checks skipped here.
+		InsecureSkipVerify: true, //nolint:gosec // G402: VerifyConnection accepts the pinned certificate alone
+		VerifyConnection: func(cs tls.ConnectionState) error {
+			if len(cs.PeerCertificates) > 0 {
+				sum := sha256.Sum256(cs.PeerCertificates[0].Raw)
+				if hex.EncodeToString(sum[:]) == pin {
+					return nil
+				}
+			}
+
+			return fmt.Errorf("the node presented a certificate other than the one in %s", path)
+		},
+	}, nil
 }

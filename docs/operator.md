@@ -635,7 +635,9 @@ node asks for the passphrase at every start, through `scripts/runner.sh attach`.
 
 No automated test runs against the chain. `tools/e2e` is the client side for a check by hand:
 it buys a session on a running node and handshakes the way client apps do; nodes of every
-type but OpenVPN served real traffic this way and reported it on chain.
+type but OpenVPN served real traffic this way and reported it on chain. It trusts the node
+API only when it presents the certificate given with `-api-cert` (by default the `tls.crt`
+in `-home`): copy the node's `tls.crt` to check a node on another host.
 
 ## 8. Operating
 

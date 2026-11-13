@@ -5,11 +5,19 @@ package main
 import (
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/pem"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	base "github.com/sentinel-official/sentinelhub/v12/types"
+
+	"github.com/Feryx-Official/dvpnd/v9/services/common"
 )
 
 // The vector api/session's TestReplyDigestVector pins for the node.
@@ -48,5 +56,48 @@ func TestCheckReplySignature(t *testing.T) {
 	}
 	if _, err := checkReplySignature("", 7, request, reply, addrs, node); err == nil {
 		t.Fatal("a reply without a signature passed")
+	}
+}
+
+// The driver talks to a node API only when it presents the certificate it was
+// given.
+func TestTrustNodeCertificate(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	own := filepath.Join(dir, "own.crt")
+	if err := os.WriteFile(own, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: srv.Certificate().Raw}), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	otherPEM, _, err := common.SelfSignedCertificate("dvpnd", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := filepath.Join(dir, "other.crt")
+	if err := os.WriteFile(other, otherPEM, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	get := func(path string) error {
+		cfg, err := trustNodeCertificate(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		client := &http.Client{Transport: &http.Transport{TLSClientConfig: cfg}}
+		resp, err := client.Get(srv.URL)
+		if err == nil {
+			resp.Body.Close()
+		}
+		return err
+	}
+	if err := get(own); err != nil {
+		t.Fatalf("the node's own certificate is refused: %v", err)
+	}
+	if err := get(other); err == nil {
+		t.Fatal("a node presenting another certificate is trusted")
+	}
+	if _, err := trustNodeCertificate(filepath.Join(dir, "missing.crt")); err == nil {
+		t.Fatal("a missing certificate file is accepted")
 	}
 }
