@@ -156,3 +156,12 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
   installer installs it when the host has no Go recent enough. `go.mod` named only the
   minimum language version: CI tested on 1.26.10 and installer builds used it, with a
   reachable `net/http` advisory, while the image was compiled with 1.27.4.
+- **[RT-32] Every pull request and push to `main` runs the security checks, and what they
+  find fails them.** govulncheck fails on a vulnerability the code reaches that
+  `SECURITY.md` does not explain under "Known dependency advisories"; golangci-lint, gosec
+  included, on any finding not excused on its own line with the reason; CodeQL runs on
+  both, not only weekly. `main`'s ruleset, `.github/rulesets/main-checks.json`, requires
+  every job CI and CodeQL run on a pull request, and holds merges to CodeQL's alerts.
+  govulncheck only warned, golangci-lint ran with its exit code forced to 0, and CodeQL saw
+  code up to a week after it merged: a pull request that added a reachable vulnerability
+  or a gosec finding was green.

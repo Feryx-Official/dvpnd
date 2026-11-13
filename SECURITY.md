@@ -66,7 +66,10 @@ node account.
 **Logs keep no client addresses** at the default level, and the session
 database zeroes deleted rows.
 
-## Known dependency advisory
+## Known dependency advisories
+
+CI runs govulncheck on every push and pull request (`scripts/govulncheck.sh`)
+and fails on any vulnerability the code reaches that is not explained here.
 
 govulncheck reports GO-2026-5932, `golang.org/x/crypto/openpgp`, which has no
 fix. Only its armor and errors packages are linked, by cosmos-sdk's

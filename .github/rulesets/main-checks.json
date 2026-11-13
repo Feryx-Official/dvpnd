@@ -1,0 +1,42 @@
+{
+  "name": "main: required checks",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "include": ["~DEFAULT_BRANCH"],
+      "exclude": []
+    }
+  },
+  "bypass_actors": [
+    { "actor_id": 1, "actor_type": "OrganizationAdmin", "bypass_mode": "always" },
+    { "actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always" }
+  ],
+  "rules": [
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": false,
+        "do_not_enforce_on_create": false,
+        "required_status_checks": [
+          { "context": "Build and test", "integration_id": 15368 },
+          { "context": "Integration suite", "integration_id": 15368 },
+          { "context": "Docker image", "integration_id": 15368 },
+          { "context": "Licence gate", "integration_id": 15368 },
+          { "context": "Fork provenance", "integration_id": 15368 },
+          { "context": "govulncheck", "integration_id": 15368 },
+          { "context": "golangci-lint", "integration_id": 15368 },
+          { "context": "Analyze", "integration_id": 15368 }
+        ]
+      }
+    },
+    {
+      "type": "code_scanning",
+      "parameters": {
+        "code_scanning_tools": [
+          { "tool": "CodeQL", "security_alerts_threshold": "high_or_higher", "alerts_threshold": "errors" }
+        ]
+      }
+    }
+  ]
+}

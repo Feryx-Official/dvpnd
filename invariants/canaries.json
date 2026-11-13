@@ -1402,6 +1402,26 @@
         "go test -count=1 -run '^TestOneGoToolchain$' ./test/static/"
       ],
       "expect": "scripts/install.sh installs Go"
+    },
+    {
+      "name": "[RT-32] CI passes a reachable vulnerability SECURITY.md does not explain",
+      "file": "scripts/govulncheck.sh",
+      "find": "if [[ -n \"${unexplained}\" ]]; then",
+      "replace": "if false; then",
+      "run": [
+        "go test -count=1 -run '^TestGovulncheckFailsOnUnexplainedAdvisories$' ./test/static/"
+      ],
+      "expect": "passed = true, want false"
+    },
+    {
+      "name": "[RT-32] the linter's findings fail nothing",
+      "file": ".github/workflows/ci.yml",
+      "find": "  lint:\n    name: golangci-lint\n",
+      "replace": "  lint:\n    name: golangci-lint\n    continue-on-error: true\n",
+      "run": [
+        "go test -count=1 -run '^TestSecurityChecksGateEveryChange$' ./test/static/"
+      ],
+      "expect": "continues on error"
     }
   ]
 }

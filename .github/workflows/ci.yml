@@ -103,40 +103,27 @@ jobs:
       - run: bash docs/provenance/verify-fork.sh
 
   vulnerabilities:
-    name: govulncheck (advisory)
+    name: govulncheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      # Advisory: findings are reported as warnings and in the job summary, but
-      # never fail the run or a pull request's checks. Dependabot brings the
-      # fixes; the licence gate is what must stay red on a bad bump.
-      - name: govulncheck
-        run: |
-          set +e
-          go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./... > govulncheck.txt 2>&1
-          status=$?
-          set -e
-          { echo '## govulncheck'; echo; echo '```'; cat govulncheck.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-          if [ "$status" -ne 0 ]; then
-            n=$(grep -c '^Vulnerability #' govulncheck.txt || true)
-            echo "::warning::govulncheck reported $n vulnerabilities reachable from this code; see the job summary"
-          fi
+      # Fails on a vulnerability the code reaches unless SECURITY.md explains
+      # why it is accepted (Known dependency advisories).
+      - run: bash scripts/govulncheck.sh
 
   lint:
-    name: golangci-lint (advisory)
+    name: golangci-lint
     runs-on: ubuntu-latest
-    # Advisory like govulncheck: gosec and the standard linters report in the
-    # job, without failing the run.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      # gosec and the standard linters: any finding fails the run, unless it
+      # is excused on its own line with the reason (.golangci.yml).
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.14.0
-          args: --issues-exit-code=0

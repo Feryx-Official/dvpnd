@@ -65,7 +65,10 @@ not yet.
   systemd unit's umask and task cap; and every Dockerfile's base images
   pinned by digest, in a directory Dependabot watches, one Alpine release
   across a Dockerfile's stages, and the image's protocol pins the same as the
-  installer's;
+  installer's; CI's security checks failing on what they find (the
+  govulncheck step, `scripts/govulncheck.sh`, runs against a fake govulncheck
+  and a `SECURITY.md` of the test's own) on every pull request and push to
+  `main`, and `main`'s ruleset requiring every job they run on a pull request;
 - the same SPDX and `sentinel-go-sdk` checks as shell steps, and
   `docs/provenance/verify-fork.sh`, which also asks apache.org,
   proxy.golang.org and Software Heritage when it can reach them (an
@@ -75,7 +78,10 @@ not yet.
 fails it, and says to fetch the tags.
 
 CI runs the same checks, and the canaries, on every push and pull request
-(`.github/workflows/ci.yml`).
+(`.github/workflows/ci.yml`), with govulncheck, golangci-lint and CodeQL
+(`codeql.yml`), each failing on what it finds. A pull request merges only with
+every one green: `.github/rulesets/main-checks.json` is `main`'s ruleset on
+GitHub, and a job renamed in a workflow is renamed there in the same change.
 
 ## Rules and the registry
 

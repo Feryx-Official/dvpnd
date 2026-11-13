@@ -52,6 +52,8 @@ after that point under a non-open-source license. To keep this codebase clean:
   to a service, the egress policy, packaging or the systemd unit (`test/README.md`). A
   bug fix comes with a test that fails without it; a new rule goes into
   `docs/invariants/` with the test that pins it.
-- Keep pull requests focused; one logical change per PR.
+- Keep pull requests focused; one logical change per PR. A pull request merges with
+  every CI and CodeQL check green (`.github/rulesets/main-checks.json`), and `main`
+  takes signed commits only.
 - Bug reports and feature requests go through GitHub issues; security issues
   do not — see `SECURITY.md`.
