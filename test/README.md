@@ -152,8 +152,10 @@ means nothing guards its rule any more.
 
 The copies build with `-trimpath`, so they share the Go build cache and only
 the mutated package is compiled again. Every money, root and privacy rule has
-at least one canary, except a rule whose test is skipped as a known bug: its
-canary comes with the fix. `python3 invariants/canaries.py --only SL-2` runs
+at least one canary, except a rule whose test is skipped as a known bug (its
+canary comes with the fix) and a rule pinned only in the integration tier,
+whose tests need privileged Docker and the real daemons, which the canary
+copies do not start (EG-12, RT-7). `python3 invariants/canaries.py --only SL-2` runs
 the canaries whose name contains `SL-2`.
 
 ## Integration gate: `make check-integration`

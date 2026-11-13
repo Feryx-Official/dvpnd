@@ -1522,6 +1522,87 @@
         "go test -count=1 -run '^TestUnencryptedKeyWarning$' ./cmd/"
       ],
       "expect": "own account in the test keyring"
+    },
+    {
+      "name": "[CH-6] the hot key is not granted the node details update",
+      "file": "lite/grants.go",
+      "find": "\tsdk.MsgTypeURL(&nodetypes.MsgUpdateNodeDetailsRequest{}),\n",
+      "replace": "",
+      "run": [
+        "go test -count=1 -run '^(TestNodeMsgTypeURLs)$' ./lite/",
+        "go test -count=1 -run '^(TestAuthzCommands)$' ./cmd/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[CH-7] the fee allowance leaves out the session reports",
+      "file": "cmd/start.go",
+      "find": "[]time.Duration{config.Node.IntervalUpdateStatus, config.Node.IntervalUpdateSessions}",
+      "replace": "[]time.Duration{config.Node.IntervalUpdateStatus}",
+      "run": [
+        "go test -count=1 -run '^(TestExpectedFees)$' ./cmd/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[CH-7] the fee allowance ignores the gas adjustment",
+      "file": "cmd/start.go",
+      "find": "strconv.FormatFloat(config.Chain.GasAdjustment, 'f', -1, 64)",
+      "replace": "strconv.FormatFloat(1, 'f', -1, 64)",
+      "run": [
+        "go test -count=1 -run '^(TestExpectedFees)$' ./cmd/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[CH-9] only the first page of a hot key's fee allowances is read",
+      "file": "lite/authz.go",
+      "find": "\t\t\tpage = &sdkquery.PageRequest{Key: resp.Pagination.NextKey, Limit: 500}",
+      "replace": "\t\t\treturn nil",
+      "run": [
+        "go test -count=1 -run '^(TestFeeAllowanceFoundPastTheFirstPage)$' ./lite/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[RT-4] forwarding is written without being read first",
+      "file": "services/common/host.go",
+      "find": "err == nil && strings.TrimSpace(string(cur)) == \"1\" {",
+      "replace": "false && err == nil && strings.TrimSpace(string(cur)) == \"1\" {",
+      "run": [
+        "go test -count=1 -run '^(TestEnsureForwarding)$' ./services/common/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[RT-4] forwarding that is off is left off",
+      "file": "services/common/host.go",
+      "find": "\t\terr := os.WriteFile(sw.path, []byte(\"1\\n\"), 0o644)",
+      "replace": "\t\terr := error(nil)",
+      "run": [
+        "go test -count=1 -run '^(TestEnsureForwarding)$' ./services/common/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[RT-8] replies coming back into the tunnel are left to the FORWARD policy",
+      "file": "services/common/nat.go",
+      "find": "\t\t\tnatRule{tool, \"\", \"FORWARD\", []string{\"-o\", n.Interface, \"-m\", \"conntrack\", \"--ctstate\", \"RELATED,ESTABLISHED\", \"-j\", \"ACCEPT\"}},\n",
+      "replace": "",
+      "run": [
+        "go test -count=1 -run '^(TestConfigTemplateForwardRules)$' ./services/wireguard/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[LIC-6] a wallet address is committed in a document",
+      "file": "docs/invariants/provenance.md",
+      "find": "**[LIC-6] No wallet or node address is committed.**",
+      "replace": "**[LIC-6] No wallet or node address is committed.** sent\u0031qurswpc8qurswpc8qurswpc8qurswpc8gg3ryw",
+      "run": [
+        "go test -count=1 -run '^TestNoOnChainAddresses$' ./test/static/"
+      ],
+      "expect": "an on-chain address in a committed file \\(it links the repository to a wallet\\): docs/invariants/provenance\\.md: sent1"
     }
   ]
 }
