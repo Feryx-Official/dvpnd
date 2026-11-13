@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -101,7 +102,9 @@ func (c *Client) QueryNode(nodeAddr base.NodeAddress) (result *nodetypes.Node, e
 // and MaxDuration) or *subscriptiontypes.Session (plan subscription, carries
 // SubscriptionID). nil, nil means the chain no longer has the session.
 func (c *Client) QuerySession(id uint64) (result sessiontypes.Session, err error) {
-	c.log.Debug("Querying the session", "id", id)
+	// As text: a client's handshake names this id, and CodeQL counts any value
+	// a client sent, a number too, as able to break a log line.
+	c.log.Debug("Querying the session", "id", strconv.FormatUint(id, 10))
 	err = c.query("session", func(ctx client.Context) error {
 		resp, err := sessiontypes.NewQueryServiceClient(ctx).QuerySession(
 			context.TODO(),

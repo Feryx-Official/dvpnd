@@ -56,13 +56,13 @@ func (w *bodyCapture) Write(b []byte) (int, error) {
 const maxLoggedField = 200
 
 // clip cuts s to maxLoggedField bytes, dropping a character the cut splits,
-// and marks the cut.
+// marks the cut, and writes its line breaks as types.OneLine does.
 func clip(s string) string {
-	if len(s) <= maxLoggedField {
-		return s
+	if len(s) > maxLoggedField {
+		s = strings.ToValidUTF8(s[:maxLoggedField], "") + "..."
 	}
 
-	return strings.ToValidUTF8(s[:maxLoggedField], "") + "..."
+	return types.OneLine(s)
 }
 
 // logRefusals logs every request the node answers with an error status: what

@@ -55,3 +55,7 @@ node must keep doing. IDs as in `test/README.md`.
   JSON POST from any origin allows the `Content-Type` header. The node once listed the
   media type's value (`application/json; charset=utf-8`) as the allowed header, and a
   browser then blocked every handshake before sending it.
+- **[HS-15] A value the client wrote is logged on one line.** The request path, the
+  User-Agent and the error of a handshake that failed inside the node, which can quote
+  the request, have their line breaks written as `\r` and `\n`. The node's JSON and
+  console writers escape them as well; this holds whatever logger the node is given.

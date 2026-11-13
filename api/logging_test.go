@@ -4,6 +4,7 @@ package api
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -174,5 +175,65 @@ func TestReplySigningHeader(t *testing.T) {
 		if got := rec.Header().Get("X-Dvpnd-Reply-Signing"); got != "dvpnd/handshake-reply/v1" {
 			t.Errorf("%s %s: X-Dvpnd-Reply-Signing %q", req.Method, req.URL.Path, got)
 		}
+	}
+}
+
+// valueLogger keeps each entry's values as the code passed them, the way a
+// writer that escapes nothing would print them.
+type valueLogger struct{ entries []map[string]string }
+
+func (l *valueLogger) Debug(_ string, kv ...interface{}) { l.add(kv) }
+func (l *valueLogger) Info(_ string, kv ...interface{})  { l.add(kv) }
+func (l *valueLogger) Error(_ string, kv ...interface{}) { l.add(kv) }
+func (l *valueLogger) With(...interface{}) cmtlog.Logger { return l }
+
+func (l *valueLogger) add(kv []interface{}) {
+	entry := map[string]string{}
+	for i := 0; i+1 < len(kv); i += 2 {
+		entry[fmt.Sprint(kv[i])] = fmt.Sprint(kv[i+1])
+	}
+	l.entries = append(l.entries, entry)
+}
+
+// A path and a User-Agent carrying line breaks are logged on one line, at
+// debug, as a refusal and from a handler that panicked, whatever logger the
+// node is given.
+//
+// Rules: [HS-15].
+func TestClientValuesStayOnOneLine(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	logger := &valueLogger{}
+	ctx := context.NewContext().WithLogger(logger)
+
+	r := gin.New()
+	r.Use(logRefusals(ctx), recoverPanics(ctx))
+	r.GET("/sessions/:id", func(c *gin.Context) {
+		c.JSON(http.StatusNotFound, gin.H{"success": false})
+	})
+	r.GET("/panic/:id", func(*gin.Context) { panic("handler failed") })
+
+	for _, path := range []string{"/sessions/7%0D%0Aforged=1", "/panic/7%0D%0Aforged=1"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("User-Agent", "probe/1.0\r\nforged=1")
+		r.ServeHTTP(httptest.NewRecorder(), req)
+	}
+
+	seen := map[string]int{}
+	for _, entry := range logger.entries {
+		for _, key := range []string{"path", "agent"} {
+			v, ok := entry[key]
+			if !ok {
+				continue
+			}
+			seen[key]++
+			if strings.ContainsAny(v, "\r\n") {
+				t.Errorf("%s logged with its line breaks: %q", key, v)
+			}
+		}
+	}
+	// Two requests answered and refused, and one panic.
+	if seen["path"] != 5 || seen["agent"] != 4 {
+		t.Fatalf("logged %d paths and %d agents, want 5 and 4", seen["path"], seen["agent"])
 	}
 }

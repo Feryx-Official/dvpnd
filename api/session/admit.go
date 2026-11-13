@@ -41,7 +41,8 @@ func newAPIError(status, code int, err error) *apiError {
 // endpoint's error or the proxy's is the operator's business.
 func replyError(ctx *context.Context, c *gin.Context, status, code int, err error) {
 	if status >= http.StatusInternalServerError {
-		ctx.Log().Error("Handshake failed inside the node", "path", c.Request.URL.Path, "code", code, "error", err)
+		ctx.Log().Error("Handshake failed inside the node",
+			"path", types.OneLine(c.Request.URL.Path), "code", code, "error", types.OneLine(err.Error()))
 		err = errors.New(types.InternalErrorMessage)
 	}
 	c.JSON(status, types.NewResponseError(code, err))

@@ -22,7 +22,7 @@ func recoverPanics(ctx *context.Context) gin.HandlerFunc {
 	return gin.CustomRecoveryWithWriter(io.Discard, func(c *gin.Context, err any) {
 		ctx.Log().Error("Request handler panicked",
 			"method", c.Request.Method,
-			"path", c.Request.URL.Path,
+			"path", clip(c.Request.URL.Path),
 			"error", fmt.Sprint(err),
 			"stack", string(debug.Stack()),
 		)
