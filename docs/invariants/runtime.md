@@ -159,8 +159,8 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
 - **[RT-32] Every pull request and push to `main` runs the security checks, and what they
   find fails them.** govulncheck fails on a vulnerability the code reaches that
   `SECURITY.md` does not explain under "Known dependency advisories"; golangci-lint, gosec
-  included, on any finding not excused on its own line with the reason; CodeQL runs on
-  both, not only weekly. `main`'s ruleset, `.github/rulesets/main-checks.json`, requires
+  included, on any finding not excused on its own line with the reason, at the version
+  `make tools` installs; CodeQL runs on both, not only weekly. `main`'s ruleset, `.github/rulesets/main-checks.json`, requires
   every job CI and CodeQL run on a pull request, and holds merges to CodeQL's alerts.
   govulncheck only warned, golangci-lint ran with its exit code forced to 0, and CodeQL saw
   code up to a week after it merged: a pull request that added a reachable vulnerability

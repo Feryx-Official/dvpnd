@@ -60,3 +60,9 @@ leaves users unable to connect, or shows them a wrong fact. IDs as in `test/READ
   confirmed to use; any other `transport` stops the start, naming `tcp`. The inherited
   table refused `http`, took the typo `httpt` instead, and passed six transports nothing
   had tested, each advertised under a code no client was checked against.
+- **[CT-16] A build reports the version of the tag it was built from, a pre-release suffix
+  included.** `make build` stamps the tag without its `v` and, past the tag, the number of
+  commits since it: `v9.5.0-rc1` is `9.5.0-rc1`, three commits after `v9.4.4` is `9.4.4-3`.
+  The Makefile cut the last `-` field, meant for the commit hash, so an exact pre-release tag
+  was stamped as the release it precedes, which the root document's `version` and the
+  `Server` header then showed.

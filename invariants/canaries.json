@@ -1462,6 +1462,16 @@
         "go test -count=1 -run '^TestReleaseCarriesTheSignedInstaller$' ./test/static/"
       ],
       "expect": "lacks gh release upload"
+    },
+    {
+      "name": "[CT-16] a pre-release build reports the release it precedes",
+      "file": "Makefile",
+      "find": "--long | sed -E 's/^v//; s/-(0-)?g[0-9a-f]+$$//')",
+      "replace": "| sed 's/^v//' | rev | cut -d - -f 2- | rev)",
+      "run": [
+        "go test -count=1 -run '^TestMakefileTargets$' ./test/static/"
+      ],
+      "expect": "want \"9.5.0-rc1\""
     }
   ]
 }

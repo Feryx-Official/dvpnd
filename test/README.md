@@ -72,7 +72,10 @@ not yet.
   and the release gate, `scripts/release-gate.sh`, which runs against tags
   signed with keys of the test's own and a fake `gh`, with every other job of
   the release workflow needing it, one of them attaching the installer with
-  its signature, which the operator guide checks;
+  its signature, which the operator guide checks; and the Makefile's targets,
+  as a dry run in a repository of the test's own: the version a build stamps
+  on a release, a pre-release and the commits past them, `install`,
+  `benchmark`, and `tools` installing the golangci-lint CI runs;
 - the same SPDX and `sentinel-go-sdk` checks as shell steps, and
   `docs/provenance/verify-fork.sh`, which also asks apache.org,
   proxy.golang.org and Software Heritage when it can reach them (an

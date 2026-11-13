@@ -1,5 +1,9 @@
 .DEFAULT_GOAL := default
-VERSION := $(shell git describe --tags --match 'v*' | sed 's/^v//' | rev | cut -d - -f 2- | rev)
+# The tag without its v, a pre-release suffix included, and past the tag the
+# number of commits since it: v9.5.0-rc1 is 9.5.0-rc1, three commits after
+# v9.4.4 is 9.4.4-3. --long always appends -N-g<hash>: that is cut, with N
+# when it is 0.
+VERSION := $(shell git describe --tags --match 'v*' --long | sed -E 's/^v//; s/-(0-)?g[0-9a-f]+$$//')
 COMMIT := $(shell git log -1 --format='%H')
 
 TAGS := $(strip netgo)
@@ -57,7 +61,7 @@ check-all: verify check-integration
 
 .PHONY: benchmark
 benchmark:
-	@go test -bench -mod=readonly -v ./...
+	@go test -run '^$$' -bench . -mod=readonly ./...
 
 .PHONY: build
 build:
@@ -71,23 +75,25 @@ clean:
 .PHONY: default
 default: clean build
 
+# Into Go's bin directory, $GOBIN or the first GOPATH's bin, as dvpnd.
 .PHONY: install
 install:
-	go build -ldflags="${LD_FLAGS}" -mod=readonly -tags="${TAGS}" -trimpath \
-		-o "${GOPATH}/bin/dvpnd" main.go
+	go install -ldflags="${LD_FLAGS}" -mod=readonly -tags="${TAGS}" -trimpath .
 
 .PHONY: build-image
 build-image:
 	@docker build --compress --file Dockerfile --force-rm --tag dvpnd .
 
+# What CI's golangci-lint job runs; it reports, and changes no file.
 .PHONY: go-lint
 go-lint:
-	@golangci-lint run --fix
+	@golangci-lint run
 
 .PHONY: test
 test:
 	@go test -cover -mod=readonly -v ./...
 
+# The golangci-lint CI runs (.github/workflows/ci.yml).
 .PHONY: tools
 tools:
-	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.1
+	@go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
