@@ -83,7 +83,7 @@ func expectedFees(config *types.Config, d time.Duration) sdk.Coins {
 			txs += int64(d / interval)
 		}
 	}
-	gas := sdkmath.LegacyNewDec(int64(config.Chain.Gas)).Mul(sdkmath.LegacyMustNewDecFromStr(
+	gas := sdkmath.LegacyNewDecFromInt(sdkmath.NewIntFromUint64(config.Chain.Gas)).Mul(sdkmath.LegacyMustNewDecFromStr(
 		strconv.FormatFloat(config.Chain.GasAdjustment, 'f', -1, 64)))
 
 	var fees sdk.Coins

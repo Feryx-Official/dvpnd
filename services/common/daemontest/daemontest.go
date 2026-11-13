@@ -23,7 +23,7 @@ func Script(pidFile string) string {
 func Pid(t testing.TB, pidFile string) int {
 	t.Helper()
 	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(10 * time.Millisecond) {
-		b, _ := os.ReadFile(pidFile)
+		b, _ := os.ReadFile(pidFile) //nolint:gosec // G304: the test's own pid file
 		if pid, _ := strconv.Atoi(strings.TrimSpace(string(b))); pid > 0 {
 			return pid
 		}

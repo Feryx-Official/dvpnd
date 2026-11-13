@@ -126,7 +126,7 @@ func TestServeEndsWhenTheListenerCloses(t *testing.T) {
 
 	client := &http.Client{
 		Timeout:   5 * time.Second,
-		Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}, //nolint:gosec // a throwaway certificate
+		Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}, // a throwaway certificate
 	}
 	for _, scheme := range []string{"https", "http"} {
 		res, err := client.Get(scheme + "://" + l.Addr().String() + "/")

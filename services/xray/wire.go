@@ -208,7 +208,7 @@ func parseStat(b []byte) (name string, value int64, err error) {
 			if n < 0 {
 				return "", 0, protowire.ParseError(n)
 			}
-			value, b = int64(v), b[n:]
+			value, b = int64(v), b[n:] //nolint:gosec // G115: a protobuf int64 travels as its two's-complement uint64
 		default:
 			n = protowire.ConsumeFieldValue(num, typ, b)
 			if n < 0 {

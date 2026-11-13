@@ -306,7 +306,7 @@ func randomUint16(min, max uint16) uint16 {
 		panic(err)
 	}
 
-	return min + uint16(n.Int64())
+	return min + uint16(n.Int64()) //nolint:gosec // G115: n < max-min+1, which fits
 }
 
 func randomUint32(min, max uint32) uint32 {

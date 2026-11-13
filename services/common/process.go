@@ -93,7 +93,7 @@ type Process struct {
 // outright runs no Stop, so the kernel sends the child SIGTERM when the node
 // dies.
 func StartProcess(name string, args []string, extraEnv []string, attr *syscall.SysProcAttr) (*Process, error) {
-	cmd := exec.Command(name, args...)
+	cmd := exec.Command(name, args...) //nolint:gosec // G204: an argv call, no shell, to the daemons the node runs
 	cmd.Env = childEnv(extraEnv)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

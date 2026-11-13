@@ -139,7 +139,7 @@ func run(home, api string, gigabytes int64, maxPriceStr string, sessionID uint64
 	}
 
 	// 2. GET / — what client apps read first.
-	http.DefaultClient.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+	http.DefaultClient.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} //nolint:gosec // G402: nodes' certificates are self-signed; the handshake reply's signature is checked
 	http.DefaultClient.Timeout = 15 * time.Second
 	root, err := http.Get(strings.TrimRight(api, "/") + "/")
 	if err != nil {

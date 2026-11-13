@@ -31,7 +31,7 @@ func toolCommand(ctx context.Context, name string, args ...string) *exec.Cmd {
 	if name == "iptables" || name == "ip6tables" {
 		args = append([]string{"-w", xtablesWait}, args...)
 	}
-	cmd := exec.CommandContext(ctx, name, args...)
+	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // G204: an argv call, no shell, to the node's own tools
 	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
 	cmd.WaitDelay = 5 * time.Second
 
@@ -119,7 +119,7 @@ func EnsureForwarding() error {
 			continue
 		}
 
-		err := os.WriteFile(sw.path, []byte("1\n"), 0o644)
+		err := os.WriteFile(sw.path, []byte("1\n"), 0o644) //nolint:gosec // G306: a /proc/sys switch, which exists, so the mode is never used
 		if err == nil {
 			continue
 		}

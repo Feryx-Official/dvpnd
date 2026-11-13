@@ -26,7 +26,7 @@ const databaseOptions = "?_secure_delete=on&_journal_mode=DELETE&_busy_timeout=5
 // proxy UUIDs, so it is readable by its owner only, and narrowed when an
 // earlier release left it wider; SQLite gives its journal the same mode.
 func OpenDatabase(path string) (*gorm.DB, error) {
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o600)
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o600) //nolint:gosec // G304: the session database in the node's home
 	if err != nil {
 		return nil, err
 	}

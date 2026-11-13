@@ -107,7 +107,7 @@ func TestInstallerWaitsForThePackageLock(t *testing.T) {
 // shellFunction returns the lines of the function name defines in a shell
 // script, from "name() {" to its closing "}", or nothing if it has none.
 func shellFunction(lines []string, name string) (start, end int) {
-	start, end = -1, -1
+	start = -1
 	for i, line := range lines {
 		if line == name+"() {" {
 			start = i

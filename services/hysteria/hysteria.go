@@ -260,7 +260,7 @@ func (s *Hysteria) Stop() error {
 // below what QUIC wants. Best effort: a container cannot write /proc/sys.
 func raiseUDPBuffers() {
 	for _, path := range udpBufferSwitches {
-		raw, err := os.ReadFile(path)
+		raw, err := os.ReadFile(path) //nolint:gosec // G304: a /proc/sys switch from a fixed list
 		if err != nil {
 			continue
 		}

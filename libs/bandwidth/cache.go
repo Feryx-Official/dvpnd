@@ -40,7 +40,7 @@ func readCache(home string, log Logger) *cacheEntry {
 	}
 
 	path := filepath.Join(home, cacheFileName)
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // G304: a fixed name in the node's home
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
 	}

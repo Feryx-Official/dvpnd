@@ -93,7 +93,7 @@ var (
 // tx timeout elapses. cosmos-sdk v0.47 removed the "block" broadcast mode that
 // upstream relied on, so inclusion has to be confirmed explicitly.
 func (c *Client) waitForTx(ctx client.Context, hash string) (*sdk.TxResponse, error) {
-	deadline := time.Now().Add(time.Duration(c.txTimeout) * time.Second)
+	deadline := time.Now().Add(time.Duration(c.txTimeout) * time.Second) //nolint:gosec // G115: the operator's timeout in seconds, which wraps only past 292 years
 	for {
 		res, err := authtx.QueryTx(ctx, hash)
 		if err == nil {

@@ -38,7 +38,7 @@ const (
 )
 
 // defaultURLs is a variable so tests can point every provider at a local server.
-var defaultURLs = map[string]string{
+var defaultURLs = map[string]string{ //nolint:gosec // G101: the providers' endpoints, which hold no credential
 	ProviderIPWhois:     "https://ipwho.is/",
 	ProviderIP2Location: "https://api.ip2location.io/",
 	ProviderCloudflare:  "https://www.cloudflare.com/cdn-cgi/trace",

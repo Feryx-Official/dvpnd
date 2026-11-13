@@ -14,7 +14,7 @@ import (
 // CertificatePin returns the hex SHA-256 of the first certificate in a PEM
 // file: what clients pin, since a node's certificate is self-signed.
 func CertificatePin(path string) (string, error) {
-	pemBytes, err := os.ReadFile(path)
+	pemBytes, err := os.ReadFile(path) //nolint:gosec // G304: the node's own certificate
 	if err != nil {
 		return "", err
 	}

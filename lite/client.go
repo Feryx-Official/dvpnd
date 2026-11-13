@@ -74,7 +74,7 @@ func (c *Client) rpc(remote string, timeout uint) (*rpchttp.HTTP, error) {
 	if err != nil {
 		return nil, err
 	}
-	hc.Timeout = time.Duration(timeout) * time.Second
+	hc.Timeout = time.Duration(timeout) * time.Second //nolint:gosec // G115: the operator's timeout in seconds, which wraps only past 292 years
 	if t, ok := hc.Transport.(*http.Transport); ok {
 		t.IdleConnTimeout = rpcIdleTimeout
 	}

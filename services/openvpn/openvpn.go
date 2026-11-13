@@ -403,7 +403,7 @@ func (s *OpenVPN) AddPeer(data []byte) ([]byte, error) {
 	s.mu.Unlock()
 
 	result := make([]byte, 4, 4+len(certDER)+len(keyDER))
-	binary.BigEndian.PutUint32(result, uint32(len(certDER)))
+	binary.BigEndian.PutUint32(result, uint32(len(certDER))) //nolint:gosec // G115: a certificate the node just made, far below 4 GiB
 	result = append(result, certDER...)
 	result = append(result, keyDER...)
 

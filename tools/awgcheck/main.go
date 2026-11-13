@@ -80,7 +80,7 @@ func run(home, out, endpoint string, v3 bool) error {
 		tiers = append(tiers, 3)
 	}
 	for tier, gw := range gateways {
-		if err := os.WriteFile(filepath.Join(out, fmt.Sprintf("gateway%d", tier)), []byte(gw), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(out, fmt.Sprintf("gateway%d", tier)), []byte(gw), 0o644); err != nil { //nolint:gosec // G306: check.sh reads it as the user who ran it, not root
 			return err
 		}
 	}

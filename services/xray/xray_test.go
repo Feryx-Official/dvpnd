@@ -17,6 +17,8 @@ import (
 	statscommand "github.com/xtls/xray-core/app/stats/command"
 	"github.com/xtls/xray-core/proxy/vless"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/Feryx-Official/dvpnd/v9/services/common"
 	"github.com/Feryx-Official/dvpnd/v9/services/common/daemontest"
@@ -38,7 +40,7 @@ type fakeAPI struct {
 
 func (f *fakeAPI) AlterInbound(_ context.Context, req *proxymancommand.AlterInboundRequest) (*proxymancommand.AlterInboundResponse, error) {
 	if req.GetTag() != xraytypes.InboundTag {
-		return nil, grpc.Errorf(2, "unknown inbound %q", req.GetTag())
+		return nil, status.Errorf(codes.Unknown, "unknown inbound %q", req.GetTag())
 	}
 
 	op, err := req.GetOperation().GetInstance()
@@ -55,12 +57,12 @@ func (f *fakeAPI) AlterInbound(_ context.Context, req *proxymancommand.AlterInbo
 		f.users[op.GetUser().GetEmail()] = acc.(*vless.Account)
 	case *proxymancommand.RemoveUserOperation:
 		if _, ok := f.users[op.GetEmail()]; !ok {
-			return nil, grpc.Errorf(5, "user %q not found", op.GetEmail())
+			return nil, status.Errorf(codes.NotFound, "user %q not found", op.GetEmail())
 		}
 		delete(f.users, op.GetEmail())
 		f.removed = append(f.removed, op.GetEmail())
 	default:
-		return nil, grpc.Errorf(2, "unexpected operation %T", op)
+		return nil, status.Errorf(codes.Unknown, "unexpected operation %T", op)
 	}
 
 	return &proxymancommand.AlterInboundResponse{}, nil
@@ -407,7 +409,7 @@ func TestDoneWhenTheProxyDies(t *testing.T) {
 func TestHandshakePayload(t *testing.T) {
 	stubBinary(t)
 
-	dir, cfg := home(t, xraytypes.SecurityTLS)
+	dir, _ := home(t, xraytypes.SecurityTLS)
 	s := NewXRay()
 	if err := s.Init(dir); err != nil {
 		t.Fatal(err)
@@ -421,7 +423,7 @@ func TestHandshakePayload(t *testing.T) {
 		t.Fatalf("public listing must carry codes and flow only: %s", pub)
 	}
 
-	dir, cfg = home(t, xraytypes.SecurityReality)
+	dir, cfg := home(t, xraytypes.SecurityReality)
 	s = NewXRay()
 	if err := s.Init(dir); err != nil {
 		t.Fatal(err)

@@ -250,7 +250,7 @@ func (s *WireGuard) Init(home string) (err error) {
 // at path: there is none, it carries the marker, or it is one a release
 // before the marker wrote, which holds the node's own private key.
 func ownsConfig(path, privateKey string) (bool, error) {
-	raw, err := os.ReadFile(path)
+	raw, err := os.ReadFile(path) //nolint:gosec // G304: the interface configuration the node writes
 	if errors.Is(err, fs.ErrNotExist) {
 		return true, nil
 	}

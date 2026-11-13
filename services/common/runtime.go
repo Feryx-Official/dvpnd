@@ -111,17 +111,17 @@ func PrepareRuntime(home string, euid int, daemon bool) (Runtime, error) {
 		rt.Dir = filepath.Join(home, "run")
 	}
 
-	if err := os.MkdirAll(rt.Dir, 0o700); err != nil {
+	if err := os.MkdirAll(rt.Dir, 0o700); err != nil { //nolint:gosec // G703: the runtime directory, from the node's home or configuration
 		return rt, err
 	}
 	if rt.Proxy == nil {
-		return rt, os.Chmod(rt.Dir, 0o700)
+		return rt, os.Chmod(rt.Dir, 0o700) //nolint:gosec // G302: a directory, which needs its x bit
 	}
-	if err := os.Chown(rt.Dir, 0, int(rt.Proxy.GID)); err != nil {
+	if err := os.Chown(rt.Dir, 0, int(rt.Proxy.GID)); err != nil { //nolint:gosec // G703: the runtime directory, from the node's home or configuration
 		return rt, fmt.Errorf("runtime directory %s: %w", rt.Dir, err)
 	}
 
-	return rt, os.Chmod(rt.Dir, 0o750)
+	return rt, os.Chmod(rt.Dir, 0o750) //nolint:gosec // G302: the proxy account's group reads the daemons' files in it
 }
 
 // WriteFile writes a file the daemon reads into the runtime directory:
@@ -141,7 +141,7 @@ func (rt Runtime) WriteFile(name string, data []byte) (string, error) {
 	written.paths[path] = true
 	written.Unlock()
 
-	if err := os.WriteFile(path, data, mode); err != nil {
+	if err := os.WriteFile(path, data, mode); err != nil { //nolint:gosec // G703: a file in the runtime directory, named by the node
 		return "", err
 	}
 	if rt.Proxy != nil {
@@ -161,7 +161,7 @@ func (rt Runtime) TLSFiles(home string) (cert, key string, err error) {
 		name string
 		path *string
 	}{{"tls.crt", &cert}, {"tls.key", &key}} {
-		data, err := os.ReadFile(filepath.Join(home, f.name))
+		data, err := os.ReadFile(filepath.Join(home, f.name)) //nolint:gosec // G304: the node's TLS files, in its home
 		if err != nil {
 			return "", "", err
 		}

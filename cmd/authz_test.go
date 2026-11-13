@@ -62,3 +62,15 @@ func TestExpectedFees(t *testing.T) {
 		t.Fatalf("expected fees %s, want %s", got, want)
 	}
 }
+
+// TestExpectedFeesForAnyGasLimit: the gas limit is a uint64 and the estimate
+// read it as an int64, so a limit of 1<<63 or more was a negative amount,
+// which sdk.NewCoin refuses with a panic.
+func TestExpectedFeesForAnyGasLimit(t *testing.T) {
+	config := types.NewConfig().WithDefaultValues()
+	config.Chain.Gas = 1 << 63
+	got := expectedFees(config, time.Hour)
+	if !got.IsAllPositive() {
+		t.Fatalf("expected fees %s at gas 1<<63, want a positive amount", got)
+	}
+}
