@@ -503,3 +503,16 @@ func TestCIJobsArePinnedAndBounded(t *testing.T) {
 		}
 	}
 }
+
+// TestIssueTemplatesAssignNoOne: the issue templates came from upstream with
+// one of its developers as the assignee of every report; a template here
+// assigns no one.
+func TestIssueTemplatesAssignNoOne(t *testing.T) {
+	for _, f := range files(t, ".github/ISSUE_TEMPLATE/") {
+		for _, line := range strings.Split(string(read(t, f)), "\n") {
+			if v, ok := strings.CutPrefix(line, "assignees:"); ok && strings.Trim(strings.TrimSpace(v), `'"`) != "" {
+				t.Errorf("%s assigns %s to every issue it opens", f, strings.TrimSpace(v))
+			}
+		}
+	}
+}

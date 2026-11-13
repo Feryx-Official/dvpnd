@@ -1,9 +1,10 @@
 ---
+# Modified from sentinel-official/dvpn-node @ 62bde16 (2024-01-25). See NOTICE.
 name: Feature request
 about: Suggest an idea for this project
 title: ''
 labels: enhancement
-assignees: bsrinivas8687
+assignees: ''
 
 ---
 

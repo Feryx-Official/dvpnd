@@ -1,9 +1,10 @@
 ---
+# Modified from sentinel-official/dvpn-node @ 62bde16 (2024-01-25). See NOTICE.
 name: Bug report
 about: Create a report to help us improve
 title: ''
 labels: bug
-assignees: bsrinivas8687
+assignees: ''
 
 ---
 
