@@ -12,11 +12,12 @@
 #
 # What it cannot catch: a package that changed MEANING without changing its
 # path, a new component nobody drew, or an edge that no longer exists. Those
-# are on the author, which is why CLAUDE.md carries the rule as well.
+# are on the author, which is why CONTRIBUTING.md carries the rule as well.
 #
-# SKIPS, never fails, when Archify is not installed. It is an agent skill
-# living in the user's home (`npx skills add tt-a1i/archify -g`), not a repo
-# dependency, so CI and a fresh clone must stay green without it.
+# SKIPS, never fails, when ARCHIFY_HOME does not name an Archify installation
+# (the directory holding bin/archify.mjs). The renderer is installed
+# separately, not a repo dependency, so CI and a fresh clone must stay green
+# without it.
 #
 # The pinned revision in the committed JSON is left alone: it records the
 # commit the diagram was last verified against. This check always validates at
@@ -25,15 +26,16 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DOC="$ROOT/docs/architecture/dvpnd.architecture.json"
-SKILL="${ARCHIFY_HOME:-$HOME/.claude/skills/archify}"
+ARCHIFY="${ARCHIFY_HOME:-}"
 
 skip() { echo "check-architecture-doc: skipped ($1)"; exit 0; }
 
 [ -f "$DOC" ] || skip "no $DOC"
 command -v node >/dev/null 2>&1 || skip "no node on PATH"
-[ -f "$SKILL/bin/archify.mjs" ] || skip "Archify skill not installed at $SKILL"
+[ -n "$ARCHIFY" ] || skip "ARCHIFY_HOME is not set"
+[ -f "$ARCHIFY/bin/archify.mjs" ] || skip "no bin/archify.mjs under ARCHIFY_HOME ($ARCHIFY)"
 
-# No network from a check run: this also stops the skill's update reminder.
+# No network from a check run: this also stops the renderer's update reminder.
 export ARCHIFY_UPDATE_CHECK_DISABLED=1
 
 HEAD_REV="$(git -C "$ROOT" rev-parse HEAD)"
@@ -57,7 +59,7 @@ node -e '
 ' "$DOC" "$PINNED" "$HEAD_REV" "$ORIGIN"
 
 OUT="$TMP/validate.log"
-if node "$SKILL/bin/archify.mjs" validate architecture "$PINNED" \
+if node "$ARCHIFY/bin/archify.mjs" validate architecture "$PINNED" \
      --quality showcase --repo-root "$ROOT" >"$OUT" 2>&1; then
   cat "$OUT"
   exit 0
@@ -91,7 +93,7 @@ check-architecture-doc: FAILED at HEAD ($HEAD_REV).
 
   Fix the JSON, then re-render and re-pin:
 
-    node ~/.claude/skills/archify/bin/archify.mjs deliver architecture \\
+    node "\$ARCHIFY_HOME/bin/archify.mjs" deliver architecture \\
       docs/architecture/dvpnd.architecture.json \\
       docs/architecture/dvpnd-architecture.html \\
       --quality showcase --repo-root .

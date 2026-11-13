@@ -46,3 +46,9 @@ unlicensed code (`NOTICE`, `CONTRIBUTING.md`). IDs as in `test/README.md`.
   real file. The local files were kept out by one clone's `.git/info/exclude` only: in a
   fresh clone `git add -A` would have committed them, and every image build copied them
   into its build stage.
+- **[LIC-10] No committed file names a contributor's private tooling or the local files
+  that go with it.** What the repository needs from outside, such as the architecture
+  renderer, it names as a dependency a reader installs, never by a path in someone's home
+  directory. The test holds the names as SHA-256 sums, so that its list names none of them
+  itself. The architecture guide and its check pointed at one contributor's home directory
+  and at a local file the public repository does not hold.

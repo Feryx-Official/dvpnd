@@ -3,9 +3,13 @@
 package static
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -178,6 +182,62 @@ func TestDockerIgnored(t *testing.T) {
 	} {
 		if got := dockerIgnored(patterns, path); got != want {
 			t.Errorf("%s: ignored = %v, want %v", path, got, want)
+		}
+	}
+}
+
+// privateNames are the SHA-256 sums of the lower-case words that name a
+// contributor's private tooling or the local files that go with it: sums, so
+// that this list names none of them itself.
+var privateNames = map[string]bool{
+	"c857d09db23e6822e3600bc06ad8d58f92ed62bc8efd81c753f77048662cb97d": true,
+	"c70eca6b0f88f44d81a41311647e50fda1ac454ec04ffd442b0eb4743a993131": true,
+	"57de4cf40144bdf7d00010f2f5557a7d642c2b9705309bfade167dd313e2ca93": true,
+	"7d3194f79e645c42e4396dda38be04766810ec6a00d00aced3ffc2a0a1f1a9ef": true,
+	"60965168ce762e949600281ba6d01fee136e5b6e8257b1f216f9025ed324474c": true,
+	"3ea125d0bff386e6754b3782b300016fc79a9cf8f8669c0a5c3db64467ddb681": true,
+}
+
+var word = regexp.MustCompile(`[a-z0-9]+`)
+
+// namingLines returns the numbers of the lines of text that hold a word whose
+// sum is in names.
+func namingLines(text string, names map[string]bool) []int {
+	var lines []int
+	for i, line := range strings.Split(strings.ToLower(text), "\n") {
+		for _, w := range word.FindAllString(line, -1) {
+			if sum := sha256.Sum256([]byte(w)); names[hex.EncodeToString(sum[:])] {
+				lines = append(lines, i+1)
+				break
+			}
+		}
+	}
+
+	return lines
+}
+
+// Rules: [LIC-10].
+func TestNoPrivateToolingNamed(t *testing.T) {
+	// Positive control: a word put on a list of its own is found, in any case
+	// and inside a path, and a longer word that holds it is not.
+	sum := sha256.Sum256([]byte("dvpnd"))
+	control := map[string]bool{hex.EncodeToString(sum[:]): true}
+	if got := namingLines("one\nsee ~/.DVPND/config.toml\nthe dvpndx tool\n", control); len(got) != 1 || got[0] != 2 {
+		t.Fatalf("the scanner found lines %v; want [2]", got)
+	}
+	for s := range privateNames {
+		if len(s) != 64 {
+			t.Fatalf("%q is not a SHA-256 sum in hex", s)
+		}
+	}
+
+	for _, f := range files(t, ".") {
+		b := read(t, f)
+		if bytes.IndexByte(b, 0) >= 0 { // binary
+			continue
+		}
+		for _, n := range namingLines(string(b), privateNames) {
+			t.Errorf("%s:%d names a contributor's private tooling or its local files; name what the repository needs as a dependency a reader installs", f, n)
 		}
 	}
 }
