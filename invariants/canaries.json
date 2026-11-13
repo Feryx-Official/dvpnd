@@ -1512,6 +1512,16 @@
         "go test -count=1 -run '^TestLocalFilesStayOutOfTheImageBuild$' ./test/static/"
       ],
       "expect": "sends NOTES\\.md into the image's build context"
+    },
+    {
+      "name": "[PV-13] a node with its own key in the test keyring starts without a word",
+      "file": "cmd/start.go",
+      "find": "\tif backend != keyring.BackendTest || granter != nil {\n",
+      "replace": "\tif backend != keyring.BackendTest || granter == nil {\n",
+      "run": [
+        "go test -count=1 -run '^TestUnencryptedKeyWarning$' ./cmd/"
+      ],
+      "expect": "own account in the test keyring"
     }
   ]
 }

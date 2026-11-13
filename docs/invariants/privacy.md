@@ -48,3 +48,8 @@ passwords) must not pile up on the node either. IDs as in `test/README.md`.
   job, the installer printed it into a log; when its output is not a terminal the mnemonic
   goes to a file in the node's home that only root can read, named in the output, for the
   operator to copy and delete.
+- **[PV-13] A node that keeps its own account's key unencrypted says so at every start.**
+  With `[keyring] backend = test` and no `[keyring] granter`, the key to the account that
+  receives the node's earnings sits on the host without a passphrase; `start` logs that and
+  names the hot key setting. The installer's unattended setup chooses the test backend, and
+  only the guide said what it means.

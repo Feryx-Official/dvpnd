@@ -86,3 +86,24 @@ func TestGranterOf(t *testing.T) {
 		t.Error("a value that is not an address was accepted")
 	}
 }
+
+// TestUnencryptedKeyWarning: a node that signs with its own account from the
+// test keyring, which stores keys without a passphrase, says so; with a hot
+// key the account and its earnings stay off the host, and the other backends
+// encrypt the key.
+//
+// Rules: [PV-13].
+func TestUnencryptedKeyWarning(t *testing.T) {
+	granter := sdk.AccAddress(bytes.Repeat([]byte{2}, 20))
+	if w := unencryptedKeyWarning("test", nil); !strings.Contains(w, "unencrypted") || !strings.Contains(w, "[keyring] granter") {
+		t.Errorf("own account in the test keyring: %q; want a warning naming the hot key setting", w)
+	}
+	for _, c := range []struct {
+		backend string
+		granter sdk.AccAddress
+	}{{"test", granter}, {"file", nil}, {"os", nil}, {"file", granter}} {
+		if w := unencryptedKeyWarning(c.backend, c.granter); w != "" {
+			t.Errorf("backend %s, granter %v: %q; want no warning", c.backend, c.granter, w)
+		}
+	}
+}

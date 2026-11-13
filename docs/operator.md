@@ -116,7 +116,7 @@ Edit `~/.dvpnd/config.toml`:
 
 | Key | Set to |
 |---|---|
-| `[keyring] backend` | `test` — the node must sign transactions unattended, so the key is stored unencrypted under `~/.dvpnd/keyring-test` (mode 700). Prefer a **hot key** (`[keyring] granter`, §3a): the operator key and the earnings then stay off the server. Otherwise use a dedicated operator key and sweep earnings out regularly; see §8. |
+| `[keyring] backend` | `test` — the node must sign transactions unattended, so the key is stored unencrypted under `~/.dvpnd/keyring-test` (mode 700). Prefer a **hot key** (`[keyring] granter`, §3a): the operator key and the earnings then stay off the server. Otherwise use a dedicated operator key and sweep earnings out regularly; see §8. Without a granter, `start` logs a warning saying so at every start. |
 | `[keyring] granter` | empty, or the node account's `sent1…` address when `from` is a hot key (§3a). |
 | `[keyring] from` | the key name you will create in step 3, e.g. `operator` |
 | `[node] type` | `wireguard`, `amneziawg`, `openvpn`, `v2ray`, `xray` or `hysteria2`; see §2a to §2f for the protocol's own file |

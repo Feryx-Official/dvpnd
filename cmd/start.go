@@ -125,6 +125,20 @@ func granterOf(value string, signer sdk.AccAddress) (sdk.AccAddress, error) {
 	return granter, nil
 }
 
+// unencryptedKeyWarning is what start logs when the node signs with its own
+// account from the test keyring, which stores keys without a passphrase: the
+// key to the account that receives the node's earnings is readable by anyone
+// who reads the node's home. Empty with a hot key or another backend.
+func unencryptedKeyWarning(backend string, granter sdk.AccAddress) string {
+	if backend != keyring.BackendTest || granter != nil {
+		return ""
+	}
+
+	return "The node account's key is stored unencrypted on this host ([keyring] backend = test), " +
+		"and the node's earnings accrue to that account: sign with a hot key ([keyring] granter, " +
+		"docs/operator.md section 3a), or move the earnings off it regularly"
+}
+
 // apiPort is the TCP port of the node API's listen address; zero when it
 // names none.
 func apiPort(listenOn string) uint16 {
@@ -241,6 +255,9 @@ func StartCmd() *cobra.Command {
 			if granter != nil {
 				client = client.WithGranter(granter)
 				log.Info("Signing with a hot key for the node account", "key", client.FromAddress(), "node_account", granter)
+			}
+			if w := unencryptedKeyWarning(config.Keyring.Backend, granter); w != "" {
+				log.Error(w)
 			}
 
 			account, err := client.QueryAccount(client.FromAddress())
