@@ -106,7 +106,7 @@ sentence with an ID and the reason it exists:
 | `CH` | `chain.md` | how the node talks to the chain and signs |
 | `RT` | `runtime.md` | how the node runs the daemons, and what it leaves behind |
 | `CT` | `contract.md` | what client apps and aggregators read from the node |
-| `LIC` | `provenance.md` | what keeps the fork's legal position answerable |
+| `LIC` | `provenance.md` | what keeps the fork's legal position answerable, and what the public repository holds |
 
 A test pins a rule by carrying its ID in the comment directly above
 `func TestX` (`// Rules: [SL-2].`) or in a literal `t.Run` name. A test that

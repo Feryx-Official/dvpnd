@@ -393,7 +393,7 @@ def check(root, config):
     for i, where in sorted(definitions.items()):
         prefix = i.split('-')[0]
         if homes and prefix not in homes:
-            problems[key].append(f'{i}: unknown prefix (add it to "homes" in config.json and to docs/testing.md)')
+            problems[key].append(f'{i}: unknown prefix (add it to "homes" in config.json and to the table in test/README.md)')
         elif homes and any(f != homes[prefix] for f in where):
             problems[key].append(f'{i}: defined in {", ".join(where)}, but {prefix} lives in {homes[prefix]}')
         if len(where) > 1:

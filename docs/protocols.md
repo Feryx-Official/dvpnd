@@ -21,7 +21,7 @@ API, the handshake, the session table and every client; that is a separate decis
 | Type | Name | Class | State |
 |---|---|---|---|
 | 1 | `wireguard` | A | shipped, exercised against the public network |
-| 2 | `v2ray` | B | shipped, not yet exercised end to end |
+| 2 | `v2ray` | B | shipped; a V2Ray client tunnelled through it in the integration suite, and paid sessions on a public node on the live network |
 | 3 | `openvpn` | A | shipped; an OpenVPN client tunnelled through it between two containers over UDP and TCP, and a removed peer was killed and denied |
 | 4 | `xray` | B | shipped; a VLESS client tunnelled through it on a test machine over TLS and over REALITY |
 | 5 | `amneziawg` | A | shipped; two tiers on one 3.1 engine: between two containers, a client with the engine the apps bundle tunnelled on the default tier and a 3.1 client on the 3.1 tier (`tools/awgcheck`) |
@@ -288,9 +288,9 @@ with the egress chains installed before the server starts and removed after it e
 Without `client-to-client`, traffic between clients goes through the kernel and the egress
 chain drops it.
 
-Binary: `openvpn` from apk (2.7 in the image) and apt. The management port is a loopback TCP
-port without a password, as OpenVPN warns at start: on a dedicated node the only other user
-of loopback is root already.
+Binary: `openvpn` from apk (2.7 in the image) and apt. The management interface is a unix
+socket in the node's runtime directory, which only root may connect to
+(`management-client-user root`); an older file's `[management] port` is ignored.
 
 ## Packaging policy
 

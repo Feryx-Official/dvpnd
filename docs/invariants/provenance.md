@@ -2,7 +2,9 @@
 
 dvpnd is a fork taken at the last Apache-2.0 commit of `sentinel-official/dvpn-node`.
 Its legal position rests on that grant and on never mixing in post-relicence or
-unlicensed code (`NOTICE`, `CONTRIBUTING.md`). IDs as in `test/README.md`.
+unlicensed code (`NOTICE`, `CONTRIBUTING.md`). The rules from LIC-6 on keep to the public
+repository what belongs there and nothing that links it to a wallet or a contributor's own
+machine. IDs as in `test/README.md`.
 
 - **[LIC-1] Every Go file starts with `// SPDX-License-Identifier: Apache-2.0`, and every
   shell or Python script, Dockerfile, Makefile, YAML file, systemd unit and ignore file

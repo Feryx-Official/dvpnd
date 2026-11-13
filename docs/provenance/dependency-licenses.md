@@ -1,19 +1,19 @@
 # Dependency licence audit
 
-## Current graph — sentinelhub v12.0.2 / cosmos-sdk v0.47.17 (2026-09-06)
+## Current graph — sentinelhub v12.0.2 / cosmos-sdk v0.47.17 (2026-11-13)
 
-Raw output: `dependency-licenses.csv` (128 modules), generated with `go-licenses v1.6.0`;
+Raw output: `dependency-licenses.csv` (133 modules, dvpnd itself left out), generated with `go-licenses v1.6.0`;
 re-run with `go run github.com/google/go-licenses@v1.6.0 report ./...`. The CI licence gate
 runs the matching `check` on every push.
 
 | Licence | Modules |
 |---|---|
-| MIT | 52 |
-| Apache-2.0 | 39 — cosmos-sdk, CometBFT (`sentinel-official/cometbft` fork), `sentinelhub` |
-| BSD-3-Clause | 24 |
+| MIT | 54 |
+| Apache-2.0 | 40 — cosmos-sdk, CometBFT (`sentinel-official/cometbft` fork), `sentinelhub` |
+| BSD-3-Clause | 25 |
 | BSD-2-Clause | 5 |
-| ISC | 4 |
-| MPL-2.0 | 3 — `hashicorp/*`, file-level weak copyleft, unmodified |
+| ISC | 5 |
+| MPL-2.0 | 3 — `hashicorp/go-immutable-radix`, `hashicorp/golang-lru`, `pgregory.net/rapid`; file-level weak copyleft, unmodified |
 | BSD-2-Clause-FreeBSD | 1 |
 
 **No GPL, LGPL or AGPL dependency. No dependency without a licence. No `Unknown`.**

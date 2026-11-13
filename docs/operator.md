@@ -1,15 +1,18 @@
 # Running a dvpnd node
 
-What you need: a Linux host (Ubuntu 22.04/24.04 or Debian 12/13, x86_64) with a **public IPv4
-address** (a home connection behind carrier-grade NAT will not work — check that your
-router's WAN address is not in 100.64.0.0/10), root access, and an account on the Sentinel
-chain holding a little DVPN for gas. Registration deposit is currently 0.
+What you need: a Linux host (Ubuntu 22.04/24.04 or Debian 12/13, x86_64; the installer also
+takes aarch64, where an XRAY or Hysteria2 node needs its binary on `PATH` first, and the image
+is x86_64 only) with a **public IPv4 address** (a home connection behind carrier-grade NAT
+will not work — check that your router's WAN address is not in 100.64.0.0/10), root access,
+and an account on the Sentinel chain holding a little P2P for gas (the coin formerly called
+DVPN; on the chain its denomination is still `udvpn`). Registration deposit is currently 0.
 
 This guide covers WireGuard, AmneziaWG, OpenVPN, V2Ray, XRAY and Hysteria2 nodes; the
 protocol is chosen with `[node] type`. A WireGuard node has been run this way against the
-public network with real clients; AmneziaWG, OpenVPN, XRAY and Hysteria2 nodes served their
-protocol's own client end to end on a test machine; the V2Ray path is documented from the
-code and has not been exercised end to end yet.
+public network with real clients, and every type but OpenVPN has served paid sessions on a
+public node on the live network, the client side driven by `tools/e2e`. OpenVPN has served
+its own client end to end between two containers, as every protocol does in the integration
+suite (`test/README.md`).
 
 ## Which way to run it
 
@@ -118,7 +121,7 @@ Edit `~/.dvpnd/config.toml`:
 | `[keyring] from` | the key name you will create in step 3, e.g. `operator` |
 | `[node] type` | `wireguard`, `amneziawg`, `openvpn`, `v2ray`, `xray` or `hysteria2`; see §2a to §2f for the protocol's own file |
 | `[node] moniker` | your node's public name (4–32 characters) |
-| `[node] gigabyte_prices` | e.g. `40000000udvpn` (40 DVPN per GB). Only denoms the chain lists in its node params are accepted; prices below the chain's minimums are rejected at registration. |
+| `[node] gigabyte_prices` | e.g. `40000000udvpn` (40 P2P per GB). Only denoms the chain lists in its node params are accepted; prices below the chain's minimums are rejected at registration. |
 | `[node] hourly_prices` | e.g. `97500000udvpn` |
 | `[node] remote_url` | `https://<public-ip>:8585` — this becomes the on-chain `remote_addrs` (`host:port`); clients connect to it directly |
 | `[node] listen_on` | `0.0.0.0:8585` |
@@ -253,8 +256,9 @@ dvpnd openvpn config init             # writes ~/.dvpnd/openvpn.toml
 ```
 
 Interface `ovpn0`, a fixed `listen_port`, `proto = "udp"` (recommended) or `"tcp"`,
-`uplink` and `enable_ipv6` as in §2a, and `[management] port`, a loopback port over which
-the node admits clients and reads their traffic; nothing else may bind it. The node is its
+`uplink` and `enable_ipv6` as in §2a. The node admits clients and reads their traffic over
+the server's management interface, a unix socket in `/run/dvpnd` that only root may use; a
+`[management] port` left in a file from an older version is ignored. The node is its
 own certificate authority: on the first start it creates a CA, a server certificate and a
 tls-crypt key under `~/.dvpnd/openvpn/` (keep them: they persist across restarts, and a
 client's profile embeds the CA and the tls-crypt key), and it issues every session its own
@@ -271,8 +275,8 @@ dvpnd keys add operator --recover      # or import an existing mnemonic
 dvpnd keys list                        # shows the sent1… operator and sentnode1… node address
 ```
 
-Send a few DVPN to the `sent1…` address for gas (each status update and usage report is a
-transaction; budget roughly 0.02 DVPN per transaction, a status update every 48 minutes).
+Send a few P2P to the `sent1…` address for gas (each status update and usage report is a
+transaction; budget roughly 0.02 P2P per transaction, a status update every 48 minutes).
 
 ### 3a. A hot key (recommended)
 
@@ -293,8 +297,8 @@ dvpnd keys authz-commands                               # prints the grants to m
 Run the five commands it prints with the `sentinelhub` CLI from the wallet that holds the node
 account: four authz grants (register, update details, update status, update session) and one
 fee allowance limited to `MsgExec`. They last a year by default (`--valid-for`) and the fee
-allowance is capped at 100 DVPN (`--spend-limit`). The fee grant also creates the hot key's
-account on the chain. Keep a few DVPN on the node account for the fees.
+allowance is capped at 100 P2P (`--spend-limit`). The fee grant also creates the hot key's
+account on the chain. Keep a few P2P on the node account for the fees.
 
 At start the node checks the grants and refuses to run while one is missing or expired,
 naming it. It warns in the log when a grant expires within 14 days or the fee allowance would
@@ -629,9 +633,9 @@ with cosign as above when cosign is installed, and remove an image that fails; `
 only an image already pulled. Its `init` sets the `test` keyring backend: with `file`, the
 node asks for the passphrase at every start, through `scripts/runner.sh attach`.
 
-The WireGuard path is exercised by an end-to-end test that builds the image, registers a
-node, buys a session and connects a client from a second container — a WireGuard node served
-real traffic this way and reported it on chain.
+No automated test runs against the chain. `tools/e2e` is the client side for a check by hand:
+it buys a session on a running node and handshakes the way client apps do; nodes of every
+type but OpenVPN served real traffic this way and reported it on chain.
 
 ## 8. Operating
 
