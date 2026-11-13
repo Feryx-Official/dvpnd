@@ -5,8 +5,6 @@ package types
 
 import (
 	"time"
-
-	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 // Session is a local row for an on-chain session whose peer this node serves.
@@ -71,17 +69,4 @@ func (s *Session) Duration() time.Duration {
 // its peer has been served until at; a session without hours never has.
 func (s *Session) PaidTimeUsed(at time.Time) bool {
 	return s.MaxDuration > 0 && time.Duration(s.BaseDuration)+at.Sub(s.CreatedAt) >= time.Duration(s.MaxDuration)
-}
-
-func (s *Session) GetAddress() sdk.AccAddress {
-	if s.Address == "" {
-		return nil
-	}
-
-	v, err := sdk.AccAddressFromBech32(s.Address)
-	if err != nil {
-		panic(err)
-	}
-
-	return v
 }

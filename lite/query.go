@@ -13,7 +13,6 @@ import (
 	sdkquery "github.com/cosmos/cosmos-sdk/types/query"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	base "github.com/sentinel-official/sentinelhub/v12/types"
-	v1base "github.com/sentinel-official/sentinelhub/v12/types/v1"
 	nodetypes "github.com/sentinel-official/sentinelhub/v12/x/node/types/v3"
 	sessiontypes "github.com/sentinel-official/sentinelhub/v12/x/session/types/v3"
 	v2subscriptiontypes "github.com/sentinel-official/sentinelhub/v12/x/subscription/types/v2"
@@ -185,42 +184,6 @@ func (c *Client) QuerySessionParams() (result *sessiontypes.Params, err error) {
 
 		result = &resp.Params
 		return nil
-	})
-
-	return result, err
-}
-
-// HasNodeForPlan walks the plan's node list page by page looking for nodeAddr.
-func (c *Client) HasNodeForPlan(id uint64, nodeAddr base.NodeAddress) (result bool, err error) {
-	want := nodeAddr.String()
-	err = c.query("nodes_for_plan", func(ctx client.Context) error {
-		var (
-			qc   = nodetypes.NewQueryServiceClient(ctx)
-			page = &sdkquery.PageRequest{Limit: 500}
-		)
-
-		for {
-			resp, err := qc.QueryNodesForPlan(
-				context.TODO(),
-				nodetypes.NewQueryNodesForPlanRequest(id, v1base.StatusUnspecified, page),
-			)
-			if err != nil {
-				return types.QueryError(err)
-			}
-
-			for i := 0; i < len(resp.Nodes); i++ {
-				if resp.Nodes[i].Address == want {
-					result = true
-					return nil
-				}
-			}
-
-			if resp.Pagination == nil || len(resp.Pagination.NextKey) == 0 {
-				return nil
-			}
-
-			page = &sdkquery.PageRequest{Key: resp.Pagination.NextKey, Limit: 500}
-		}
 	})
 
 	return result, err

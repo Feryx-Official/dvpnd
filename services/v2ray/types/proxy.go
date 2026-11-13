@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+// Modified from sentinel-official/dvpn-node @ 62bde16 (2024-01-25). See NOTICE.
 
 package types
 
@@ -14,10 +15,6 @@ type Proxy byte
 
 func (p Proxy) Byte() byte {
 	return byte(p)
-}
-
-func (p Proxy) IsValid() bool {
-	return p.String() != ""
 }
 
 func (p Proxy) Tag() string {

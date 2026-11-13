@@ -45,7 +45,10 @@ type V2Ray struct {
 	process *common.Process
 	config  *v2raytypes.Config
 	peers   *v2raytypes.Peers
-	tlsPin  string
+	// tlsPin is the hex SHA-256 of the certificate presented on the TLS
+	// inbound, which clients pin because the node's certificate is
+	// self-signed. Empty when TLS is disabled.
+	tlsPin string
 	// configPath is the rendered configuration, written by Init.
 	configPath string
 
@@ -82,13 +85,6 @@ func (s *V2Ray) Type() uint64 {
 
 func (s *V2Ray) Info() []byte {
 	return s.info
-}
-
-// TLSPin is the hex SHA-256 of the certificate presented on the TLS inbound,
-// which clients pin because the node's certificate is self-signed. Empty when
-// TLS is disabled.
-func (s *V2Ray) TLSPin() string {
-	return s.tlsPin
 }
 
 func (s *V2Ray) Init(home string) (err error) {

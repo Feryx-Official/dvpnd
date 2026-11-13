@@ -144,11 +144,6 @@ func (c *Client) WithChainID(v string) *Client {
 	return c
 }
 
-func (c *Client) WithFeeGranterAddress(v sdk.AccAddress) *Client {
-	c.ctx = c.ctx.WithFeeGranterAddress(v)
-	return c
-}
-
 func (c *Client) WithFromAddress(v sdk.AccAddress) *Client {
 	c.ctx = c.ctx.WithFromAddress(v)
 	return c

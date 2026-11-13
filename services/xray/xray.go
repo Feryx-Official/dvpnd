@@ -58,7 +58,9 @@ type XRay struct {
 	process *common.Process
 	config  *xraytypes.Config
 	peers   *common.PeerSet
-	tlsPin  string
+	// tlsPin is the hex SHA-256 of the certificate on the TLS inbound;
+	// empty with REALITY.
+	tlsPin string
 	// configPath is the rendered configuration, written by Init.
 	configPath string
 
@@ -80,12 +82,6 @@ func (s *XRay) Type() uint64 {
 
 func (s *XRay) Info() []byte {
 	return s.info
-}
-
-// TLSPin is the hex SHA-256 of the certificate on the TLS inbound; empty
-// with REALITY.
-func (s *XRay) TLSPin() string {
-	return s.tlsPin
 }
 
 // configFileName is the rendered configuration in the runtime directory.

@@ -161,11 +161,6 @@ func (s *AmneziaWG) v3On() bool {
 	return s.config.V3Enabled()
 }
 
-// Obfuscation is the default tier's parameter set in force after Init.
-func (s *AmneziaWG) Obfuscation() *awgtypes.Obfuscation {
-	return s.config.Obfuscation
-}
-
 // Start turns IP forwarding on, brings the default tier up, then the 3.1
 // tier; if the second fails the first is taken down again, so a failed start
 // leaves nothing behind.

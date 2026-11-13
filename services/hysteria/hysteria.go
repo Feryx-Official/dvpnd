@@ -71,9 +71,12 @@ type counters struct {
 }
 
 type Hysteria struct {
-	info        []byte
-	process     *common.Process
-	config      *hysteriatypes.Config
+	info    []byte
+	process *common.Process
+	config  *hysteriatypes.Config
+	// tlsPin is the SHA-256 of the node's certificate in colon-separated
+	// hex, as Hysteria2 nodes on the network send it; clients refuse to
+	// connect without it.
 	tlsPin      string
 	statsSecret string
 	configPath  string
@@ -105,12 +108,6 @@ func (s *Hysteria) Type() uint64 {
 
 func (s *Hysteria) Info() []byte {
 	return s.info
-}
-
-// TLSPin is the SHA-256 of the node's certificate in colon-separated hex, as
-// Hysteria2 nodes on the network send it; clients refuse to connect without it.
-func (s *Hysteria) TLSPin() string {
-	return s.tlsPin
 }
 
 func (s *Hysteria) Init(home string) (err error) {

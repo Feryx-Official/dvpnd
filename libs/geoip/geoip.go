@@ -295,15 +295,6 @@ func publicIPv4(s string) (string, error) {
 	return ip.String(), nil
 }
 
-// parse decodes one provider's response body into the common location type.
-func parse(name string, r io.Reader) (*types.GeoIPLocation, error) {
-	p, ok := providers[name]
-	if !ok {
-		return nil, fmt.Errorf("unknown geoip provider %q", name)
-	}
-	return p.parse(r)
-}
-
 func parseIPWhois(r io.Reader) (*types.GeoIPLocation, error) {
 	var body struct {
 		IP          string  `json:"ip"`

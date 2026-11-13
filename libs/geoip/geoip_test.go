@@ -4,6 +4,7 @@ package geoip
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -540,4 +541,13 @@ func TestOnlyAPublicIPv4IsTheNodeAddress(t *testing.T) {
 			t.Fatalf("IP %q, want 203.0.113.9", loc.IP)
 		}
 	})
+}
+
+// parse decodes one provider's response body into the common location type.
+func parse(name string, r io.Reader) (*types.GeoIPLocation, error) {
+	p, ok := providers[name]
+	if !ok {
+		return nil, fmt.Errorf("unknown geoip provider %q", name)
+	}
+	return p.parse(r)
 }

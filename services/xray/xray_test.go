@@ -185,8 +185,8 @@ func TestInitRendersTLSConfig(t *testing.T) {
 	}
 
 	if s.ListenPort() != 8443 || s.info[2] != proxyVLESS || s.info[3] != types.TransportProtocolTCP ||
-		s.info[4] != types.TransportSecurityTLS || len(s.TLSPin()) != 64 {
-		t.Fatalf("info %x pin %q", s.info, s.TLSPin())
+		s.info[4] != types.TransportSecurityTLS || len(s.tlsPin) != 64 {
+		t.Fatalf("info %x pin %q", s.info, s.tlsPin)
 	}
 }
 
@@ -214,8 +214,8 @@ func TestInitRendersRealityConfig(t *testing.T) {
 	if _, ok := stream["tlsSettings"]; ok {
 		t.Fatal("reality config must not carry tlsSettings")
 	}
-	if s.info[4] != types.TransportSecurityReality || s.TLSPin() != "" {
-		t.Fatalf("info %x pin %q", s.info, s.TLSPin())
+	if s.info[4] != types.TransportSecurityReality || s.tlsPin != "" {
+		t.Fatalf("info %x pin %q", s.info, s.tlsPin)
 	}
 }
 
@@ -415,7 +415,7 @@ func TestHandshakePayload(t *testing.T) {
 		t.Fatal(err)
 	}
 	out, _ := json.Marshal(mustPayload(t, s))
-	want := `{"metadata":[{"port":8443,"proxy_protocol":1,"transport_protocol":1,"transport_security":2,"tls_pin":"` + s.TLSPin() + `","flow":2}]}`
+	want := `{"metadata":[{"port":8443,"proxy_protocol":1,"transport_protocol":1,"transport_security":2,"tls_pin":"` + s.tlsPin + `","flow":2}]}`
 	if string(out) != want {
 		t.Fatalf("tls payload:\n got %s\nwant %s", out, want)
 	}
