@@ -498,7 +498,7 @@ func TestCIJobsArePinnedAndBounded(t *testing.T) {
 		if cancels && !ownGroup {
 			t.Errorf("%s cancels more than a pull request's superseded run:%s", file, group)
 		}
-		if w.on["pull_request"] && !(cancels && ownGroup) {
+		if w.on["pull_request"] && (!cancels || !ownGroup) {
 			t.Errorf("%s runs on pull requests and does not cancel a superseded run:%s", file, group)
 		}
 	}

@@ -61,7 +61,7 @@ func gitIgnored(t *testing.T, paths []string) map[string]bool {
 		cmd := exec.Command("git", args...)
 		cmd.Dir, cmd.Env = dir, env
 		out, err := cmd.Output()
-		if err != nil && !(len(args) > 0 && args[0] == "check-ignore") {
+		if err != nil && (len(args) == 0 || args[0] != "check-ignore") {
 			t.Fatalf("git %s: %v", strings.Join(args, " "), err)
 		}
 		return out
