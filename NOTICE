@@ -15,8 +15,9 @@ this software except in compliance with the License. A copy is in the LICENSE
 file and at http://www.apache.org/licenses/LICENSE-2.0.
 
 Files modified in this fork carry the header
-"Modified from sentinel-official/dvpn-node @ 62bde16" as required by Section
-4(b) of the License. Contributions to the original work were made by their
+"Modified from sentinel-official/dvpn-node @ 62bde16" as a comment, as required
+by Section 4(b) of the License; go.sum, whose format takes no comments, is
+changed in this fork as well. Contributions to the original work were made by their
 respective authors, who retain copyright and licensed them under Section 5 of
 the License; the git history preserves individual attribution.
 

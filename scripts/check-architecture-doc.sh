@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
 # Re-checks docs/architecture/dvpnd.architecture.json against the code it
 # claims to describe (`make check-architecture`).
 #

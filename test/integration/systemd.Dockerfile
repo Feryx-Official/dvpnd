@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # A Debian host running systemd, for the integration suite's systemd stage
 # (test/integration/run.sh): the node's unit runs the tests there. XRAY and
 # Hysteria2 are the static binaries of the node image; OpenVPN and iptables

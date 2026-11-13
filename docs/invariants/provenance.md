@@ -4,14 +4,21 @@ dvpnd is a fork taken at the last Apache-2.0 commit of `sentinel-official/dvpn-n
 Its legal position rests on that grant and on never mixing in post-relicence or
 unlicensed code (`NOTICE`, `CONTRIBUTING.md`). IDs as in `test/README.md`.
 
-- **[LIC-1] Every Go file starts with `// SPDX-License-Identifier: Apache-2.0`.**
+- **[LIC-1] Every Go file starts with `// SPDX-License-Identifier: Apache-2.0`, and every
+  shell or Python script, Dockerfile, Makefile, YAML file, systemd unit and ignore file
+  with `# SPDX-License-Identifier: Apache-2.0`,** after its `#!` line when it has one. Only
+  Go files and the installer carried it.
 - **[LIC-2] dvpnd never depends on `sentinel-official/sentinel-go-sdk`.** That
   repository ships no licence, which means all rights reserved; neither `go.mod`,
   `go.sum` nor any import may name it.
 - **[LIC-3] A file inherited from upstream and changed in substance says so.** It
-  carries `// Modified from sentinel-official/dvpn-node @ 62bde16 (2024-01-25). See
-  NOTICE.` (Apache-2.0 section 4(b)). The SPDX line and the module path rename alone
-  don't count as a change.
+  carries `Modified from sentinel-official/dvpn-node @ 62bde16 (2024-01-25). See NOTICE.`
+  as a comment in its own syntax: `//` in Go files and `go.mod`, `#` in scripts and
+  configuration, `<!-- -->` in Markdown (Apache-2.0 section 4(b)). The SPDX line and the
+  module path rename alone don't count as a change. The test lists the two exceptions with
+  their reasons: `go.sum`, whose format takes no comments, and `README.md`, rewritten
+  whole. Only Go files were checked: the Dockerfile, the Makefile, the runner, `go.mod` and
+  four more were changed without saying so, while `NOTICE` said they did.
 - **[LIC-4] `LICENSE` is the file the fork point had, and `NOTICE` keeps the upstream
   copyright line.** `Copyright [2017] [Sentinel]` stays.
 - **[LIC-5] The provenance record verifies.** `docs/provenance/verify-fork.sh` proves the

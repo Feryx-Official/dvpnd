@@ -1,3 +1,4 @@
+<!-- Modified from sentinel-official/dvpn-node @ 62bde16 (2024-01-25). See NOTICE. -->
 # Contributor Covenant Code of Conduct
 
 ## Our Pledge

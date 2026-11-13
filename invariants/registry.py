@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """The invariant registry.
 
 Every rule the docs state carries an ID where it is stated (`**[REL-1] Refund on any

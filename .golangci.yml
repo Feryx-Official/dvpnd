@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Modified from sentinel-official/dvpn-node @ 62bde16 (2024-01-25). See NOTICE.
 # golangci-lint v2, the version `make tools` installs. CI runs it on every push
 # and pull request and fails on any finding: a finding is fixed, or excused on
 # its own line with //nolint:<linter> and the reason.

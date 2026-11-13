@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Modified from sentinel-official/dvpn-node @ 62bde16 (2024-01-25). See NOTICE.
 name: "CodeQL"
 
 # Every pull request and push to main, and weekly, so new queries see code

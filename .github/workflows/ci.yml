@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 name: CI
 
 # A release tag too: the release workflow publishes only a commit CI passed.

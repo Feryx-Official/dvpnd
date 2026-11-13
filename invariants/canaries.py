@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """Mutation canaries.
 
 A canary is one deliberate regression - drop the refund call, let the root helper

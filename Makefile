@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Modified from sentinel-official/dvpn-node @ 62bde16 (2024-01-25). See NOTICE.
 .DEFAULT_GOAL := default
 # The tag without its v, a pre-release suffix included, and past the tag the
 # number of commits since it: v9.5.0-rc1 is 9.5.0-rc1, three commits after

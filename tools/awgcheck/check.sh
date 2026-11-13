@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
 # The two-container AmneziaWG check (docs/protocols.md, AmneziaWG): the node
 # image built from this tree, with the 3.1 engine and both tiers up, against
 # a client with the engine the apps bundle and a client with the 3.1 engine,

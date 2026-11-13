@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
 # Re-runnable provenance check for this fork of sentinel-official/dvpn-node.
 # Proves: the tree descends from the last Apache-2.0 upstream commit, no later
 # upstream object exists in this repository, and the LICENSE is the unmodified

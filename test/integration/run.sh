@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
 # The integration suite: every protocol with its real daemon and a real
 # client, in containers that stand in for the node host, the internet and the
 # provider's private network (test/README.md). Needs Docker and

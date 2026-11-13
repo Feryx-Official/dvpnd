@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Modified from sentinel-official/dvpn-node @ 62bde16 (2024-01-25). See NOTICE.
 # Base images are pinned by digest (Dependabot moves the pins), so a tag
 # re-pointed upstream cannot change what is built. Both stages are the same
 # Alpine release, since hnsd is built against the libraries the image runs

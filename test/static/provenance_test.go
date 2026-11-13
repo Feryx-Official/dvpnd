@@ -20,8 +20,10 @@ import (
 )
 
 const (
-	spdxLine     = "// SPDX-License-Identifier: Apache-2.0"
-	modifiedLine = "// Modified from sentinel-official/dvpn-node @ 62bde16 (2024-01-25). See NOTICE."
+	spdxText     = "SPDX-License-Identifier: Apache-2.0"
+	modifiedText = "Modified from sentinel-official/dvpn-node @ 62bde16 (2024-01-25). See NOTICE."
+	spdxLine     = "// " + spdxText
+	modifiedLine = "// " + modifiedText
 	copyright    = "Copyright [2017] [Sentinel]"
 	sdkModule    = "github.com/sentinel-official/sentinel-go-sdk"
 	// The module path at the fork point and now; renaming it alone is not a
@@ -59,6 +61,23 @@ func TestEveryGoFileStartsWithSPDX(t *testing.T) {
 	}
 }
 
+// hashCommented are the files besides Go that are code or configuration and
+// take "#" comments.
+var hashCommented = []string{"*.sh", "*.py", "*Dockerfile", "Makefile", "*.yml", "*.yaml", "*.service", ".gitignore", ".dockerignore"}
+
+// Rules: [LIC-1].
+func TestEveryScriptAndConfigFileStartsWithSPDX(t *testing.T) {
+	for _, f := range files(t, hashCommented...) {
+		lines := strings.SplitN(string(read(t, f)), "\n", 3)
+		if strings.HasPrefix(lines[0], "#!") {
+			lines = lines[1:]
+		}
+		if lines[0] != "# "+spdxText {
+			t.Errorf("%s: the first line, or the second after a #! line, must be %q", f, "# "+spdxText)
+		}
+	}
+}
+
 // Rules: [LIC-2].
 func TestNoSentinelGoSDK(t *testing.T) {
 	for _, f := range []string{"go.mod", "go.sum"} {
@@ -85,9 +104,45 @@ func TestNoSentinelGoSDK(t *testing.T) {
 // entry is no longer true, so the list can only shrink.
 var knownUnmarked = map[string]string{}
 
-// substance is a Go file's content as a multiset of lines, ignoring what does
-// not change what the file says: the licence header lines, blank lines,
-// whitespace inside a line, the order of lines, and the module path.
+// unmarkable lists the upstream files changed here that carry no notice, each
+// with its reason.
+var unmarkable = map[string]string{
+	"go.sum":    "Go's checksum list takes no comments; NOTICE says it changed",
+	"README.md": "rewritten whole: no line of upstream's README is left",
+}
+
+// commentText is the text of a "//", "#" or "<!-- -->" comment line, or ""
+// when the line is not one.
+func commentText(line string) string {
+	line = strings.TrimSpace(line)
+	switch {
+	case strings.HasPrefix(line, "//"):
+		return strings.TrimSpace(line[2:])
+	case strings.HasPrefix(line, "#"):
+		return strings.TrimSpace(line[1:])
+	case strings.HasPrefix(line, "<!--") && strings.HasSuffix(line, "-->"):
+		return strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(line, "<!--"), "-->"))
+	}
+
+	return ""
+}
+
+// saysModified reports whether a file carries the notice as a comment in any
+// of the syntaxes commentText reads.
+func saysModified(src string) bool {
+	for _, line := range strings.Split(src, "\n") {
+		if commentText(line) == modifiedText {
+			return true
+		}
+	}
+
+	return false
+}
+
+// substance is a file's content as a multiset of lines, ignoring what does
+// not change what the file says: the licence header lines in any comment
+// syntax, blank lines, whitespace inside a line, the order of lines, and the
+// module path.
 func substance(src string, upstream bool) map[string]int {
 	lines := map[string]int{}
 	for _, line := range strings.Split(src, "\n") {
@@ -95,7 +150,7 @@ func substance(src string, upstream bool) map[string]int {
 			line = strings.ReplaceAll(line, upstreamModule, forkModule)
 		}
 		line = strings.Join(strings.Fields(line), " ")
-		if line == "" || line == spdxLine || line == modifiedLine {
+		if c := commentText(line); line == "" || c == spdxText || c == modifiedText {
 			continue
 		}
 		lines[line]++
@@ -121,30 +176,38 @@ func sameSubstance(a, b map[string]int) bool {
 func TestChangedUpstreamFilesSayModified(t *testing.T) {
 	upstream := map[string]bool{}
 	for _, f := range strings.Split(string(git(t, "ls-tree", "-r", "-z", "--name-only", "fork-point")), "\x00") {
-		upstream[f] = strings.HasSuffix(f, ".go")
+		upstream[f] = f != ""
 	}
 	if len(upstream) == 0 {
 		t.Fatal("the fork-point tag lists no files; fetch the tags (git fetch --tags)")
 	}
 
-	for _, f := range files(t, "*.go") {
+	for _, f := range files(t, ".") {
 		if !upstream[f] {
+			continue
+		}
+		if _, ok := unmarkable[f]; ok {
 			continue
 		}
 		current := string(read(t, f))
 		changed := !sameSubstance(substance(string(git(t, "show", "fork-point:"+f)), true), substance(current, false))
-		marked := strings.Contains(current, modifiedLine)
+		marked := saysModified(current)
+		if strings.HasSuffix(f, ".go") {
+			marked = strings.Contains(current, modifiedLine)
+		}
 		_, known := knownUnmarked[f]
 		switch {
 		case changed && !marked && !known:
-			t.Errorf("%s is changed from upstream: add the line %q under the SPDX line", f, modifiedLine)
+			t.Errorf("%s is changed from upstream: add %q as a comment under the SPDX line, or at the top where it has none", f, modifiedText)
 		case known && (marked || !changed):
 			t.Errorf("%s carries the notice now (or matches upstream): remove it from knownUnmarked", f)
 		}
 	}
-	for f := range knownUnmarked {
-		if _, err := os.Stat(filepath.Join(root(t), f)); err != nil {
-			t.Errorf("knownUnmarked lists %s, which no longer exists", f)
+	for _, list := range []map[string]string{knownUnmarked, unmarkable} {
+		for f := range list {
+			if _, err := os.Stat(filepath.Join(root(t), f)); err != nil || !upstream[f] {
+				t.Errorf("%s is listed but is not an upstream file in the tree; remove it", f)
+			}
 		}
 	}
 }
@@ -351,6 +414,30 @@ func TestSubstance(t *testing.T) {
 	} {
 		if got := !sameSubstance(substance(upstream, true), substance(c.current, false)); got != c.changed {
 			t.Errorf("%s: changed = %v, want %v", c.name, got, c.changed)
+		}
+	}
+
+	script := "#!/bin/sh\nset -e\necho hi\n"
+	for _, c := range []struct {
+		name, current string
+		changed       bool
+	}{
+		{"# header only", "#!/bin/sh\n# " + spdxText + "\n# " + modifiedText + "\nset -e\necho hi\n", false},
+		{"<!-- --> header only", "<!-- " + modifiedText + " -->\n#!/bin/sh\nset -e\necho hi\n", false},
+		{"a changed line", "#!/bin/sh\n# " + spdxText + "\nset -eu\necho hi\n", true},
+	} {
+		if got := !sameSubstance(substance(script, true), substance(c.current, false)); got != c.changed {
+			t.Errorf("%s: changed = %v, want %v", c.name, got, c.changed)
+		}
+	}
+	for src, want := range map[string]bool{
+		"# " + modifiedText:                  true,
+		"x\n  <!-- " + modifiedText + " -->": true,
+		"// " + modifiedText:                 true,
+		"x " + modifiedText:                  false,
+	} {
+		if saysModified(src) != want {
+			t.Errorf("saysModified(%q) = %v, want %v", src, !want, want)
 		}
 	}
 }

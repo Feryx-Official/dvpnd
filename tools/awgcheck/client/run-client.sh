@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
 # run-client <conf> <gateway>: bring the tunnel up from the node's payload,
 # check the handshake, ping the node's tunnel address and fetch over HTTPS
 # through it, then show the counters and take the tunnel down.

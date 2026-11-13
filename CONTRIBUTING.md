@@ -34,9 +34,12 @@ after that point under a non-open-source license. To keep this codebase clean:
    (GPL-3.0) — never from the `sentinel-js-sdk`/`sentinel-go-sdk` packages it
    wraps, which ship no licence text.
 4. Every new or modified `.go` file starts with
-   `// SPDX-License-Identifier: Apache-2.0`. Files inherited from upstream and
-   changed here additionally carry
-   `// Modified from sentinel-official/dvpn-node @ 62bde16 (2024-01-25). See NOTICE.`
+   `// SPDX-License-Identifier: Apache-2.0`; scripts, Dockerfiles, the Makefile, YAML
+   files, systemd units and ignore files start with the same line as a `#` comment, after
+   any `#!` line. Files inherited from upstream and changed here additionally carry
+   `Modified from sentinel-official/dvpn-node @ 62bde16 (2024-01-25). See NOTICE.` as a
+   comment in their own syntax (`//`, `#` or `<!-- -->`), under the SPDX line where
+   there is one.
 5. Never edit `LICENSE`. Never remove or alter the `Copyright [2017] [Sentinel]`
    notice.
 6. New dependencies must carry an OSI-approved permissive or weak-copyleft

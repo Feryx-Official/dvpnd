@@ -1,5 +1,7 @@
 module github.com/Feryx-Official/dvpnd/v9
 
+// Modified from sentinel-official/dvpn-node @ 62bde16 (2024-01-25). See NOTICE.
+
 go 1.26.10
 
 toolchain go1.27.4
