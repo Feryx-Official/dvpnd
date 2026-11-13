@@ -171,3 +171,8 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
   the tagged commit to pass; every other job needs it, and CI runs on each release tag
   pushed. A published release went straight to build, push and signing: neither the tag's
   signature nor CI, the integration suite among it, was checked.
+- **[RT-34] Each release carries its installer, signed by the release workflow.** The
+  release workflow, once the gate passed, signs `scripts/install.sh` keylessly, as it signs
+  the image, and attaches it with its Sigstore bundle; `docs/operator.md` checks it with
+  cosign against that workflow's identity. The installer, which runs as root, came only
+  from the `main` branch or from a clone the operator checked by hand.

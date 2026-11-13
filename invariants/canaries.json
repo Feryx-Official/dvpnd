@@ -1452,6 +1452,16 @@
         "go test -count=1 -run '^TestReleaseWorkflowRunsTheGateFirst$' ./test/static/"
       ],
       "expect": "does not need the gate"
+    },
+    {
+      "name": "[RT-34] a release carries the installer without its signature",
+      "file": ".github/workflows/docker-publish.yml",
+      "find": "run: gh release upload \"${TAG}\" install.sh install.sh.sigstore.json --clobber",
+      "replace": "run: gh release upload \"${TAG}\" install.sh --clobber",
+      "run": [
+        "go test -count=1 -run '^TestReleaseCarriesTheSignedInstaller$' ./test/static/"
+      ],
+      "expect": "lacks gh release upload"
     }
   ]
 }

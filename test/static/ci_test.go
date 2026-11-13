@@ -430,3 +430,40 @@ func TestReleaseWorkflowRunsTheGateFirst(t *testing.T) {
 		t.Errorf("%s does not run on a release tag pushed, so the gate may find no run of the tagged commit:%s", ci.file, ci.top["on"])
 	}
 }
+
+// TestReleaseCarriesTheSignedInstaller holds the release workflow to
+// attaching the installer with a keyless signature, and the operator guide
+// to checking it against that workflow: the installer runs as root and came
+// only from main, or from a clone checked by hand.
+//
+// Rules: [RT-34].
+func TestReleaseCarriesTheSignedInstaller(t *testing.T) {
+	w := readWorkflow(t, ".github/workflows/docker-publish.yml")
+	job := w.job(t, "cosign sign-blob --yes --bundle install.sh.sigstore.json install.sh", "signs the installer")
+	for _, want := range []string{
+		"cp scripts/install.sh install.sh",
+		`gh release upload "${TAG}" install.sh install.sh.sigstore.json`,
+		"contents: write",
+		"id-token: write",
+	} {
+		if !strings.Contains(job.text, want) {
+			t.Errorf("%s: job %s lacks %s", w.file, job.id, want)
+		}
+	}
+	guide := string(read(t, "docs/operator.md"))
+	const verify = "cosign verify-blob install.sh --bundle install.sh.sigstore.json"
+	i := strings.Index(guide, verify)
+	if i < 0 || !strings.Contains(guide[:i], "releases/latest/download") {
+		t.Fatalf("docs/operator.md does not check the release's installer with %s", verify)
+	}
+	command := guide[i:]
+	if end := strings.Index(command, "\n```"); end >= 0 {
+		command = command[:end]
+	}
+	identity := `^https://github.com/Feryx-Official/dvpnd/\.github/workflows/` + strings.ReplaceAll(filepath.Base(w.file), ".", `\.`) + `@refs/tags/v`
+	for _, want := range []string{"--certificate-identity-regexp '" + identity + "'", "--certificate-oidc-issuer https://token.actions.githubusercontent.com"} {
+		if !strings.Contains(command, want) {
+			t.Errorf("docs/operator.md checks the release's installer without %s:\n%s", want, command)
+		}
+	}
+}

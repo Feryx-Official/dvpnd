@@ -65,8 +65,25 @@ git -c gpg.ssh.allowedSignersFile=allowed_signers verify-tag "$tag" && git check
 sudo bash scripts/install.sh --source "$PWD" --moniker "My node"
 ```
 
-`verify-tag` must print `Good "git" signature` with that fingerprint. When the installer's
-output is not a terminal (cloud-init, `| tee`, a CI job), it does not print a new key's
+`verify-tag` must print `Good "git" signature` with that fingerprint.
+
+Releases after 9.4.4 also carry the installer itself, signed by the release workflow the
+way the image is (§7). With [cosign](https://docs.sigstore.dev/cosign/system_config/installation/)
+3 or later, check it before it runs:
+
+```sh
+base=https://github.com/Feryx-Official/dvpnd/releases/latest/download
+curl -fsSLO "$base/install.sh" && curl -fsSLO "$base/install.sh.sigstore.json"
+cosign verify-blob install.sh --bundle install.sh.sigstore.json \
+  --certificate-identity-regexp '^https://github.com/Feryx-Official/dvpnd/\.github/workflows/docker-publish\.yml@refs/tags/v' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+sudo bash install.sh --moniker "My node"
+```
+
+`verify-blob` must print `Verified OK`. The installer then builds the latest release,
+checking its tag as above.
+
+When the installer's output is not a terminal (cloud-init, `| tee`, a CI job), it does not print a new key's
 mnemonic, which a log would keep: it writes it to `/root/.dvpnd/operator-mnemonic.txt`,
 readable by root only. Copy it off the server, then delete the file (`shred -u`).
 Turning ufw on, it opens every port `sshd -T` reports, so an SSH port set in

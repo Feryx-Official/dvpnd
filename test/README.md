@@ -71,7 +71,8 @@ not yet.
   `main`, and `main`'s ruleset requiring every job they run on a pull request;
   and the release gate, `scripts/release-gate.sh`, which runs against tags
   signed with keys of the test's own and a fake `gh`, with every other job of
-  the release workflow needing it;
+  the release workflow needing it, one of them attaching the installer with
+  its signature, which the operator guide checks;
 - the same SPDX and `sentinel-go-sdk` checks as shell steps, and
   `docs/provenance/verify-fork.sh`, which also asks apache.org,
   proxy.golang.org and Software Heritage when it can reach them (an
