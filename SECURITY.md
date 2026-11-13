@@ -71,8 +71,9 @@ database zeroes deleted rows.
 CI runs govulncheck on every push and pull request (`scripts/govulncheck.sh`)
 and fails on any vulnerability the code reaches that is not explained here.
 
-govulncheck reports GO-2026-5932, `golang.org/x/crypto/openpgp`, which has no
-fix. Only its armor and errors packages are linked, by cosmos-sdk's
-`crypto/armor.go` (key export and import), and they are reached at package
-initialisation. Leaving it needs a cosmos-sdk newer than the v0.47 line the
-Sentinel chain (sentinelhub v12) is built on.
+govulncheck reports GO-2026-5932, `golang.org/x/crypto/openpgp`. The fix it
+names, an untagged `x/crypto` commit, deletes the `openpgp` packages, which
+cosmos-sdk's `crypto/armor.go` (key export and import) imports, so the node
+cannot build with it. Only the armor and errors packages are linked, and they
+are reached at package initialisation. Leaving it needs a cosmos-sdk newer
+than the v0.47 line the Sentinel chain (sentinelhub v12) is built on.
