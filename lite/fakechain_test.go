@@ -56,12 +56,13 @@ type fakeChain struct {
 	broadcasts  int
 	simulations int
 
-	hold               bool   // keep what the mempool took out of blocks
-	landOnAccountQuery bool   // a held transaction lands just before the next account query
-	failCode           uint32 // the code an included transaction ends with
-	refuseCode         uint32 // CheckTx refuses every transaction with this code
-	loseReplyTo        int    // take the n-th broadcast, then lose the reply
-	spendBefore        int    // another wallet's transaction uses the sequence before the n-th broadcast
+	hold                bool   // keep what the mempool took out of blocks
+	landOnAccountQuery  bool   // a held transaction lands just before the next account query
+	failCode            uint32 // the code an included transaction ends with
+	refuseCode          uint32 // CheckTx refuses every transaction with this code
+	loseReplyTo         int    // take the n-th broadcast, then lose the reply
+	spendBefore         int    // another wallet's transaction uses the sequence before the n-th broadcast
+	staleAccountQueries int    // the first n account queries answer the sequence before the last block's, as a backend a block behind does
 }
 
 type pendingTx struct {
@@ -295,7 +296,14 @@ func (f *fakeChain) query(path string, data []byte) ([]byte, error) {
 		if f.landOnAccountQuery {
 			f.release()
 		}
-		account, err := codectypes.NewAnyWithValue(f.account)
+		answer := f.account
+		if f.staleAccountQueries > 0 {
+			f.staleAccountQueries--
+			behind := *f.account
+			behind.Sequence--
+			answer = &behind
+		}
+		account, err := codectypes.NewAnyWithValue(answer)
 		if err != nil {
 			return nil, err
 		}

@@ -4,21 +4,25 @@
 package lite
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
+	cmttypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 )
 
 // ErrUnconfirmed: a remote took the transaction but no block included it
 // within rpc_tx_timeout. It may still land, so it is neither sent again nor
-// replaced by a new one.
+// replaced by a new one, unless the chain shows it never can (cannotLand).
 var ErrUnconfirmed = errors.New("the transaction was taken but no block included it")
 
 // FailedTxError is a transaction a block included with a non-zero code: its
@@ -219,33 +223,89 @@ func (c *Client) PrepareTxFactory(messages ...sdk.Msg) (txf tx.Factory, err erro
 }
 
 // signedTx builds the transaction at the account's current sequence and
-// signs it.
-func (c *Client) signedTx(messages ...sdk.Msg) ([]byte, error) {
+// signs it, and returns that sequence with it.
+func (c *Client) signedTx(messages ...sdk.Msg) ([]byte, uint64, error) {
 	c.log.Info("Preparing the transaction", "messages", len(messages))
 	txf, err := c.PrepareTxFactory(messages...)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	c.log.Info("Transaction info", "gas", txf.Gas(), "sequence", txf.Sequence())
 	txb, err := txf.BuildUnsignedTx(messages...)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	if err = tx.Sign(txf, c.FromName(), txb, true); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return c.TxConfig().TxEncoder()(txb.GetTx())
+	txBytes, err := c.TxConfig().TxEncoder()(txb.GetTx())
+
+	return txBytes, txf.Sequence(), err
+}
+
+// unconfirmed reports that a remote took the transaction and no block
+// included it in time, and that no block included it with a failure either.
+func unconfirmed(err error) bool {
+	var failed *FailedTxError
+
+	return errors.Is(err, ErrUnconfirmed) && !errors.As(err, &failed)
+}
+
+// cannotLand reports whether no block can include a transaction a remote
+// took: the account's sequence has moved past the one it was signed at and
+// no block holds it, so another transaction used that sequence. A remote a
+// block behind takes such a transaction when the account query, also a block
+// behind, gave the sequence the last transaction used. The account is read
+// before the transaction is looked up, one poll interval later, so one a
+// block included as the sequence moved is found, not taken for lost. A query
+// that fails proves nothing.
+func (c *Client) cannotLand(txBytes []byte, sequence uint64) bool {
+	hash := fmt.Sprintf("%X", cmttypes.Tx(txBytes).Hash())
+
+	var gone bool
+	_ = c.query("transaction", func(ctx client.Context) error {
+		resp, err := authtypes.NewQueryClient(ctx).Account(
+			context.TODO(),
+			&authtypes.QueryAccountRequest{Address: c.FromAddress().String()},
+		)
+		if err != nil {
+			return err
+		}
+		var account authtypes.AccountI
+		if err := c.ctx.InterfaceRegistry.UnpackAny(resp.Account, &account); err != nil {
+			return err
+		}
+		if account.GetSequence() <= sequence {
+			return nil // it may still land
+		}
+
+		time.Sleep(txPollInterval)
+		_, err = authtx.QueryTx(ctx, hash)
+		switch {
+		case err == nil:
+			return nil // a block included it
+		case !strings.Contains(err.Error(), "tx ("+hash+") not found"):
+			return err
+		}
+		gone = true
+
+		return nil
+	})
+
+	return gone
 }
 
 // Tx signs the messages into one transaction and sends it until a block
 // includes it, paying for one transaction at most. A transaction a block
 // included is never sent again, whatever its code, and one a remote took is
-// left to land. When no remote answers, the same bytes go again: a remote
+// left to land, unless the chain shows that no block can include it any more
+// (cannotLand). When no remote answers, the same bytes go again: a remote
 // may have taken them, and a new transaction would be a second one. Only a
-// refusal for a sequence another transaction used builds a new one.
+// transaction whose sequence another one used is built anew: refused for it,
+// or taken and shown unable to land.
 func (c *Client) Tx(messages ...sdk.Msg) (*sdk.TxResponse, error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -253,20 +313,21 @@ func (c *Client) Tx(messages ...sdk.Msg) (*sdk.TxResponse, error) {
 	messages = c.execMessages(messages)
 
 	var (
-		txBytes []byte // the transaction sent last, while a remote may hold it
-		errs    []error
+		txBytes  []byte // the transaction sent last, while a remote may hold it
+		sequence uint64 // the sequence txBytes was signed at
+		errs     []error
 	)
 	for attempt := 0; attempt < txAttempts; attempt++ {
 		if attempt > 0 {
 			time.Sleep(txRetryDelay)
 		}
 		if txBytes == nil {
-			b, err := c.signedTx(messages...)
+			b, seq, err := c.signedTx(messages...)
 			if err != nil {
 				errs = append(errs, err) // nothing was sent
 				continue
 			}
-			txBytes = b
+			txBytes, sequence = b, seq
 		}
 
 		c.log.Info("Broadcasting the transaction", "size", len(txBytes))
@@ -280,6 +341,10 @@ func (c *Client) Tx(messages ...sdk.Msg) (*sdk.TxResponse, error) {
 
 		refused := refusal(err)
 		switch {
+		case unconfirmed(err) && c.cannotLand(txBytes, sequence):
+			c.log.Info("Building the transaction again: no block can include the one taken, its sequence is used",
+				"sequence", sequence)
+			txBytes = nil
 		case settled(err):
 			return nil, err
 		case refused == nil:

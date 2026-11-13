@@ -1603,6 +1603,26 @@
         "go test -count=1 -run '^TestNoOnChainAddresses$' ./test/static/"
       ],
       "expect": "an on-chain address in a committed file \\(it links the repository to a wallet\\): docs/invariants/provenance\\.md: sent1"
+    },
+    {
+      "name": "[CH-11] a transaction taken at a used sequence is waited for, never built again",
+      "file": "lite/tx.go",
+      "find": "\t\tcase unconfirmed(err) && c.cannotLand(txBytes, sequence):",
+      "replace": "\t\tcase false && unconfirmed(err) && c.cannotLand(txBytes, sequence):",
+      "run": [
+        "go test -count=1 -run '^(TestATransactionTakenAtAUsedSequenceIsBuiltAgain)$' ./lite/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[CH-11] a taken transaction is built again once the sequence moves, though a block included it",
+      "file": "lite/tx.go",
+      "find": "\t\tcase err == nil:\n\t\t\treturn nil // a block included it\n",
+      "replace": "\t\tcase err == nil:\n",
+      "run": [
+        "go test -count=1 -run '^(TestOneCallPaysForOneTransactionAtMost)$' ./lite/"
+      ],
+      "expect": "--- FAIL"
     }
   ]
 }

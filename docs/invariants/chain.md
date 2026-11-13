@@ -37,7 +37,12 @@ signs transactions unattended, so its key lives on the server. IDs as in
 - **[CH-11] One transaction call pays for one transaction at most.** A transaction a
   block included is never sent again, whatever its code. One a remote took but no block
   included within `rpc_tx_timeout` is left to land, and the session report does not send
-  its sessions again. A lost reply is answered by sending the same bytes again. Only a
-  refusal at CheckTx for a sequence another transaction used builds a new transaction;
-  any other refusal is not sent again. Before, every error was retried with a new
-  transaction up to five times, so a failure the chain recorded could be paid five times.
+  its sessions again, unless the chain shows no block can include it: the account's
+  sequence has moved past it and no block holds it. A lost reply is answered by sending
+  the same bytes again. Only a transaction whose sequence another one used builds a new
+  transaction, refused at CheckTx for it or taken and shown unable to land; any other
+  refusal is not sent again. Before, every error was retried with a new transaction up to
+  five times, so a failure the chain recorded could be paid five times. Waiting for every
+  taken transaction lost a session report on a live node: right after one transaction
+  landed, a remote a block behind took the next at the sequence the first had used, and
+  the report sent on a restart was cleared without reaching the chain.
