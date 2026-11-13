@@ -1,8 +1,10 @@
 name: CI
 
+# A release tag too: the release workflow publishes only a commit CI passed.
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
 
 permissions:

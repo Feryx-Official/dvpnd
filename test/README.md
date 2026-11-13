@@ -69,6 +69,9 @@ not yet.
   govulncheck step, `scripts/govulncheck.sh`, runs against a fake govulncheck
   and a `SECURITY.md` of the test's own) on every pull request and push to
   `main`, and `main`'s ruleset requiring every job they run on a pull request;
+  and the release gate, `scripts/release-gate.sh`, which runs against tags
+  signed with keys of the test's own and a fake `gh`, with every other job of
+  the release workflow needing it;
 - the same SPDX and `sentinel-go-sdk` checks as shell steps, and
   `docs/provenance/verify-fork.sh`, which also asks apache.org,
   proxy.golang.org and Software Heritage when it can reach them (an

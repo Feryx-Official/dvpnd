@@ -269,3 +269,164 @@ func TestSecurityChecksGateEveryChange(t *testing.T) {
 		t.Errorf("%s does not hold merges to CodeQL's alerts (a code_scanning rule for CodeQL)", file)
 	}
 }
+
+// fakeGH answers each gh call with the files in $GH_RESPONSES in turn, 1, 2,
+// ..., repeating the last, and logs its arguments to $GH_LOG.
+const fakeGH = `#!/bin/sh
+printf '%s\n' "$*" >>"$GH_LOG"
+n=$(wc -l <"$GH_LOG")
+while [ "$n" -gt 1 ] && [ ! -f "$GH_RESPONSES/$n" ]; do n=$((n - 1)); done
+cat "$GH_RESPONSES/$n"
+`
+
+// TestReleaseGateNeedsASignedTagAndGreenCI holds the release workflow's gate
+// to a tag the installer would build and a commit CI passed: a published
+// release went straight to build, push and signing, whatever its tag was and
+// whatever CI said of its commit. The gate runs here in a repository of the
+// test's own, with the installer's verify_tag pinned to a key of the test's
+// own, against a fake gh.
+//
+// Rules: [RT-33].
+func TestReleaseGateNeedsASignedTagAndGreenCI(t *testing.T) {
+	home := t.TempDir()
+	keys := map[string]string{}
+	for _, name := range []string{"maintainer", "someone"} {
+		keys[name] = filepath.Join(home, name)
+		if out, err := exec.Command("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", name, "-f", keys[name]).CombinedOutput(); err != nil {
+			t.Fatalf("ssh-keygen: %v\n%s", err, out)
+		}
+	}
+	b, err := os.ReadFile(keys["maintainer"] + ".pub")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub := strings.Fields(string(b))
+	signer := "maintainer@example.org " + pub[0] + " " + pub[1]
+
+	repo := filepath.Join(home, "src")
+	installerRepo(t, home, repo)
+	// The gate reads verify_tag and TAG_SIGNER from scripts/install.sh: here
+	// the installer as it is, with the test's key in place of the maintainer's.
+	installer := string(read(t, "scripts/install.sh"))
+	pinned := regexp.MustCompile(`(?m)^TAG_SIGNER=.*$`)
+	if !pinned.MatchString(installer) {
+		t.Fatal("scripts/install.sh pins no TAG_SIGNER")
+	}
+	installer = pinned.ReplaceAllLiteralString(installer, `TAG_SIGNER="`+signer+`"`)
+	gate := filepath.Join(repo, "scripts", "release-gate.sh")
+	if err := os.MkdirAll(filepath.Dir(gate), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for path, content := range map[string]string{
+		filepath.Join(repo, "scripts", "install.sh"): installer,
+		gate:                          string(read(t, "scripts/release-gate.sh")),
+		filepath.Join(home, "bin/gh"): fakeGH,
+	} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tag := func(name, message, key string) {
+		args := []string{"-C", repo, "tag", "-a"}
+		if key != "" {
+			args = []string{"-C", repo, "-c", "gpg.format=ssh", "-c", "user.signingkey=" + key, "tag", "-s"}
+		}
+		installerGit(t, home, append(args, "-m", message, name)...)
+	}
+	tag("v1.0.0", "a release", keys["maintainer"])
+	tag("v5.0.0", "not signed", "")
+	tag("v6.0.0", "signed with another key", keys["someone"])
+	installerGit(t, home, "-C", repo, "update-ref", "refs/tags/v2.0.0", installerGit(t, home, "-C", repo, "rev-parse", "refs/tags/v1.0.0"))
+	commit := installerGit(t, home, "-C", repo, "rev-parse", "refs/tags/v1.0.0^{commit}")
+
+	for _, c := range []struct {
+		what, tag string
+		runs      []string // what CI's runs are, call after call: "status conclusion" a line
+		wait      string
+		release   bool
+		calls     int
+	}{
+		{"a signed tag, CI passed", "v1.0.0", []string{"completed success"}, "0", true, 1},
+		{"a signed tag, CI failed and passed on a re-run", "v1.0.0", []string{"completed failure\ncompleted success"}, "0", true, 1},
+		{"a signed tag, CI running, then passed", "v1.0.0", []string{"in_progress ", "completed success"}, "60", true, 2},
+		{"a signed tag, CI failed", "v1.0.0", []string{"completed failure"}, "60", false, 1},
+		{"a signed tag, CI cancelled", "v1.0.0", []string{"completed cancelled"}, "60", false, 1},
+		{"a signed tag, CI still queued at the deadline", "v1.0.0", []string{"queued "}, "0", false, 1},
+		{"a signed tag, no CI run", "v1.0.0", []string{""}, "0", false, 1},
+		{"the maintainer's v1.0.0 under another name", "v2.0.0", []string{"completed success"}, "0", false, 0},
+		{"a tag not signed", "v5.0.0", []string{"completed success"}, "0", false, 0},
+		{"a tag signed with another key", "v6.0.0", []string{"completed success"}, "0", false, 0},
+		{"no such tag", "v8.0.0", []string{"completed success"}, "0", false, 0},
+	} {
+		dir := t.TempDir()
+		for i, runs := range c.runs {
+			if err := os.WriteFile(filepath.Join(dir, strconv.Itoa(i+1)), []byte(runs+"\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		log := filepath.Join(dir, "log")
+		cmd := exec.Command("bash", gate, c.tag)
+		cmd.Env = append(installerGitEnv(home), "PATH="+filepath.Join(home, "bin")+":"+os.Getenv("PATH"),
+			"GH_LOG="+log, "GH_RESPONSES="+dir, "GH_TOKEN=test", "GITHUB_REPOSITORY=example/dvpnd", "GATE_POLL=0", "GATE_WAIT="+c.wait)
+		out, err := cmd.CombinedOutput()
+		if released := err == nil; released != c.release {
+			t.Errorf("%s (%s): released = %v, want %v\n%s", c.what, c.tag, released, c.release, out)
+		}
+		logged, _ := os.ReadFile(log)
+		var calls []string
+		if s := strings.TrimSpace(string(logged)); s != "" {
+			calls = strings.Split(s, "\n")
+		}
+		if len(calls) != c.calls {
+			t.Errorf("%s: gh called %d times, want %d: %q", c.what, len(calls), c.calls, calls)
+		}
+		for _, call := range calls {
+			if !strings.Contains(call, "repos/example/dvpnd/actions/workflows/ci.yml/runs?head_sha="+commit+"&") {
+				t.Errorf("%s: gh asked %q, want the CI runs of the tagged commit %s", c.what, call, commit)
+			}
+		}
+	}
+}
+
+// needs lists the jobs a job needs.
+func needs(j workflowJob) []string {
+	var list []string
+	for _, n := range strings.Split(strings.Trim(j.keys["needs"], "[]"), ",") {
+		if n = strings.TrimSpace(n); n != "" {
+			list = append(list, n)
+		}
+	}
+
+	return list
+}
+
+// TestReleaseWorkflowRunsTheGateFirst holds the release workflow to its
+// gate: a job that runs scripts/release-gate.sh on the release's tag object,
+// which every other job needs; and CI to running on each release tag pushed,
+// so that the gate has a run of the tagged commit to wait for.
+//
+// Rules: [RT-33].
+func TestReleaseWorkflowRunsTheGateFirst(t *testing.T) {
+	w := readWorkflow(t, ".github/workflows/docker-publish.yml")
+	if !w.on["release"] {
+		t.Errorf("%s does not run on a release:%s", w.file, w.top["on"])
+	}
+	gate := w.job(t, `bash scripts/release-gate.sh "${TAG}"`, "runs the release gate")
+	for _, want := range []string{"TAG: ${{ github.event.release.tag_name }}", `git fetch --force origin "refs/tags/${TAG}:refs/tags/${TAG}"`} {
+		if !strings.Contains(gate.text, want) {
+			t.Errorf("%s: the gate job lacks %s: verify_tag reads the release's own tag object", w.file, want)
+		}
+	}
+	for _, j := range w.jobs {
+		if j.id != gate.id && !slices.Contains(needs(j), gate.id) {
+			t.Errorf("%s: job %s does not need the gate (%s), so it runs whatever the tag and CI", w.file, j.id, gate.id)
+		}
+	}
+	ci := readWorkflow(t, ".github/workflows/ci.yml")
+	if !regexp.MustCompile(`(?m)^ {4}tags: \['v\*'\]$`).MatchString(ci.top["on"]) {
+		t.Errorf("%s does not run on a release tag pushed, so the gate may find no run of the tagged commit:%s", ci.file, ci.top["on"])
+	}
+}

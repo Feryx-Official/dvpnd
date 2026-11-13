@@ -165,3 +165,9 @@ the node must not leave a tunnel, a rule or a process behind when it stops. IDs 
   govulncheck only warned, golangci-lint ran with its exit code forced to 0, and CodeQL saw
   code up to a week after it merged: a pull request that added a reachable vulnerability
   or a gosec finding was green.
+- **[RT-33] A release publishes only a tag the installer would build, from a commit CI
+  passed.** The release workflow's first job checks the tag with the installer's own
+  `verify_tag` and `TAG_SIGNER`, read from `scripts/install.sh`, then waits for a CI run of
+  the tagged commit to pass; every other job needs it, and CI runs on each release tag
+  pushed. A published release went straight to build, push and signing: neither the tag's
+  signature nor CI, the integration suite among it, was checked.

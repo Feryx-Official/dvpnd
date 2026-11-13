@@ -454,8 +454,9 @@ the daemon's own reason.
 Use this when you want the bundled `v2ray`, `xray`, `hysteria`, `openvpn`, AmneziaWG tools
 and `hnsd`, cannot install Go on the host, or the host already runs everything in Docker.
 Every GitHub release publishes the image as `ghcr.io/feryx-official/dvpnd:<version>` and
-`:latest`, built by the repository's own workflow from that tag. Pull it and give it the
-local name the commands below use:
+`:latest`, built by the repository's own workflow from that tag once the tag's signature
+checks out against the maintainer's key and CI, the integration suite included, has passed on
+its commit. Pull it and give it the local name the commands below use:
 
 ```sh
 docker pull ghcr.io/feryx-official/dvpnd:latest && docker tag ghcr.io/feryx-official/dvpnd:latest dvpnd

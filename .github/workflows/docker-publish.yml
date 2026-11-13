@@ -5,21 +5,51 @@ on:
     types:
       - released
 
-# id-token and attestations let the job sign the image keylessly and publish
-# its build provenance; both are tied to this workflow's identity.
 permissions:
   contents: read
-  packages: write
-  id-token: write
-  attestations: write
 
 env:
   REGISTRY: ghcr.io
 
 jobs:
+  # Nothing is built or published until the tag is one the installer would
+  # build and CI, the integration suite included, passed on its commit
+  # (scripts/release-gate.sh).
+  gate:
+    name: Release gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # verify_tag reads the signed tag object itself, so fetch it as it is.
+      - name: Fetch the release's tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: git fetch --force origin "refs/tags/${TAG}:refs/tags/${TAG}"
+
+      - name: Signed tag, CI passed
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/release-gate.sh "${TAG}"
+
   build:
     name: Build
+    needs: gate
     runs-on: ubuntu-latest
+    # id-token and attestations let the job sign the image keylessly and
+    # publish its build provenance; both are tied to this workflow's identity.
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
 
     steps:
       - name: Checkout repository

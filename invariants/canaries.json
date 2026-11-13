@@ -1422,6 +1422,36 @@
         "go test -count=1 -run '^TestSecurityChecksGateEveryChange$' ./test/static/"
       ],
       "expect": "continues on error"
+    },
+    {
+      "name": "[RT-33] a release publishes a tag the installer would refuse",
+      "file": "scripts/release-gate.sh",
+      "find": "if ! verify_tag \"${root}\" \"${tag}\"; then",
+      "replace": "if false; then",
+      "run": [
+        "go test -count=1 -run '^TestReleaseGateNeedsASignedTagAndGreenCI$' ./test/static/"
+      ],
+      "expect": "released = true, want false"
+    },
+    {
+      "name": "[RT-33] a release publishes a commit CI failed",
+      "file": "scripts/release-gate.sh",
+      "find": "    elif [[ \"${conclusion}\" == success ]]; then",
+      "replace": "    elif true; then",
+      "run": [
+        "go test -count=1 -run '^TestReleaseGateNeedsASignedTagAndGreenCI$' ./test/static/"
+      ],
+      "expect": "released = true, want false"
+    },
+    {
+      "name": "[RT-33] the image is built before the gate has passed",
+      "file": ".github/workflows/docker-publish.yml",
+      "find": "    name: Build\n    needs: gate\n",
+      "replace": "    name: Build\n",
+      "run": [
+        "go test -count=1 -run '^TestReleaseWorkflowRunsTheGateFirst$' ./test/static/"
+      ],
+      "expect": "does not need the gate"
     }
   ]
 }

@@ -56,4 +56,4 @@ if [[ -n "${unexplained}" ]]; then
   done
   exit 1
 fi
-echo "Reachable, and explained in SECURITY.md:" ${found}
+echo "Reachable, and explained in SECURITY.md: $(tr '\n' ' ' <<<"${found}")"
