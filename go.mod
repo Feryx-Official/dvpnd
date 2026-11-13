@@ -9,7 +9,7 @@ toolchain go1.27.4
 require (
 	github.com/cosmos/cosmos-sdk v0.47.17
 	github.com/cosmos/go-bip39 v1.0.0
-	github.com/gin-contrib/cors v1.7.10
+	github.com/gin-contrib/cors v1.7.11
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/pkg/errors v0.9.1
