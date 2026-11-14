@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
+	base "github.com/Feryx-Official/feryxhub/v12/types"
+	v1base "github.com/Feryx-Official/feryxhub/v12/types/v1"
+	nodetypes "github.com/Feryx-Official/feryxhub/v12/x/node/types/v3"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	base "github.com/sentinel-official/sentinelhub/v12/types"
-	v1base "github.com/sentinel-official/sentinelhub/v12/types/v1"
-	nodetypes "github.com/sentinel-official/sentinelhub/v12/x/node/types/v3"
 )
 
 // quickTx shortens the waits between polls and attempts for the test.

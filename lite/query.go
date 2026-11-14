@@ -9,15 +9,15 @@ import (
 	"fmt"
 	"strconv"
 
+	base "github.com/Feryx-Official/feryxhub/v12/types"
+	nodetypes "github.com/Feryx-Official/feryxhub/v12/x/node/types/v3"
+	sessiontypes "github.com/Feryx-Official/feryxhub/v12/x/session/types/v3"
+	v2subscriptiontypes "github.com/Feryx-Official/feryxhub/v12/x/subscription/types/v2"
+	subscriptiontypes "github.com/Feryx-Official/feryxhub/v12/x/subscription/types/v3"
 	"github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkquery "github.com/cosmos/cosmos-sdk/types/query"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	base "github.com/sentinel-official/sentinelhub/v12/types"
-	nodetypes "github.com/sentinel-official/sentinelhub/v12/x/node/types/v3"
-	sessiontypes "github.com/sentinel-official/sentinelhub/v12/x/session/types/v3"
-	v2subscriptiontypes "github.com/sentinel-official/sentinelhub/v12/x/subscription/types/v2"
-	subscriptiontypes "github.com/sentinel-official/sentinelhub/v12/x/subscription/types/v3"
 
 	"github.com/Feryx-Official/dvpnd/v9/types"
 )

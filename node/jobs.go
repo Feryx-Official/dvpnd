@@ -10,8 +10,8 @@ import (
 	"time"
 
 	sdkmath "cosmossdk.io/math"
-	v1base "github.com/sentinel-official/sentinelhub/v12/types/v1"
-	subscriptiontypes "github.com/sentinel-official/sentinelhub/v12/x/subscription/types/v3"
+	v1base "github.com/Feryx-Official/feryxhub/v12/types/v1"
+	subscriptiontypes "github.com/Feryx-Official/feryxhub/v12/x/subscription/types/v3"
 
 	"github.com/Feryx-Official/dvpnd/v9/lite"
 	"github.com/Feryx-Official/dvpnd/v9/types"

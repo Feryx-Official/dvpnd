@@ -8,8 +8,8 @@ import (
 	"io"
 	"text/tabwriter"
 
+	base "github.com/Feryx-Official/feryxhub/v12/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
-	base "github.com/sentinel-official/sentinelhub/v12/types"
 )
 
 func WriteKeys(w io.Writer, keys ...*keyring.Record) error {

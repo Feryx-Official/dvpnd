@@ -27,9 +27,10 @@ after that point under a non-open-source license. To keep this codebase clean:
    That repository ships no license at all, which means all rights reserved.
    CI rejects any `go.mod` that mentions it.
 3. Chain protocol facts come from Apache-licensed sources only: the `.proto`
-   files in `github.com/sentinel-official/sentinelhub` (verify its LICENSE at the
-   version you pin), chain queries against a live node, or traffic you capture
-   from a client you run yourself. The node↔client API was derived from the
+   files in `github.com/sentinel-official/sentinelhub` or in its Apache-2.0 fork
+   `github.com/Feryx-Official/feryxhub`, the chain library this branch builds
+   against (verify the LICENSE at the version you pin), chain queries against a
+   live node, or traffic you capture from a client you run yourself. The node↔client API was derived from the
    request/response handling in the maintainer's own client, Katacomb VPN
    (GPL-3.0) — never from the `sentinel-js-sdk`/`sentinel-go-sdk` packages it
    wraps, which ship no licence text.
@@ -45,8 +46,8 @@ after that point under a non-open-source license. To keep this codebase clean:
 6. New dependencies must carry an OSI-approved permissive or weak-copyleft
    license. The `Licence gate` job in `.github/workflows/ci.yml` runs
    `go-licenses` (fails on `forbidden`, `restricted`, `unknown`), refuses
-   `sentinel-go-sdk` in `go.mod`, re-checks that the pinned `sentinelhub` is still
-   Apache-2.0, and requires the SPDX header on every Go file. The `Fork provenance`
+   `sentinel-go-sdk` in `go.mod`, re-checks that the pinned chain library
+   (`feryxhub`) is still Apache-2.0, and requires the SPDX header on every Go file. The `Fork provenance`
    job runs `docs/provenance/verify-fork.sh`.
 
 ## Practical

@@ -4,6 +4,7 @@
 package lite
 
 import (
+	"github.com/Feryx-Official/feryxhub/v12/x/vpn"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
@@ -14,7 +15,6 @@ import (
 	authvesting "github.com/cosmos/cosmos-sdk/x/auth/vesting"
 	authzmodule "github.com/cosmos/cosmos-sdk/x/authz/module"
 	feegrantmodule "github.com/cosmos/cosmos-sdk/x/feegrant/module"
-	"github.com/sentinel-official/sentinelhub/v12/x/vpn"
 )
 
 type EncodingConfig struct {

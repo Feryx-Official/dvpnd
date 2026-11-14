@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
+	base "github.com/Feryx-Official/feryxhub/v12/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
-	base "github.com/sentinel-official/sentinelhub/v12/types"
 
 	"github.com/Feryx-Official/dvpnd/v9/services/common"
 )

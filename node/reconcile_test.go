@@ -10,8 +10,8 @@ import (
 	"time"
 
 	sdkmath "cosmossdk.io/math"
+	v1base "github.com/Feryx-Official/feryxhub/v12/types/v1"
 	cmtlog "github.com/cometbft/cometbft/libs/log"
-	v1base "github.com/sentinel-official/sentinelhub/v12/types/v1"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"

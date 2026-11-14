@@ -93,12 +93,12 @@ jobs:
             echo '::error::github.com/sentinel-official/sentinel-go-sdk carries no licence and must not be a dependency'
             exit 1
           fi
-      - name: Pinned sentinelhub is still Apache-2.0
+      - name: Pinned feryxhub is still Apache-2.0
         run: |
-          go mod download github.com/sentinel-official/sentinelhub/v12
-          mod=$(go list -m -f '{{.Dir}}' github.com/sentinel-official/sentinelhub/v12)
-          [ -n "$mod" ] && [ -f "$mod/LICENSE" ] || { echo "::error::sentinelhub module directory not found ($mod)"; exit 1; }
-          head -2 "$mod/LICENSE" | grep -q 'Apache License' || { echo '::error::sentinelhub LICENSE is no longer Apache-2.0'; exit 1; }
+          go mod download github.com/Feryx-Official/feryxhub/v12
+          mod=$(go list -m -f '{{.Dir}}' github.com/Feryx-Official/feryxhub/v12)
+          [ -n "$mod" ] && [ -f "$mod/LICENSE" ] || { echo "::error::feryxhub module directory not found ($mod)"; exit 1; }
+          head -2 "$mod/LICENSE" | grep -q 'Apache License' || { echo '::error::feryxhub LICENSE is no longer Apache-2.0'; exit 1; }
       - name: go-licenses
         run: |
           go run github.com/google/go-licenses@v1.6.0 check ./... \

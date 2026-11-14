@@ -15,11 +15,11 @@ import (
 	"time"
 
 	sdkmath "cosmossdk.io/math"
+	v1base "github.com/Feryx-Official/feryxhub/v12/types/v1"
+	nodetypes "github.com/Feryx-Official/feryxhub/v12/x/node/types/v3"
+	sessiontypes "github.com/Feryx-Official/feryxhub/v12/x/session/types/v3"
+	subscriptiontypes "github.com/Feryx-Official/feryxhub/v12/x/subscription/types/v3"
 	cmtlog "github.com/cometbft/cometbft/libs/log"
-	v1base "github.com/sentinel-official/sentinelhub/v12/types/v1"
-	nodetypes "github.com/sentinel-official/sentinelhub/v12/x/node/types/v3"
-	sessiontypes "github.com/sentinel-official/sentinelhub/v12/x/session/types/v3"
-	subscriptiontypes "github.com/sentinel-official/sentinelhub/v12/x/subscription/types/v3"
 	"gorm.io/gorm"
 
 	"github.com/Feryx-Official/dvpnd/v9/context"

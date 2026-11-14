@@ -4,7 +4,7 @@ package node
 
 import (
 	sdkmath "cosmossdk.io/math"
-	v1base "github.com/sentinel-official/sentinelhub/v12/types/v1"
+	v1base "github.com/Feryx-Official/feryxhub/v12/types/v1"
 	"gorm.io/gorm"
 
 	"github.com/Feryx-Official/dvpnd/v9/types"

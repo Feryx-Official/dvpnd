@@ -19,12 +19,12 @@ import (
 	"time"
 
 	sdkmath "cosmossdk.io/math"
+	v1base "github.com/Feryx-Official/feryxhub/v12/types/v1"
 	cmtlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/gin-gonic/gin"
-	v1base "github.com/sentinel-official/sentinelhub/v12/types/v1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 

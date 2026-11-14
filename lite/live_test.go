@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	base "github.com/Feryx-Official/feryxhub/v12/types"
+	nodetypes "github.com/Feryx-Official/feryxhub/v12/x/node/types/v3"
+	subscriptiontypes "github.com/Feryx-Official/feryxhub/v12/x/subscription/types/v3"
 	cmtlog "github.com/cometbft/cometbft/libs/log"
-	base "github.com/sentinel-official/sentinelhub/v12/types"
-	nodetypes "github.com/sentinel-official/sentinelhub/v12/x/node/types/v3"
-	subscriptiontypes "github.com/sentinel-official/sentinelhub/v12/x/subscription/types/v3"
 )
 
 // TestLiveChain talks to a real RPC endpoint and is skipped unless

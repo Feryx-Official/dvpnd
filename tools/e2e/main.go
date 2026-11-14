@@ -36,13 +36,13 @@ import (
 	"strings"
 	"time"
 
+	base "github.com/Feryx-Official/feryxhub/v12/types"
+	v1base "github.com/Feryx-Official/feryxhub/v12/types/v1"
+	nodetypes "github.com/Feryx-Official/feryxhub/v12/x/node/types/v3"
 	cmtlog "github.com/cometbft/cometbft/libs/log"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	base "github.com/sentinel-official/sentinelhub/v12/types"
-	v1base "github.com/sentinel-official/sentinelhub/v12/types/v1"
-	nodetypes "github.com/sentinel-official/sentinelhub/v12/x/node/types/v3"
 	"github.com/spf13/viper"
 
 	"github.com/Feryx-Official/dvpnd/v9/lite"

@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
+	base "github.com/Feryx-Official/feryxhub/v12/types"
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	base "github.com/sentinel-official/sentinelhub/v12/types"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 

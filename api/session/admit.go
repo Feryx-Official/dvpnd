@@ -10,12 +10,12 @@ import (
 	"net/http"
 
 	sdkmath "cosmossdk.io/math"
+	v1base "github.com/Feryx-Official/feryxhub/v12/types/v1"
+	sessiontypes "github.com/Feryx-Official/feryxhub/v12/x/session/types/v3"
+	v2subscriptiontypes "github.com/Feryx-Official/feryxhub/v12/x/subscription/types/v2"
+	subscriptiontypes "github.com/Feryx-Official/feryxhub/v12/x/subscription/types/v3"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/gin-gonic/gin"
-	v1base "github.com/sentinel-official/sentinelhub/v12/types/v1"
-	sessiontypes "github.com/sentinel-official/sentinelhub/v12/x/session/types/v3"
-	v2subscriptiontypes "github.com/sentinel-official/sentinelhub/v12/x/subscription/types/v2"
-	subscriptiontypes "github.com/sentinel-official/sentinelhub/v12/x/subscription/types/v3"
 
 	"github.com/Feryx-Official/dvpnd/v9/context"
 	"github.com/Feryx-Official/dvpnd/v9/types"

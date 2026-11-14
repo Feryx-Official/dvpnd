@@ -4,8 +4,8 @@
 package node
 
 import (
-	sessiontypes "github.com/sentinel-official/sentinelhub/v12/x/session/types/v3"
-	subscriptiontypes "github.com/sentinel-official/sentinelhub/v12/x/subscription/types/v3"
+	sessiontypes "github.com/Feryx-Official/feryxhub/v12/x/session/types/v3"
+	subscriptiontypes "github.com/Feryx-Official/feryxhub/v12/x/subscription/types/v3"
 
 	"github.com/Feryx-Official/dvpnd/v9/context"
 	"github.com/Feryx-Official/dvpnd/v9/types"

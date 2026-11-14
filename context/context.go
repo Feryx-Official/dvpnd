@@ -10,10 +10,10 @@ import (
 	"sync"
 	"time"
 
+	base "github.com/Feryx-Official/feryxhub/v12/types"
+	v1base "github.com/Feryx-Official/feryxhub/v12/types/v1"
 	cmtlog "github.com/cometbft/cometbft/libs/log"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	base "github.com/sentinel-official/sentinelhub/v12/types"
-	v1base "github.com/sentinel-official/sentinelhub/v12/types/v1"
 	"gorm.io/gorm"
 
 	geoiptypes "github.com/Feryx-Official/dvpnd/v9/libs/geoip/types"

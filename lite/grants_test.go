@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
+	v1base "github.com/Feryx-Official/feryxhub/v12/types/v1"
+	nodetypes "github.com/Feryx-Official/feryxhub/v12/x/node/types/v3"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/authz"
 	"github.com/cosmos/cosmos-sdk/x/feegrant"
-	v1base "github.com/sentinel-official/sentinelhub/v12/types/v1"
-	nodetypes "github.com/sentinel-official/sentinelhub/v12/x/node/types/v3"
 )
 
 // Rules: [CH-6].

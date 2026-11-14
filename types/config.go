@@ -13,10 +13,10 @@ import (
 	"strings"
 	"time"
 
+	v1base "github.com/Feryx-Official/feryxhub/v12/types/v1"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/pkg/errors"
-	v1base "github.com/sentinel-official/sentinelhub/v12/types/v1"
 	"github.com/spf13/viper"
 
 	"github.com/Feryx-Official/dvpnd/v9/libs/geoip"
