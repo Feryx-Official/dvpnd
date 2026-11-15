@@ -6,7 +6,7 @@ cosmossdk.io/math,https://github.com/cosmos/cosmos-sdk/blob/math/v1.5.3/math/LIC
 filippo.io/edwards25519,https://github.com/FiloSottile/edwards25519/blob/v1.0.0/LICENSE,BSD-3-Clause
 github.com/99designs/keyring,https://github.com/cosmos/keyring/blob/v1.2.0/LICENSE,MIT
 github.com/ChainSafe/go-schnorrkel,https://github.com/ChainSafe/go-schnorrkel/blob/v1.1.0/LICENSE,Apache-2.0
-github.com/Feryx-Official/feryxhub/v12,https://github.com/Feryx-Official/feryxhub/blob/7c76d1f0fce9/LICENSE,Apache-2.0
+github.com/Feryx-Official/feryxhub/v12,https://github.com/Feryx-Official/feryxhub/blob/c7c5337d0fda/LICENSE,Apache-2.0
 github.com/adrg/xdg,https://github.com/adrg/xdg/blob/v0.5.3/LICENSE,MIT
 github.com/armon/go-metrics,https://github.com/armon/go-metrics/blob/v0.4.1/LICENSE,MIT
 github.com/beorn7/perks/quantile,https://github.com/beorn7/perks/blob/v1.0.1/LICENSE,MIT

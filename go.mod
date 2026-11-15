@@ -75,7 +75,7 @@ require (
 	github.com/99designs/keyring v1.2.1 // indirect
 	github.com/ChainSafe/go-schnorrkel v1.1.0 // indirect
 	github.com/DataDog/zstd v1.5.0 // indirect
-	github.com/Feryx-Official/feryxhub/v12 v12.0.2-feryx.1.0.20261115022810-7c76d1f0fce9
+	github.com/Feryx-Official/feryxhub/v12 v12.0.2-feryx.1.0.20261115042717-c7c5337d0fda
 	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
