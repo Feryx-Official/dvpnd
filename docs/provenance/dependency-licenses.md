@@ -1,6 +1,6 @@
 # Dependency licence audit
 
-## Current graph — sentinelhub v12.0.2 / cosmos-sdk v0.47.17 (2026-11-13)
+## Current graph — FeryxHub v12 (`7c76d1f0`) / cosmos-sdk v0.47.17 (2026-11-15)
 
 Raw output: `dependency-licenses.csv` (133 modules, dvpnd itself left out), generated with `go-licenses v1.6.0`;
 re-run with `go run github.com/google/go-licenses@v1.6.0 report ./...`. The CI licence gate
@@ -9,7 +9,7 @@ runs the matching `check` on every push.
 | Licence | Modules |
 |---|---|
 | MIT | 54 |
-| Apache-2.0 | 40 — cosmos-sdk, CometBFT (`sentinel-official/cometbft` fork), `sentinelhub` |
+| Apache-2.0 | 40 — cosmos-sdk, CometBFT (`Feryx-Official/cometbft`, the commit of the `sentinel-official/cometbft` fork), FeryxHub |
 | BSD-3-Clause | 25 |
 | BSD-2-Clause | 5 |
 | ISC | 5 |

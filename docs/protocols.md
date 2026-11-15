@@ -92,7 +92,7 @@ exists answers `409`. The sections below give each field and each protocol's pay
   32-byte digest, low-s, 64 bytes. A client accepts it when the key's account address is
   the node's (the bytes of its `feryxnode` address), or, for a node that signs with an authz
   hot key, when the chain holds a grant from the node account to that key's address for
-  `/sentinel.node.v3.MsgUpdateNodeStatusRequest` (authz `Grants` query with granter, grantee
+  `/feryx.node.v3.MsgUpdateNodeStatusRequest` (authz `Grants` query with granter, grantee
   and that message type). The digest of fixed inputs is pinned in `api/session`'s
   `TestReplyDigestVector` for client implementers. The legacy endpoint's replies are not
   signed.

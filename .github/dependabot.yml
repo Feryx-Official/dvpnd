@@ -38,8 +38,6 @@ updates:
       # still come through.
       - dependency-name: "github.com/Feryx-Official/*"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
-      - dependency-name: "github.com/sentinel-official/*"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "github.com/cosmos/cosmos-sdk"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "github.com/cometbft/cometbft"

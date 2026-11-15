@@ -19,10 +19,10 @@ import (
 // Rules: [CH-6].
 func TestNodeMsgTypeURLs(t *testing.T) {
 	want := []string{
-		"/sentinel.node.v3.MsgRegisterNodeRequest",
-		"/sentinel.node.v3.MsgUpdateNodeDetailsRequest",
-		"/sentinel.node.v3.MsgUpdateNodeStatusRequest",
-		"/sentinel.session.v3.MsgUpdateSessionRequest",
+		"/feryx.node.v3.MsgRegisterNodeRequest",
+		"/feryx.node.v3.MsgUpdateNodeDetailsRequest",
+		"/feryx.node.v3.MsgUpdateNodeStatusRequest",
+		"/feryx.session.v3.MsgUpdateSessionRequest",
 	}
 	if strings.Join(NodeMsgTypeURLs, " ") != strings.Join(want, " ") || ExecMsgTypeURL != "/cosmos.authz.v1beta1.MsgExec" {
 		t.Fatalf("type urls %v, exec %s", NodeMsgTypeURLs, ExecMsgTypeURL)
@@ -74,7 +74,7 @@ func TestEvaluateGrants(t *testing.T) {
 				delete(g, NodeMsgTypeURLs[3])
 				return g
 			}(),
-			allowance: &feegrant.BasicAllowance{}, problem: "no authz grant for /sentinel.session.v3.MsgUpdateSessionRequest"},
+			allowance: &feegrant.BasicAllowance{}, problem: "no authz grant for /feryx.session.v3.MsgUpdateSessionRequest"},
 		{name: "grants expired", grants: allGrants(&past), allowance: &feegrant.BasicAllowance{}, problem: "expired at"},
 		{name: "grants expire soon", grants: allGrants(&week), allowance: &feegrant.BasicAllowance{}, warning: "expires at"},
 		{name: "no allowance", grants: allGrants(nil), problem: "no fee allowance"},
@@ -179,7 +179,7 @@ func TestFeeAllowanceFoundPastTheFirstPage(t *testing.T) {
 // Rules: [CH-5].
 func TestNoAuthorization(t *testing.T) {
 	mainnet := errors.New("rpc error: code = Unknown desc = authorization not found for " +
-		"/sentinel.node.v3.MsgUpdateNodeStatusRequest type: authorization not found: unknown request")
+		"/feryx.node.v3.MsgUpdateNodeStatusRequest type: authorization not found: unknown request")
 	if !noAuthorization(mainnet) {
 		t.Fatal("the chain's answer for a missing grant is not read as no grant")
 	}

@@ -7,10 +7,10 @@ Re-check with the grep below; every hit must fall in one of those.
 
 **Status on the Feryx branch `development` (2026-11-15):** dvpnd serves the Feryx network
 there, so bucket C and the legacy-home hint of bucket D are gone from that branch: the
-chain library is FeryxHub, addresses are `feryx…` / `feryxnode…`, the coin is `uxfy`, the
-node has no default chain ID or RPC (rule CH-12), and the hint that pointed at
-`~/.sentinelnode` is removed. Bucket B is unchanged on every branch. `main` keeps serving
-the Sentinel chain until the Feryx launch.
+chain library is FeryxHub with the `feryx.*` message types, addresses are `feryx…` and
+`feryxnode…`, the coin is `uxfy`, the node has no default chain ID or RPC (rule CH-12), and
+the hint that pointed at `~/.sentinelnode` is removed. Bucket B is unchanged on every
+branch. `main` keeps serving the Sentinel chain until the Feryx launch.
 
 Every occurrence of `sentinel` (case-insensitive) in the tree at the fork point, classified.
 Apache 2.0 §6 grants no trademark rights, so branding must go; §4(c) requires attribution

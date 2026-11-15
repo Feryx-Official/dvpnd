@@ -453,7 +453,7 @@ child process) and serves `https://<ip>:8585`. Check it:
 curl -sk https://127.0.0.1:8585/ | head -c 400            # {"success":true,"result":{"service_type":"wireguard",…}}
 ```
 
-On the chain, the node appears in `sentinel/node/v3/nodes/<feryxnode1…>` with status
+On the chain, the node appears in `feryx/node/v3/nodes/<feryxnode1…>` with status
 `active`. Node aggregators that client apps read re-probe active nodes every few minutes;
 once your `GET /` answers from the internet your node becomes visible in the apps.
 

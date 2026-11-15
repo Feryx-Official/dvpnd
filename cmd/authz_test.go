@@ -39,10 +39,10 @@ func TestAuthzCommands(t *testing.T) {
 		t.Fatalf("want four authz grants and a fee grant:\n%s", buf.String())
 	}
 	common := " --from feryx1granter --chain-id feryx-test-1 --node https://rpc.example:443 --gas auto --gas-adjustment 1.3 --gas-prices 0.1uxfy"
-	if lines[0] != "feryxhub tx authz grant feryx1hotkey generic --msg-type /sentinel.node.v3.MsgRegisterNodeRequest --expiration 1822435200"+common {
+	if lines[0] != "feryxhub tx authz grant feryx1hotkey generic --msg-type /feryx.node.v3.MsgRegisterNodeRequest --expiration 1822435200"+common {
 		t.Fatalf("authz line: %s", lines[0])
 	}
-	if !strings.Contains(lines[3], "/sentinel.session.v3.MsgUpdateSessionRequest") {
+	if !strings.Contains(lines[3], "/feryx.session.v3.MsgUpdateSessionRequest") {
 		t.Fatalf("session grant: %s", lines[3])
 	}
 	if lines[4] != "feryxhub tx feegrant grant feryx1granter feryx1hotkey --spend-limit 100000000uxfy --expiration 2027-10-02T00:00:00Z --allowed-messages /cosmos.authz.v1beta1.MsgExec"+common {
