@@ -96,7 +96,7 @@ func (n *Node) setSessions() error {
 
 		var (
 			available = sdkmath.NewInt(item.Available)
-			consumed  = sdkmath.NewInt(peers[i].Upload + peers[i].Download)
+			consumed  = sdkmath.NewInt(peers[i].Upload).Add(sdkmath.NewInt(peers[i].Download))
 		)
 
 		if available.IsPositive() && consumed.GT(available) {
@@ -201,7 +201,7 @@ func (n *Node) checkSession(item types.Session) (removePeer, removeSession, skip
 			"id", session.GetID(), "status", session.GetStatus())
 	}
 	if max := session.GetMaxBytes(); max.IsPositive() {
-		used := sdkmath.NewInt(item.Upload + item.Download)
+		used := sdkmath.NewInt(item.Upload).Add(sdkmath.NewInt(item.Download))
 		if used.GTE(max) {
 			removePeer = true
 			n.Log().Info("Session byte limit reached", "key", types.KeyTag(item.Key),

@@ -10,7 +10,7 @@
     {
       "name": "[SL-2] the reported upload ignores what the chain already held",
       "file": "types/session.go",
-      "find": "\tupload = s.BaseUpload + peer.Upload",
+      "find": "\tupload = AddCounters(s.BaseUpload, peer.Upload)",
       "replace": "\tupload = peer.Upload",
       "run": [
         "go test -count=1 -run '^TestReportedUsage$' ./node/"
@@ -1631,6 +1631,26 @@
       "replace": "\tc.GasAdjustment = 1.05\n",
       "run": [
         "go test -count=1 -run '^TestDefaultGasMarginCoversStateGrowth$' ./types/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-20] byte counters wrap past the largest int64",
+      "file": "types/session.go",
+      "find": "\tif b > 0 && a > math.MaxInt64-b {",
+      "replace": "\tif b > 0 && a > math.MaxInt64-b && false {",
+      "run": [
+        "go test -count=1 -run '^TestCountersSaturateAtTheCounterLimit$' ./types/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-20] the usage pass adds a peer's counters as int64",
+      "file": "node/jobs.go",
+      "find": "sdkmath.NewInt(peers[i].Upload).Add(sdkmath.NewInt(peers[i].Download))",
+      "replace": "sdkmath.NewInt(peers[i].Upload + peers[i].Download)",
+      "run": [
+        "go test -count=1 -run '^TestSetSessionsAddsCountersWithoutWrapping$' ./node/"
       ],
       "expect": "--- FAIL"
     }

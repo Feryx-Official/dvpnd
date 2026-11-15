@@ -4,6 +4,7 @@
 package types
 
 import (
+	"math"
 	"time"
 )
 
@@ -45,16 +46,28 @@ type Session struct {
 // reported totals minus what the chain already held when the peer was
 // admitted.
 func (s *Session) ServedBytes() int64 {
-	return (s.Download - s.BaseDownload) + (s.Upload - s.BaseUpload)
+	return AddCounters(s.Download-s.BaseDownload, s.Upload-s.BaseUpload)
+}
+
+// AddCounters adds two byte counters, saturating at the largest int64
+// instead of wrapping: that is the chain's counter limit, and a wrapped sum
+// would be negative.
+func AddCounters(a, b int64) int64 {
+	if b > 0 && a > math.MaxInt64-b {
+		return math.MaxInt64
+	}
+
+	return a + b
 }
 
 // Usage turns the service's counters for the session's peer, which count
 // from the moment the peer was added, into the totals to store and report:
-// what the chain held when the peer was admitted plus what moved since. moved
-// is false when nothing moved in either direction since the last write.
+// what the chain held when the peer was admitted plus what moved since, at
+// most the largest int64. moved is false when nothing moved in either
+// direction since the last write.
 func (s *Session) Usage(peer Peer) (upload, download int64, moved bool) {
-	upload = s.BaseUpload + peer.Upload
-	download = s.BaseDownload + peer.Download
+	upload = AddCounters(s.BaseUpload, peer.Upload)
+	download = AddCounters(s.BaseDownload, peer.Download)
 
 	return upload, download, upload != s.Upload || download != s.Download
 }

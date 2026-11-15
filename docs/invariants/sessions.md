@@ -78,3 +78,8 @@ reported, a report refused) or gives clients service nobody pays for. IDs as in
   seven days a certificate used to last could cut off a session still paid for. Who may
   connect is decided over the management interface at every connect and renegotiation
   (SL-16), not by the certificate's dates.
+- **[SL-20] Usage arithmetic never wraps.** The node keeps byte counters as int64 and the
+  chain refuses a total past the largest one (FeryxHub's counter limit). Totals the node
+  stores saturate there, and the counters a check adds up are added as the chain's
+  integers: a wrapped sum went negative, which the chain refuses as a report and which
+  left a peer far past its allocation connected.

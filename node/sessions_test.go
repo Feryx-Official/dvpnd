@@ -4,6 +4,7 @@ package node
 
 import (
 	"encoding/base64"
+	"math"
 	"path/filepath"
 	"sort"
 	"sync"
@@ -152,6 +153,26 @@ func TestSetSessionsRemovesUnknownAndExhaustedPeers(t *testing.T) {
 		if got := row(t, db, id); got.Upload != want[0] || got.Download != want[1] {
 			t.Errorf("session %d stored upload %d download %d, want %d and %d", id, got.Upload, got.Download, want[0], want[1])
 		}
+	}
+}
+
+// TestSetSessionsAddsCountersWithoutWrapping: a peer's two counters are added
+// as the chain's integers. Added as int64, two that together pass the
+// largest one wrapped negative, and a peer far past its allocation stayed
+// connected.
+//
+// Rules: [SL-20].
+func TestSetSessionsAddsCountersWithoutWrapping(t *testing.T) {
+	n, service, _ := usageRig(t,
+		[]types.Session{{ID: 1, Key: key(1), Address: "a", Available: 100}},
+		types.Peer{Key: key(1), Upload: math.MaxInt64, Download: 1},
+	)
+
+	if err := n.setSessions(); err != nil {
+		t.Fatal(err)
+	}
+	if !service.wasRemoved(key(1)) {
+		t.Error("a peer whose counters sum past int64 was left connected")
 	}
 }
 
