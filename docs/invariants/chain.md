@@ -46,3 +46,8 @@ signs transactions unattended, so its key lives on the server. IDs as in
   taken transaction lost a session report on a live node: right after one transaction
   landed, a remote a block behind took the next at the sequence the first had used, and
   the report sent on a restart was cleared without reaching the chain.
+- **[CH-12] The node serves only the network its operator names.** A new configuration
+  has no chain ID and no RPC address, so a node nobody pointed at a network refuses to
+  start; the installer and the Docker runner ask for both and refuse a malformed one
+  before writing anything. The defaults named the Sentinel chain and its public RPCs, so
+  a Feryx node left on them joined another network.

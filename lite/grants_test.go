@@ -53,8 +53,8 @@ func TestEvaluateGrants(t *testing.T) {
 		year     = now.Add(365 * 24 * time.Hour)
 		week     = now.Add(7 * 24 * time.Hour)
 		past     = now.Add(-time.Hour)
-		minSpend = sdk.NewCoins(sdk.NewInt64Coin("udvpn", 10_000_000))
-		plenty   = sdk.NewCoins(sdk.NewInt64Coin("udvpn", 100_000_000))
+		minSpend = sdk.NewCoins(sdk.NewInt64Coin("uxfy", 10_000_000))
+		plenty   = sdk.NewCoins(sdk.NewInt64Coin("uxfy", 100_000_000))
 	)
 
 	for _, tc := range []struct {
@@ -86,11 +86,11 @@ func TestEvaluateGrants(t *testing.T) {
 		{name: "allowance expires soon", grants: allGrants(nil),
 			allowance: onlyExec(t, &feegrant.BasicAllowance{Expiration: &week}), warning: "fee allowance expires"},
 		{name: "allowance low", grants: allGrants(nil),
-			allowance: &feegrant.BasicAllowance{SpendLimit: sdk.NewCoins(sdk.NewInt64Coin("udvpn", 5_000_000))},
-			warning:   "5000000udvpn left"},
+			allowance: &feegrant.BasicAllowance{SpendLimit: sdk.NewCoins(sdk.NewInt64Coin("uxfy", 5_000_000))},
+			warning:   "5000000uxfy left"},
 		{name: "allowance spent", grants: allGrants(nil),
 			allowance: &feegrant.PeriodicAllowance{Basic: feegrant.BasicAllowance{SpendLimit: sdk.NewCoins(sdk.NewInt64Coin("uatom", 5))}},
-			problem:   "0udvpn left"},
+			problem:   "0uxfy left"},
 	} {
 		problems, warnings := EvaluateGrants(now, tc.grants, tc.allowance, minSpend)
 		got := strings.Join(problems, "; ")
@@ -136,7 +136,7 @@ func TestHotKeyTransactions(t *testing.T) {
 	}
 
 	// The transaction carries the granter as fee granter and encodes.
-	txb, err := c.txf.WithChainID("sentinelhub-2").WithFeeGranter(granter).BuildUnsignedTx(got...)
+	txb, err := c.txf.WithChainID("feryx-test-1").WithFeeGranter(granter).BuildUnsignedTx(got...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestFeeAllowanceFoundPastTheFirstPage(t *testing.T) {
 		chain.grantAllowance(sdk.AccAddress(fmt.Sprintf("dust-granter-%07d", i)), &feegrant.BasicAllowance{})
 	}
 	granter := sdk.AccAddress("node-account-addr-01")
-	limit := sdk.NewCoins(sdk.NewInt64Coin("udvpn", 42))
+	limit := sdk.NewCoins(sdk.NewInt64Coin("uxfy", 42))
 	chain.grantAllowance(granter, &feegrant.BasicAllowance{SpendLimit: limit})
 
 	got, err := c.QueryFeeAllowance(granter, c.FromAddress())

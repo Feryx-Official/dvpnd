@@ -9,7 +9,7 @@
 //
 // It spends real funds (the session deposit plus gas) on the chain the node is
 // configured for. With -node it buys the session on another node instead (any
-// sentnode address, with -api pointing at that node's API and -api-cert at a
+// feryxnode address, with -api pointing at that node's API and -api-cert at a
 // copy of its tls.crt); the key then only pays and signs.
 //
 // The node API is trusted only when it presents the certificate in -api-cert,
@@ -56,14 +56,14 @@ func main() {
 		home       = flag.String("home", types.DefaultHomeDirectory, "node home directory (config.toml, keyring)")
 		api        = flag.String("api", "https://127.0.0.1:8585", "node API base URL")
 		gigabytes  = flag.Int64("gigabytes", 1, "session size to buy")
-		maxPrice   = flag.String("max-price", "", "maximum price accepted (chain notation denom:base,quote); default: the node's own udvpn gigabyte price")
+		maxPrice   = flag.String("max-price", "", "maximum price accepted (chain notation denom:base,quote); default: the node's own uxfy gigabyte price")
 		sessionID  = flag.Uint64("session", 0, "reuse an existing session id instead of buying one")
 		deactivate = flag.Bool("deactivate", false, "only send MsgUpdateNodeStatus(inactive) for this key's node and exit")
 		out        = flag.String("out", "", "where to write the WireGuard client config (default <home>/e2e-client.conf)")
 		endpoint   = flag.String("endpoint", "127.0.0.1", "host written as the WireGuard endpoint in the client config")
 		fullTunnel = flag.Bool("full-tunnel", false, "route all client traffic through the node (0.0.0.0/0, ::/0) instead of only its tunnel address")
 		nodeType   = flag.String("type", "wireguard", "node type to handshake as: wireguard and amneziawg write a client config; v2ray, xray, hysteria2 and openvpn write the decoded handshake payload")
-		nodeStr    = flag.String("node", "", "sentnode address of the node to buy the session on (default: the key's own node)")
+		nodeStr    = flag.String("node", "", "feryxnode address of the node to buy the session on (default: the key's own node)")
 		awgVersion = flag.Int("awg-version", 0, "amneziawg only: the tier to ask for (0 = the default tier, 3 = the 3.1 tier)")
 		apiCert    = flag.String("api-cert", "", "the node's TLS certificate (a copy of its tls.crt); the API is trusted only when it presents this one (default <home>/tls.crt)")
 	)
@@ -172,13 +172,13 @@ func run(home, api, apiCert string, gigabytes int64, maxPriceStr string, session
 				return fmt.Errorf("max-price: %w", err)
 			}
 		} else {
-			price, found := node.GigabytePrice("udvpn")
+			price, found := node.GigabytePrice("uxfy")
 			if !found {
-				return fmt.Errorf("node has no udvpn gigabyte price; pass -max-price")
+				return fmt.Errorf("node has no uxfy gigabyte price; pass -max-price")
 			}
 			maxPrice = price
 		}
-		fmt.Printf("buying %d GB at up to %s (deposit %s udvpn)\n", gigabytes, maxPrice, maxPrice.QuoteValue.MulRaw(gigabytes))
+		fmt.Printf("buying %d GB at up to %s (deposit %s uxfy)\n", gigabytes, maxPrice, maxPrice.QuoteValue.MulRaw(gigabytes))
 		res, err := client.Tx(nodetypes.NewMsgStartSessionRequest(accAddr, nodeAddr, gigabytes, 0, maxPrice))
 		if err != nil {
 			return fmt.Errorf("MsgStartSession: %w", err)

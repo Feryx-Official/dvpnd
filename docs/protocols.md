@@ -90,7 +90,7 @@ exists answers `409`. The sections below give each field and each protocol's pay
   `reply data` is `result.data` decoded, `addrs` is `result.addrs` in order. The signature
   is made the way the client signs its request: secp256k1 ECDSA over SHA-256 of the
   32-byte digest, low-s, 64 bytes. A client accepts it when the key's account address is
-  the node's (the bytes of its `sentnode` address), or, for a node that signs with an authz
+  the node's (the bytes of its `feryxnode` address), or, for a node that signs with an authz
   hot key, when the chain holds a grant from the node account to that key's address for
   `/sentinel.node.v3.MsgUpdateNodeStatusRequest` (authz `Grants` query with granter, grantee
   and that message type). The digest of fixed inputs is pinned in `api/session`'s

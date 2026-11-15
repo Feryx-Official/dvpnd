@@ -254,7 +254,7 @@ func TestFailedRecordRemovesThePeer(t *testing.T) {
 // Rules: [SL-6].
 func TestAdmissionRefusesAnotherNodesSession(t *testing.T) {
 	ctx, service, _, account := admissionRig(t, 50)
-	chain := &fakeChain{node: "sentnode1someoneelse", account: func(uint64) string { return account.String() }}
+	chain := &fakeChain{node: "feryxnode1someoneelse", account: func(uint64) string { return account.String() }}
 
 	_, apiErr := admit(ctx, chain, admitRequest{AccAddress: account, ID: 1, PeerData: randomBytes(t, 32)})
 	if apiErr == nil || apiErr.Code != 7 || service.PeerCount() != 0 {

@@ -3,6 +3,7 @@
 package static
 
 import (
+	"bytes"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +11,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/cosmos/cosmos-sdk/types/bech32"
 )
 
 // aptGetRun matches apt-get run as a command, not named in a check for it.
@@ -445,6 +448,84 @@ case "$2" in
 esac
 `
 
+// TestInstallerNamesTheNetwork holds the installer to the network the
+// operator names: a new configuration takes its chain ID and RPC addresses
+// from --chain-id and --rpc, and a missing or malformed one stops the
+// installer before anything is written.
+//
+// Rules: [CH-12].
+func TestInstallerNamesTheNetwork(t *testing.T) {
+	var functions string
+	for _, name := range []string{"check_chain", "dvs", "new_stage", "write_config"} {
+		functions += installerFunction(t, name) + "\n"
+	}
+	bin := filepath.Join(t.TempDir(), "dvpnd")
+	if err := os.WriteFile(bin, []byte(fakeDvpnd), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	run := func(home, id, rpc string) (string, error) {
+		cmd := exec.Command("bash", "-c", "set -Eeuo pipefail\ndie() { echo \"ERROR: $*\" >&2; exit 1; }\n"+functions+"\ncheck_chain\nwrite_config\n")
+		cmd.Env = append(os.Environ(), "DVPND="+bin, "NODE_HOME="+home, "KEY_NAME=operator", "MONIKER=My node",
+			"NODE_TYPE=wireguard", "GIGABYTE_PRICES=40000000uxfy", "HOURLY_PRICES=97500000uxfy", "API_PORT=8585",
+			"PUBLIC_IP=203.0.113.1", "CHAIN_ID="+id, "RPC_ADDRESSES="+rpc)
+		out, err := cmd.CombinedOutput()
+
+		return string(out), err
+	}
+
+	home := t.TempDir()
+	const rpc = "https://rpc.example:443,http://127.0.0.1:26657"
+	if out, err := run(home, "feryx-test-1", rpc); err != nil {
+		t.Fatalf("a named network was refused: %v\n%s", err, out)
+	}
+	written, err := os.ReadFile(filepath.Join(home, "config.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"chain.id = feryx-test-1", "chain.rpc_addresses = " + rpc} {
+		if !strings.Contains(string(written), want) {
+			t.Errorf("config.toml lacks %q:\n%s", want, written)
+		}
+	}
+
+	for _, c := range []struct{ id, rpc string }{
+		{"", "https://rpc.example:443"},
+		{"feryx-test-1", ""},
+		{"feryx test", "https://rpc.example:443"},
+		{"feryx-test-1", "http://rpc.example:26657"},
+		{"feryx-test-1", "https://rpc.example"},
+		{"feryx-test-1", "https://rpc.example:443,"},
+	} {
+		home := t.TempDir()
+		if out, err := run(home, c.id, c.rpc); err == nil {
+			t.Errorf("chain %q at %q was taken:\n%s", c.id, c.rpc, out)
+		}
+		if _, err := os.Stat(filepath.Join(home, "config.toml")); !os.IsNotExist(err) {
+			t.Errorf("chain %q at %q: a configuration was written", c.id, c.rpc)
+		}
+	}
+}
+
+// TestInstallerTakesAFeryxGranter holds the installer's --granter check to
+// the accounts of the chain the node serves: a Feryx account address is
+// taken, a Sentinel one or a node address is refused.
+//
+// Rules: [CH-3].
+func TestInstallerTakesAFeryxGranter(t *testing.T) {
+	check := installerFunction(t, "check_granter")
+	for hrp, ok := range map[string]bool{"feryx": true, "sent": false, "feryxnode": false} {
+		addr, err := bech32.ConvertAndEncode(hrp, bytes.Repeat([]byte{9}, 20))
+		if err != nil {
+			t.Fatal(err)
+		}
+		cmd := exec.Command("bash", "-c", "die() { echo \"ERROR: $*\" >&2; exit 1; }\n"+check+"\ncheck_granter\n")
+		cmd.Env = append(os.Environ(), "GRANTER="+addr)
+		if out, err := cmd.CombinedOutput(); (err == nil) != ok {
+			t.Errorf("--granter with a %s address: taken = %v, want %v\n%s", hrp, err == nil, ok, out)
+		}
+	}
+}
+
 // TestInstallerWritesTheConfigurationWholeOrNotAtAll holds the installer to
 // writing config.toml and the protocol file whole: a command that failed
 // after config init left a partial file, which the next run kept as the
@@ -464,9 +545,9 @@ func TestInstallerWritesTheConfigurationWholeOrNotAtAll(t *testing.T) {
 	run := func(home, call string, env ...string) error {
 		cmd := exec.Command("bash", "-c", "set -Eeuo pipefail\n"+functions+"\n"+call+"\n")
 		cmd.Env = append(os.Environ(), "DVPND="+bin, "NODE_HOME="+home, "KEY_NAME=operator", "MONIKER=My node",
-			"NODE_TYPE=openvpn", "HOURLY_PRICES=97500000udvpn", "API_PORT=8585", "PUBLIC_IP=203.0.113.1",
-			"LISTEN_PORT=51820", "V3_LISTEN_PORT=", "IPV6_OK=false", "FORCE=0", "GIGABYTE_PRICES=40000000udvpn",
-			"OPENVPN_PROTO=udp")
+			"NODE_TYPE=openvpn", "HOURLY_PRICES=97500000uxfy", "API_PORT=8585", "PUBLIC_IP=203.0.113.1",
+			"LISTEN_PORT=51820", "V3_LISTEN_PORT=", "IPV6_OK=false", "FORCE=0", "GIGABYTE_PRICES=40000000uxfy",
+			"OPENVPN_PROTO=udp", "CHAIN_ID=feryx-test-1", "RPC_ADDRESSES=https://rpc.example:443")
 		cmd.Env = append(cmd.Env, env...)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
@@ -489,7 +570,7 @@ func TestInstallerWritesTheConfigurationWholeOrNotAtAll(t *testing.T) {
 	for _, c := range []struct {
 		call, file, failing, good, last string
 	}{
-		{"write_config", "config.toml", "GIGABYTE_PRICES", "40000000udvpn", "node.remote_url = https://203.0.113.1:8585"},
+		{"write_config", "config.toml", "GIGABYTE_PRICES", "40000000uxfy", "node.remote_url = https://203.0.113.1:8585"},
 		{"write_protocol", "openvpn.toml", "OPENVPN_PROTO", "udp", "proto = udp"},
 	} {
 		home := t.TempDir()

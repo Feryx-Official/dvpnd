@@ -55,8 +55,10 @@ GO_SHA256_ARM64="3392582988a273a87ab5043ee1b2c9c17a2c3c00580bf9326c47a2e0aaaeac9
 NODE_TYPE="wireguard"
 TYPE_GIVEN=0
 MONIKER=""
-GIGABYTE_PRICES="40000000udvpn"
-HOURLY_PRICES="97500000udvpn"
+CHAIN_ID=""
+RPC_ADDRESSES=""
+GIGABYTE_PRICES="40000000uxfy"
+HOURLY_PRICES="97500000uxfy"
 API_PORT="8585"
 LISTEN_PORT=""
 V3_LISTEN_PORT=""
@@ -83,6 +85,9 @@ Options:
   --type TYPE           wireguard, amneziawg, openvpn, v2ray, xray, hysteria2
                         (default: the existing node's type, else wireguard)
   --moniker NAME        public name of the node, 4-32 characters (asked if missing)
+  --chain-id ID         chain ID of the Feryx network to serve (asked if missing)
+  --rpc URLS            RPC addresses of that network, https://host:port, comma-separated
+                        (asked if missing)
   --gigabyte-price P    price per GB, e.g. ${GIGABYTE_PRICES} (default)
   --hourly-price P      price per hour, e.g. ${HOURLY_PRICES} (default)
   --api-port PORT       TCP port of the node API (default ${API_PORT})
@@ -92,7 +97,7 @@ Options:
   --version TAG         release tag to build, e.g. v9.2.0 (default: latest release)
   --source DIR          build from this source tree instead of cloning
   --home DIR            node home directory (default ${NODE_HOME})
-  --granter ADDR        sign with a hot key for the node account ADDR (sent1...): the
+  --granter ADDR        sign with a hot key for the node account ADDR (feryx1...): the
                         operator key and the earnings stay off this server; prints the
                         authz and feegrant commands to run from that account's wallet
   --recover             import an existing mnemonic instead of creating a key
@@ -112,6 +117,8 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --type) NODE_TYPE="$2"; TYPE_GIVEN=1; shift 2 ;;
     --moniker) MONIKER="$2"; shift 2 ;;
+    --chain-id) CHAIN_ID="$2"; shift 2 ;;
+    --rpc) RPC_ADDRESSES="$2"; shift 2 ;;
     --gigabyte-price) GIGABYTE_PRICES="$2"; shift 2 ;;
     --hourly-price) HOURLY_PRICES="$2"; shift 2 ;;
     --api-port) API_PORT="$2"; shift 2 ;;
@@ -152,10 +159,14 @@ case "${NODE_TYPE}" in
   *) die "--type must be wireguard, amneziawg, openvpn, v2ray, xray or hysteria2" ;;
 esac
 case "${OPENVPN_PROTO}" in udp|tcp) ;; *) die "--openvpn-proto must be udp or tcp" ;; esac
+# check_granter refuses a node account that is not a Feryx account address.
+check_granter() {
+  [[ "${GRANTER}" =~ ^feryx1[0-9a-z]{38}$ ]] || die "--granter must be the node account's address (feryx1...)"
+}
 # With a granter the key on this server is a hot key of its own, never the
 # node account's.
 if [[ -n "${GRANTER}" ]]; then
-  [[ "${GRANTER}" =~ ^sent1[0-9a-z]{38}$ ]] || die "--granter must be the node account's address (sent1...)"
+  check_granter
   [[ "${RECOVER}" -eq 0 ]] || die "--granter creates a fresh hot key; --recover does not apply"
   KEY_NAME="hot"
 fi
@@ -423,11 +434,32 @@ dvs() {
   "${DVPND}" --home "${STAGE}" "$@"
 }
 
+# check_chain refuses a chain ID or RPC address the node would refuse at its
+# first start, before anything is written. There is no default network.
+check_chain() {
+  local id_re='^[A-Za-z0-9][A-Za-z0-9_.-]{0,47}$'
+  local https_re='^https://[^/[:space:]]+:[0-9]+/?$'
+  local local_re='^http://(127\.[0-9.]+|localhost|\[::1\]):[0-9]+/?$'
+  local item
+  [[ "${CHAIN_ID}" =~ ${id_re} ]] || die "--chain-id: not a chain ID: ${CHAIN_ID}"
+  [[ -n "${RPC_ADDRESSES}" ]] || die "--rpc: at least one RPC address is needed"
+  # read drops a trailing empty field; the node would refuse it at its start.
+  [[ "${RPC_ADDRESSES}" != ,* && "${RPC_ADDRESSES}" != *, && "${RPC_ADDRESSES}" != *,,* ]] ||
+    die "--rpc: an empty address in ${RPC_ADDRESSES}"
+  IFS=',' read -r -a RPC_ITEMS <<<"${RPC_ADDRESSES}"
+  for item in "${RPC_ITEMS[@]}"; do
+    [[ "${item}" =~ ${https_re} || "${item}" =~ ${local_re} ]] ||
+      die "--rpc takes https://host:port addresses, comma-separated (plain http on this machine only): ${item}"
+  done
+}
+
 write_config() {
   new_stage
   dvs config init >/dev/null
   dvs config set keyring.backend test >/dev/null
   dvs config set keyring.from "${KEY_NAME}" >/dev/null
+  dvs config set chain.id "${CHAIN_ID}" >/dev/null
+  dvs config set chain.rpc_addresses "${RPC_ADDRESSES}" >/dev/null
   dvs config set handshake.enable false >/dev/null
   dvs config set node.type "${NODE_TYPE}" >/dev/null
   dvs config set node.moniker "${MONIKER}" >/dev/null
@@ -445,6 +477,9 @@ else
   log "Writing ${NODE_HOME}/config.toml"
   [[ -n "${MONIKER}" ]] || ask MONIKER "Public name of the node (4-32 characters)"
   [[ ${#MONIKER} -ge 4 && ${#MONIKER} -le 32 ]] || die "the moniker must be 4 to 32 characters"
+  [[ -n "${CHAIN_ID}" ]] || ask CHAIN_ID "Chain ID of the Feryx network"
+  [[ -n "${RPC_ADDRESSES}" ]] || ask RPC_ADDRESSES "RPC address of that network (https://host:port)"
+  check_chain
   write_config
 fi
 # A granter switches an existing node to a hot key too (a migration).
@@ -646,7 +681,7 @@ fi
 
 # ---------------------------------------------------------------- summary
 
-# `keys show` prints Name, Address (sentnode1...), Operator (sent1...).
+# `keys show` prints Name, Address (feryxnode1...), Operator (feryx1...).
 read -r _ NODE_ADDR OPERATOR_ADDR < <(dv keys show "${KEY_NAME}" | awk 'NR == 2')
 if [[ -n "${GRANTER}" ]]; then
   HOT_ADDR="${OPERATOR_ADDR}"
@@ -678,7 +713,7 @@ What to do now:
 
 1. From the wallet that holds the node account ${GRANTER},
    not on this server, make the grants the node needs (the node account pays every
-   fee; keep a few P2P on it, 50 is a comfortable start):
+   fee; keep a few XFY on it, 50 is a comfortable start):
 
 EOF
   dv keys authz-commands | sed 's/^/   /'
@@ -699,8 +734,7 @@ else
 
 What to do now:
 
-1. Send a few P2P (the coin formerly called DVPN) to the operator wallet above,
-   50 is a comfortable start. Every status update and usage
+1. Send a few XFY to the operator wallet above, 50 is a comfortable start. Every status update and usage
    report is a transaction that costs gas; the node cannot register until the
    wallet holds some. Until then it retries and the log shows the error.
 EOF

@@ -171,10 +171,6 @@ func StartCmd() *cobra.Command {
 			}
 			common.SetVerbose(utils.DebugLogging())
 
-			if hint := types.LegacyHomeHint(home); hint != "" {
-				log.Info(hint)
-			}
-
 			v := viper.New()
 			v.SetConfigFile(configPath)
 

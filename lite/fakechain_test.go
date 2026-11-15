@@ -109,7 +109,7 @@ func newFakeChain(t *testing.T) (*fakeChain, *Client) {
 		WithRemotes([]string{f.srv.URL}).
 		WithQueryTimeout(5).
 		WithTxTimeout(1).
-		WithChainID("sentinelhub-2").
+		WithChainID("feryx-test-1").
 		WithKeyring(kr).
 		WithFromName("node").
 		WithFromAddress(addr).

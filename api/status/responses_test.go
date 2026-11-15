@@ -13,7 +13,7 @@ import (
 // Rules: [CT-2].
 func TestRootDocumentLayout(t *testing.T) {
 	doc := &ResponseGetRoot{
-		Addr:            "sentnode1example",
+		Addr:            "feryxnode1example",
 		Downlink:        "1000000000",
 		Uplink:          "500000000",
 		HandshakeDNS:    false,

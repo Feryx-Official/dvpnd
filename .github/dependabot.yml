@@ -32,10 +32,12 @@ updates:
         patterns: ["*"]
         update-types: ["minor", "patch"]
     ignore:
-      # The chain stack is pinned to what sentinelhub v12 was built against; moving
+      # The chain stack is pinned to what FeryxHub v12 was built against; moving
       # cosmos-sdk off v0.47 or CometBFT off v0.37 is a migration, not a routine
       # bump (for v0.x modules the breaking bump is the minor one). Patch releases
       # still come through.
+      - dependency-name: "github.com/Feryx-Official/*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "github.com/sentinel-official/*"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "github.com/cosmos/cosmos-sdk"

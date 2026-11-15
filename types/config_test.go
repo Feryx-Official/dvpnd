@@ -218,10 +218,34 @@ func TestRPCAddressesNeedTLS(t *testing.T) {
 		"https://a.example:443,http://10.0.0.2:26657": false,
 	} {
 		c := NewChainConfig().WithDefaultValues()
+		c.ID = "feryx-test-1"
 		c.RPCAddresses = addr
 		if err := c.Validate(); (err == nil) != ok {
 			t.Errorf("%s: err = %v", addr, err)
 		}
+	}
+}
+
+// TestNoDefaultNetwork: a fresh configuration names no chain, so a node its
+// operator has not pointed at a network refuses to start instead of joining
+// whichever chain a default named.
+//
+// Rules: [CH-12].
+func TestNoDefaultNetwork(t *testing.T) {
+	c := NewChainConfig().WithDefaultValues()
+	if c.ID != "" || c.RPCAddresses != "" {
+		t.Fatalf("the default chain is %q at %q, want none", c.ID, c.RPCAddresses)
+	}
+	if err := c.Validate(); err == nil {
+		t.Fatal("a configuration with no chain ID validates")
+	}
+	c.ID = "feryx-test-1"
+	if err := c.Validate(); err == nil {
+		t.Fatal("a configuration with no RPC address validates")
+	}
+	c.RPCAddresses = "https://rpc.example.com:443"
+	if err := c.Validate(); err != nil {
+		t.Fatalf("a configuration naming its chain and RPC: %v", err)
 	}
 }
 
@@ -246,8 +270,8 @@ func TestConfigValidationGaps(t *testing.T) {
 	node := func(edit func(c *NodeConfig)) error {
 		c := NewNodeConfig().WithDefaultValues()
 		c.Moniker = "a moniker"
-		c.GigabytePrices = "udvpn:0.5,1000"
-		c.HourlyPrices = "udvpn:0.5,1000"
+		c.GigabytePrices = "uxfy:0.5,1000"
+		c.HourlyPrices = "uxfy:0.5,1000"
 		c.RemoteURL = "https://node.example:7777"
 		edit(c)
 		return c.Validate()

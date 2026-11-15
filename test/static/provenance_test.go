@@ -313,15 +313,15 @@ func TestProvenanceCheckTellsAnArchiveDownFromACommitMissing(t *testing.T) {
 	}
 }
 
-// bech32Candidate matches what could be a Sentinel account, node or
-// validator address; the checksum decides.
-var bech32Candidate = regexp.MustCompile(`\bsent[a-z]*1[02-9ac-hj-np-z]{6,}\b`)
+// bech32Candidate matches what could be a Feryx or Sentinel account, node,
+// provider or validator address; the checksum decides.
+var bech32Candidate = regexp.MustCompile(`\b(?:feryx|sent)[a-z]*1[02-9ac-hj-np-z]{6,}\b`)
 
 // addressAllowed lists addresses that may appear, each with its reason.
 var addressAllowed = map[string]string{}
 
-// addresses returns the checksum-valid 20- or 32-byte Sentinel addresses in
-// text.
+// addresses returns the checksum-valid 20- or 32-byte Feryx and Sentinel
+// addresses in text.
 func addresses(text string) []string {
 	var found []string
 	for _, s := range bech32Candidate.FindAllString(text, -1) {
@@ -336,14 +336,18 @@ func addresses(text string) []string {
 // Rules: [LIC-6].
 func TestNoOnChainAddresses(t *testing.T) {
 	// Positive control: an address made here is found, one with a broken
-	// checksum is not, so a scanner that finds nothing cannot pass.
-	made, err := bech32.ConvertAndEncode("sentnode", bytes.Repeat([]byte{7}, 20))
-	if err != nil {
-		t.Fatal(err)
-	}
-	broken := made[:len(made)-1] + map[bool]string{true: "q", false: "p"}[made[len(made)-1] != 'q']
-	if got := addresses("node " + made + " and " + broken); len(got) != 1 || got[0] != made {
-		t.Fatalf("the scanner found %v in a text holding one valid address", got)
+	// checksum is not, so a scanner that finds nothing cannot pass. Feryx
+	// addresses are what this branch's node uses; Sentinel ones are what the
+	// fork's history holds.
+	for _, hrp := range []string{"feryx", "feryxnode", "feryxprov", "sent", "sentnode"} {
+		made, err := bech32.ConvertAndEncode(hrp, bytes.Repeat([]byte{7}, 20))
+		if err != nil {
+			t.Fatal(err)
+		}
+		broken := made[:len(made)-1] + map[bool]string{true: "q", false: "p"}[made[len(made)-1] != 'q']
+		if got := addresses("node " + made + " and " + broken); len(got) != 1 || got[0] != made {
+			t.Fatalf("the scanner found %v in a text holding one valid %s address", got, hrp)
+		}
 	}
 
 	var hits []string

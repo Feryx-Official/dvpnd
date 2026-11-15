@@ -42,7 +42,7 @@ func NewEncodingConfig() EncodingConfig {
 
 // DefaultEncodingConfig registers the auth and vesting account types, authz
 // and feegrant (a node that signs with a hot key sends MsgExec and reads its
-// grants), plus every Sentinel module interface (v1, v2 and v3) so that
+// grants), plus every chain module interface (v1, v2 and v3) so that
 // Any-typed query results such as sessions can be unpacked.
 func DefaultEncodingConfig() EncodingConfig {
 	var (

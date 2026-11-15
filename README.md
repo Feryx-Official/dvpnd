@@ -4,10 +4,10 @@
 [![Release](https://img.shields.io/github/v/release/Feryx-Official/dvpnd)](https://github.com/Feryx-Official/dvpnd/releases/latest)
 [![Go](https://img.shields.io/github/go-mod/go-version/Feryx-Official/dvpnd)](go.mod)
 
-**Run a VPN node on the Sentinel dVPN network and get paid in P2P for the bandwidth you share.**
+**Run a VPN node on the Feryx network and get paid in XFY for the bandwidth you share.**
 
-`dvpnd` is an open-source node for the decentralised VPN network on the Sentinel blockchain
-(chain ID `sentinelhub-2`). You install it on a server. It puts your node on the chain with
+`dvpnd` is an open-source node for the decentralised VPN network on the Feryx blockchain
+(FeryxHub). You install it on a server. It puts your node on the chain with
 your prices, serves VPN connections to the people who pay for them in their client app, and
 reports what they used so that the chain pays you.
 
@@ -60,9 +60,11 @@ You need:
   shows is between `100.64.0.0` and `100.127.255.255`, your provider uses carrier-grade NAT
   and clients cannot reach you: ask the provider for a public IPv4 address or use a VPS.
 - **Root access** (`sudo`).
-- **Some P2P** (the coin formerly called DVPN) to pay transaction fees: every status update
-  and usage report is a small transaction. 50 P2P is a comfortable start. Registering a node
-  needs no deposit at the moment.
+- **The network's chain ID and an RPC address** (`https://host:port`) of the Feryx network
+  you want to serve. The node has no default network.
+- **Some XFY** to pay transaction fees: every status update and usage report is a small
+  transaction. 50 XFY is a comfortable start. Registering a node takes the small deposit
+  the chain's node parameters set.
 - **A traffic plan that fits:** every byte your clients use passes through your server, and
   the first start measures your link speed, which moves several gigabytes.
 
@@ -117,16 +119,18 @@ signature first, see [Verify the installer first](#optional-verify-the-installer
 
 ### 3. Run it
 
-Give your node a public name of 4 to 32 characters; apps show it to users:
+Give your node a public name of 4 to 32 characters; apps show it to users. Name the Feryx
+network it serves with `--chain-id` and `--rpc` (several RPC addresses, comma-separated, are
+tried in turn):
 
 ```sh
-sudo bash install.sh --moniker "My node"
+sudo bash install.sh --moniker "My node" --chain-id CHAIN_ID --rpc https://RPC_HOST:443
 ```
 
 That makes a WireGuard node. For another protocol, add `--type`:
 
 ```sh
-sudo bash install.sh --moniker "My node" --type hysteria2
+sudo bash install.sh --moniker "My node" --chain-id CHAIN_ID --rpc https://RPC_HOST:443 --type hysteria2
 ```
 
 <details>
@@ -147,8 +151,8 @@ What the installer does:
 1. installs the packages the node needs, and Go if the server has no recent version;
 2. downloads the latest release, checks the maintainer's signature on it, and builds it
    (a few minutes the first time);
-3. writes the configuration, with default prices of 40 P2P per GB and 97.5 P2P per hour and
-   a random port for the protocol;
+3. writes the configuration, with the network you named, default prices of 40 XFY per GB
+   and 97.5 XFY per hour, and a random port for the protocol;
 4. creates the node's wallet and a TLS certificate;
 5. opens the node's ports in the firewall (ufw), keeping your SSH port open;
 6. installs dvpnd as a system service and starts it.
@@ -177,12 +181,12 @@ At the end the installer prints a summary like this one:
   node type        wireguard
   node API         https://203.0.113.10:8585   (tcp)
   wireguard port   41234/udp
-  operator wallet  sent1…
-  node address     sentnode1…
+  operator wallet  feryx1…
+  node address     feryxnode1…
   home directory   /root/.dvpnd
 ```
 
-Send some P2P to the **operator wallet** (`sent1…`). The node cannot register until the
+Send some XFY to the **operator wallet** (`feryx1…`). The node cannot register until the
 wallet can pay fees: until then it restarts every 15 seconds and the log shows the error.
 Once the coins arrive it registers by itself. You do not need to do anything else.
 
@@ -225,13 +229,15 @@ running.**
 |---|---|
 | `--type TYPE` | `wireguard` (default), `amneziawg`, `openvpn`, `v2ray`, `xray` or `hysteria2`. On an existing node it keeps the type the node has. |
 | `--moniker NAME` | The node's public name, 4 to 32 characters. Asked for if missing. |
-| `--gigabyte-price P` | Price per GB. Default `40000000udvpn` (40 P2P). |
-| `--hourly-price P` | Price per hour. Default `97500000udvpn` (97.5 P2P). |
+| `--chain-id ID` | Chain ID of the Feryx network the node serves. Asked for if missing. |
+| `--rpc URLS` | RPC addresses of that network, `https://host:port`, comma-separated. Asked for if missing. |
+| `--gigabyte-price P` | Price per GB. Default `40000000uxfy` (40 XFY). |
+| `--hourly-price P` | Price per hour. Default `97500000uxfy` (97.5 XFY). |
 | `--listen-port PORT` | Port of the VPN protocol. Default: random, printed at the end. |
 | `--api-port PORT` | TCP port of the node API. Default `8585`. |
 | `--v3-listen-port PORT` | AmneziaWG only: port of the opt-in 3.1 tier. Default: random. |
 | `--openvpn-proto P` | OpenVPN only: `udp` (default) or `tcp`. |
-| `--granter ADDR` | Sign with a hot key for the node account `sent1…` held in your own wallet; see [Hot key](#hot-key-keep-the-wallet-off-the-server). |
+| `--granter ADDR` | Sign with a hot key for the node account `feryx1…` held in your own wallet; see [Hot key](#hot-key-keep-the-wallet-off-the-server). |
 | `--recover` | Import the mnemonic of an existing wallet instead of creating one. |
 | `--version TAG` | Build this release tag instead of the latest. |
 | `--source DIR` | Build a source tree you checked yourself. |
@@ -241,7 +247,7 @@ running.**
 | `--no-start` | Install the service but do not start it. |
 | `--yes` | Never ask; fail where an answer is needed (for scripts). |
 
-Prices are in `udvpn`: 1 P2P = 1,000,000 udvpn. The chain rejects prices below its minimums.
+Prices are in `uxfy`: 1 XFY = 1,000,000 uxfy. The chain rejects prices below its minimums.
 
 ### Optional: verify the installer first
 
@@ -285,19 +291,19 @@ in a wallet you hold somewhere else (a hardware wallet, or another computer). Th
 gets a key that can only send the node's own messages for that account, with the fees paid
 by the account. The hot key holds nothing; earnings still go to the node account.
 
-1. Use a wallet you control as the node account and put some P2P on it for fees (50 is a
+1. Use a wallet you control as the node account and put some XFY on it for fees (50 is a
    comfortable start).
 2. Install with `--granter` and that account's address:
 
    ```sh
-   sudo bash install.sh --moniker "My node" --granter sent1YOUR_NODE_ACCOUNT
+   sudo bash install.sh --moniker "My node" --chain-id CHAIN_ID --rpc https://RPC_HOST:443 --granter feryx1YOUR_NODE_ACCOUNT
    ```
 
 3. The installer prints five commands: four authorisations and one fee allowance. Run them
-   with the `sentinelhub` command-line wallet, from the wallet that holds the node account.
+   with the `feryxhub` command-line wallet, from the wallet that holds the node account.
    The node waits until they exist on the chain and then starts by itself.
 
-By default the grants last a year and the fee allowance is capped at 100 P2P. The node
+By default the grants last a year and the fee allowance is capped at 100 XFY. The node
 warns in its log 14 days before either runs out. A node that already runs with its key on the server
 moves to a hot key the same way: run the installer again with `--granter`. The full steps
 are in [the operator guide, section 3a](docs/operator.md#3a-a-hot-key-recommended).
@@ -334,8 +340,8 @@ Keep a backup of `/root/.dvpnd`: with it you can rebuild the node on any server.
 ### Change prices, name or other settings
 
 ```sh
-sudo dvpnd --home /root/.dvpnd config set node.gigabyte_prices 40000000udvpn
-sudo dvpnd --home /root/.dvpnd config set node.hourly_prices 97500000udvpn
+sudo dvpnd --home /root/.dvpnd config set node.gigabyte_prices 40000000uxfy
+sudo dvpnd --home /root/.dvpnd config set node.hourly_prices 97500000uxfy
 sudo dvpnd --home /root/.dvpnd config set node.moniker "My better node"
 sudo systemctl restart dvpnd
 ```
@@ -370,7 +376,7 @@ Add `--version TAG` to install a specific release.
 
 Earnings go to the operator wallet as sessions settle. Without a hot key, that wallet's key
 sits unencrypted on the server: move earnings regularly to a wallet you hold elsewhere, by
-importing the mnemonic into a wallet that supports the Sentinel chain. Leave enough P2P on
+importing the mnemonic into a wallet that supports the Feryx chain. Leave enough XFY on
 it for fees.
 
 ### Move to another server
@@ -381,10 +387,6 @@ it for fees.
    `https://NEW_SERVER_IP:8585`.
 4. Run the installer on the new server. It keeps the copied key and settings, and at start
    the node tells the chain its new address.
-
-Coming from the upstream Sentinel node software? Stop the old node, then install with
-`--recover` and the old operator key's mnemonic: the node keeps its address. dvpnd keeps its
-files in `~/.dvpnd` and never reads `~/.sentinelnode`.
 
 ### Stop for good
 
@@ -399,7 +401,7 @@ The chain marks the node inactive within about an hour.
 **The log repeats an error every 15 seconds.** The node stops at start and the service
 starts it again. Read the error line. The usual causes:
 
-- The wallet has no P2P yet: fund the operator wallet ([step 5](#5-fund-the-nodes-wallet)).
+- The wallet has no XFY yet: fund the operator wallet ([step 5](#5-fund-the-nodes-wallet)).
 - With a hot key, a grant is missing or expired: the log names it. Make the grants again.
 - The protocol program is missing (for example `v2ray`): install it and restart.
 - `Stopping: the protocol daemon exited`: the protocol program crashed. Its own reason is
@@ -446,10 +448,13 @@ are in [the operator guide, section 7](docs/operator.md#7-run-with-docker-when-t
 
 ## Project status
 
-- dvpnd speaks the current chain protocol: the `sentinelhub` v12 message set
-  (node/session/subscription v3) on cosmos-sdk v0.47, implemented from the Apache-licensed
-  chain sources only.
-- On the live network, a public node has served paid sessions over WireGuard, both
+- dvpnd speaks the FeryxHub chain protocol: the FeryxHub v3 message set
+  (node/session/subscription) on cosmos-sdk v0.47. The chain library it builds on is
+  FeryxHub, an Apache-2.0 fork of the Sentinel chain.
+- On a four-validator Feryx test network, a node registered, kept its status and sold a
+  session whose handshake verified.
+- Before this branch, on the Sentinel network this software was first written for, a public
+  node served paid sessions over WireGuard, both
   AmneziaWG tiers, V2Ray, XRAY (TLS and REALITY) and Hysteria2. A Hysteria2 node has served
   gigabyte and hourly sessions to clients on the network, Katacomb among them, and the chain
   recorded the usage exactly as the node reported it.

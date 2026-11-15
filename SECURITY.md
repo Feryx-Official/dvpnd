@@ -76,4 +76,4 @@ names, an untagged `x/crypto` commit, deletes the `openpgp` packages, which
 cosmos-sdk's `crypto/armor.go` (key export and import) imports, so the node
 cannot build with it. Only the armor and errors packages are linked, and they
 are reached at package initialisation. Leaving it needs a cosmos-sdk newer
-than the v0.47 line the Sentinel chain (sentinelhub v12) is built on.
+than the v0.47 line the FeryxHub chain library (v12) is built on.

@@ -90,7 +90,7 @@ func TestDatabaseSettings(t *testing.T) {
 //
 // Rules: [PV-4].
 func TestADeletedSessionIsGone(t *testing.T) {
-	const address, key = "sent1softdeletemarker", "softdeletepeerkey"
+	const address, key = "feryx1softdeletemarker", "softdeletepeerkey"
 
 	path := filepath.Join(t.TempDir(), "data.db")
 	db, err := OpenDatabase(path)

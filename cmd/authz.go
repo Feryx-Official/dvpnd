@@ -37,7 +37,7 @@ type authzGrants struct {
 	SpendLimit       sdk.Coins
 }
 
-// write prints the sentinelhub commands that make the grants: one authz
+// write prints the feryxhub commands that make the grants: one authz
 // grant per message the node sends, and a fee allowance limited to MsgExec.
 // authz takes its expiry as a Unix time, feegrant as RFC 3339.
 func (g authzGrants) write(w io.Writer) error {
@@ -45,7 +45,7 @@ func (g authzGrants) write(w io.Writer) error {
 		g.Granter, g.ChainID, g.Node, g.GasPrices)
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "# Run these with the sentinelhub CLI from the wallet that holds the node account\n")
+	fmt.Fprintf(&b, "# Run these with the feryxhub CLI from the wallet that holds the node account\n")
 	fmt.Fprintf(&b, "# %s, not on this server. They let the hot key %s send the\n", g.Granter, g.Grantee)
 	fmt.Fprintf(&b, "# node's messages and spend up to %s of the node account's funds on their\n", g.SpendLimit)
 	fmt.Fprintf(&b, "# fees, for MsgExec only, until %s. Make them again before then.\n", g.Expiry.UTC().Format(time.RFC3339))
@@ -54,10 +54,10 @@ func (g authzGrants) write(w io.Writer) error {
 	}
 	fmt.Fprintf(&b, "\n")
 	for _, url := range lite.NodeMsgTypeURLs {
-		fmt.Fprintf(&b, "sentinelhub tx authz grant %s generic --msg-type %s --expiration %d %s\n",
+		fmt.Fprintf(&b, "feryxhub tx authz grant %s generic --msg-type %s --expiration %d %s\n",
 			g.Grantee, url, g.Expiry.Unix(), common)
 	}
-	fmt.Fprintf(&b, "sentinelhub tx feegrant grant %s %s --spend-limit %s --expiration %s --allowed-messages %s %s\n",
+	fmt.Fprintf(&b, "feryxhub tx feegrant grant %s %s --spend-limit %s --expiration %s --allowed-messages %s %s\n",
 		g.Granter, g.Grantee, g.SpendLimit, g.Expiry.UTC().Format(time.RFC3339), lite.ExecMsgTypeURL, common)
 
 	_, err := io.WriteString(w, b.String())
@@ -69,7 +69,7 @@ func keysAuthzCommands() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "authz-commands",
 		Short: "Print the grants that let the signing key act as a hot key for the node account",
-		Long: `Print the sentinelhub commands that grant the signing key ([keyring] from) the right
+		Long: `Print the feryxhub commands that grant the signing key ([keyring] from) the right
 to send the node's messages for the node account ([keyring] granter, or --granter) and to
 have their fees paid from it. Run them from the wallet that holds the node account; the
 node then signs with the hot key alone, and the operator key stays off the server.`,
@@ -92,7 +92,7 @@ node then signs with the hot key alone, and the operator key stays off the serve
 				granter = config.Keyring.Granter
 			}
 			if _, err = sdk.AccAddressFromBech32(granter); err != nil {
-				return fmt.Errorf("the node account: set [keyring] granter or pass --granter sent1...: %w", err)
+				return fmt.Errorf("the node account: set [keyring] granter or pass --granter feryx1...: %w", err)
 			}
 
 			validFor, err := cmd.Flags().GetDuration(flagValidFor)
@@ -139,9 +139,9 @@ node then signs with the hot key alone, and the operator key stays off the serve
 		},
 	}
 
-	cmd.Flags().String(flagGranter, "", "node account (sent1...); default [keyring] granter")
+	cmd.Flags().String(flagGranter, "", "node account (feryx1...); default [keyring] granter")
 	cmd.Flags().Duration(flagValidFor, 365*24*time.Hour, "how long the grants last")
-	cmd.Flags().String(flagSpendLimit, "100000000udvpn", "most the hot key may spend on fees")
+	cmd.Flags().String(flagSpendLimit, "100000000uxfy", "most the hot key may spend on fees")
 
 	return cmd
 }

@@ -184,7 +184,9 @@ function cmd_init {
 
     PUBLIC_IP=$(curl -fsSL https://ifconfig.me)
 
-    local chain_rpc_addresses="https://sentinel-rpc.publicnode.com:443,https://sentinel-rpc.polkachu.com:443,https://rpc-sentinel.busurnode.com:443,https://rpc.sentineldao.com:443"
+    # There is no default network: the operator names the chain and its RPC.
+    local chain_id=
+    local chain_rpc_addresses=
     local handshake_enable=false
     # The node signs unattended with the test backend, as the operator guide
     # sets it; with file it asks for the passphrase at every start, through
@@ -194,16 +196,22 @@ function cmd_init {
     local node_listen_on="0.0.0.0:${PORTS[0]}"
     local node_moniker && node_moniker=$(generate_moniker)
     # The installer's default prices.
-    local node_gigabyte_prices="40000000udvpn"
-    local node_hourly_prices="97500000udvpn"
+    local node_gigabyte_prices="40000000uxfy"
+    local node_hourly_prices="97500000uxfy"
     local node_remote_url="https://${PUBLIC_IP}:${PORTS[0]}"
     local node_type="${NODE_TYPE}"
 
     echo "Initializing the configuration..."
     must_run config init --force="${force}"
 
-    read -p "Enter chain_rpc_addresses [${chain_rpc_addresses}]:" -r input
-    [[ -n "${input}" ]] && chain_rpc_addresses="${input}"
+    while [[ -z "${chain_id}" ]]; do
+      read -p "Enter chain_id (the Feryx network to serve):" -r chain_id || return 1
+    done
+    config_set "chain.id" "${chain_id}"
+
+    while [[ -z "${chain_rpc_addresses}" ]]; do
+      read -p "Enter chain_rpc_addresses (https://host:port, comma-separated):" -r chain_rpc_addresses || return 1
+    done
     config_set "chain.rpc_addresses" "${chain_rpc_addresses}"
 
     read -p "Enter handshake_enable [${handshake_enable}]:" -r input

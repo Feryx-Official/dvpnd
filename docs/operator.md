@@ -4,13 +4,15 @@ What you need: a Linux host (Ubuntu 22.04/24.04 or Debian 12/13, x86_64; the ins
 takes aarch64, where an XRAY or Hysteria2 node needs its binary on `PATH` first, and the image
 is x86_64 only) with a **public IPv4 address** (a home connection behind carrier-grade NAT
 will not work — check that your router's WAN address is not in 100.64.0.0/10), root access,
-and an account on the Sentinel chain holding a little P2P for gas (the coin formerly called
-DVPN; on the chain its denomination is still `udvpn`). Registration deposit is currently 0.
+an account on the Feryx chain holding a little XFY for gas (on the chain its denomination is
+`uxfy`), and the chain ID and an RPC address of the Feryx network to serve: the node has no
+default network. Registration takes the small deposit the chain's node parameters set.
 
 This guide covers WireGuard, AmneziaWG, OpenVPN, V2Ray, XRAY and Hysteria2 nodes; the
-protocol is chosen with `[node] type`. A WireGuard node has been run this way against the
-public network with real clients, and every type but OpenVPN has served paid sessions on a
-public node on the live network, the client side driven by `tools/e2e`. OpenVPN has served
+protocol is chosen with `[node] type`. On the Sentinel network this software was first
+written for, a WireGuard node was run this way with real clients, and every type but OpenVPN
+served paid sessions on a public node, the client side driven by `tools/e2e`; on a Feryx test
+network a node has registered, kept its status and sold a session. OpenVPN has served
 its own client end to end between two containers, as every protocol does in the integration
 suite (`test/README.md`).
 
@@ -43,10 +45,11 @@ systemd unit. Read it first; then:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/Feryx-Official/dvpnd/main/scripts/install.sh -o install.sh
-sudo bash install.sh --moniker "My node"          # --type amneziawg|openvpn|v2ray|xray|hysteria2, --help for the rest
+sudo bash install.sh --moniker "My node" --chain-id CHAIN_ID --rpc https://RPC_HOST:443
+                                                   # --type amneziawg|openvpn|v2ray|xray|hysteria2, --help for the rest
 ```
 
-With `--granter sent1…` it creates a hot key instead of the operator key and prints the
+With `--granter feryx1…` it creates a hot key instead of the operator key and prints the
 grants to make from the node account's wallet (§3a); on an existing node that is the move to
 a hot key. It builds only a release tag whose SSH signature checks out against the maintainer's key
 pinned in the script (the key GitHub shows as verified on the tags); to build anything else,
@@ -80,7 +83,7 @@ curl -fsSLO "$base/install.sh" && curl -fsSLO "$base/install.sh.sigstore.json"
 cosign verify-blob install.sh --bundle install.sh.sigstore.json \
   --certificate-identity-regexp '^https://github.com/Feryx-Official/dvpnd/\.github/workflows/docker-publish\.yml@refs/tags/v' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
-sudo bash install.sh --moniker "My node"
+sudo bash install.sh --moniker "My node" --chain-id CHAIN_ID --rpc https://RPC_HOST:443
 ```
 
 `verify-blob` must print `Verified OK`. The installer then builds the latest release,
@@ -117,12 +120,12 @@ Edit `~/.dvpnd/config.toml`:
 | Key | Set to |
 |---|---|
 | `[keyring] backend` | `test` — the node must sign transactions unattended, so the key is stored unencrypted under `~/.dvpnd/keyring-test` (mode 700). Prefer a **hot key** (`[keyring] granter`, §3a): the operator key and the earnings then stay off the server. Otherwise use a dedicated operator key and sweep earnings out regularly; see §8. Without a granter, `start` logs a warning saying so at every start. |
-| `[keyring] granter` | empty, or the node account's `sent1…` address when `from` is a hot key (§3a). |
+| `[keyring] granter` | empty, or the node account's `feryx1…` address when `from` is a hot key (§3a). |
 | `[keyring] from` | the key name you will create in step 3, e.g. `operator` |
 | `[node] type` | `wireguard`, `amneziawg`, `openvpn`, `v2ray`, `xray` or `hysteria2`; see §2a to §2f for the protocol's own file |
 | `[node] moniker` | your node's public name (4–32 characters) |
-| `[node] gigabyte_prices` | e.g. `40000000udvpn` (40 P2P per GB). Only denoms the chain lists in its node params are accepted; prices below the chain's minimums are rejected at registration. |
-| `[node] hourly_prices` | e.g. `97500000udvpn` |
+| `[node] gigabyte_prices` | e.g. `40000000uxfy` (40 XFY per GB). Only denoms the chain lists in its node params are accepted; prices below the chain's minimums are rejected at registration. |
+| `[node] hourly_prices` | e.g. `97500000uxfy` |
 | `[node] remote_url` | `https://<public-ip>:8585` — this becomes the on-chain `remote_addrs` (`host:port`); clients connect to it directly |
 | `[node] listen_on` | `0.0.0.0:8585` |
 | `[node] legacy_handshake` | `false` (the default). `true` also serves the legacy handshake endpoint, `POST /accounts/<address>/sessions/<id>`, which only old clients use. Its signature covers the session id but not the peer key, so anyone who captures one request can replay it with a key of their own and cut the real client off. |
@@ -130,7 +133,8 @@ Edit `~/.dvpnd/config.toml`:
 | `[egress] allow_smtp` | `false` (the default). Clients never reach the node host, private or link-local networks, or each other (§5); outgoing mail to TCP port 25 is blocked too, because a node that relays anyone's mail lands on block lists and providers suspend it. Set `true` only if you accept that. |
 | `[geoip]` | Leave `provider = "auto"`: at start the node asks ipwho.is, then ip2location.io, for the location of its public IP and cross-checks the country against Cloudflare; a disagreement is logged. No key, no cost, and both services allow commercial use on their free tier. Check the result with `curl -sk https://127.0.0.1:8585/status \| jq .result.location` (`source` names the service that answered). The location a node reports is self-declared and nothing verifies it; clients use it to choose a node, so only if the lookup is wrong set `city`, `country` (name or ISO code), `latitude`, `longitude` to the server's real physical location. The node logs the contradiction and reports `source = "static"`. Do not use `ip-api` on a node that earns unless you pay for it: its free tier is non-commercial only (a paid key goes in `url`). `ipinfo` returns the country only on its free plan. |
 | `[bandwidth]` | Leave both at `0`: at start the node measures its link. It picks speed test servers by measured latency, discards any that answer from inside its own datacenter (common on cloud hosts: those measure the local network and can overstate the link several times over), and reports the lowest of two or three independent servers. That takes one to two minutes and moves several gigabytes on a fast link; the result is kept in `~/.dvpnd/bandwidth.json` and reused for a week, or until the public IP changes (delete the file to measure again). If you know what your provider sells you, set `download_mbps` and `upload_mbps` (a 1 Gbit/s port is `1000`) and the measurement is skipped. See which you got with `curl -sk https://127.0.0.1:8585/status | jq .result.bandwidth`: `source` is `speedtest`, `config` or `none`. Nothing verifies the figure and clients use it to choose a node: do not overstate it. |
-| `[chain] rpc_addresses` | comma-separated, tried in order; the defaults are public endpoints from the [chain registry](https://github.com/cosmos/chain-registry/blob/master/sentinel/chain.json). Put your own RPC first if you run one. Each must be `https`; plain `http` is accepted only on loopback (`http://127.0.0.1:26657` for an RPC on the same host), because the node admits clients on what the RPC answers. An endpoint that answers with an HTTP redirect does not work with this client. |
+| `[chain] id` | the chain ID of the Feryx network the node serves. There is no default: the node does not start until it is set. |
+| `[chain] rpc_addresses` | comma-separated, tried in order; there is no default, so name at least one RPC of that network. Put your own RPC first if you run one. Each must be `https`; plain `http` is accepted only on loopback (`http://127.0.0.1:26657` for an RPC on the same host), because the node admits clients on what the RPC answers. An endpoint that answers with an HTTP redirect does not work with this client. |
 
 At start the node names, in an error line, any key in `config.toml` that no setting takes
 (a misspelt key, or one left by the upstream node's file) and then ignores it; `config set`
@@ -272,11 +276,12 @@ connection and denies the certificate from then on. The node needs the `openvpn`
 ```sh
 dvpnd keys add operator                # prints the mnemonic once: store it safely
 dvpnd keys add operator --recover      # or import an existing mnemonic
-dvpnd keys list                        # shows the sent1… operator and sentnode1… node address
+dvpnd keys list                        # shows the feryx1… operator and feryxnode1… node address
 ```
 
-Send a few P2P to the `sent1…` address for gas (each status update and usage report is a
-transaction; budget roughly 0.02 P2P per transaction, a status update every 48 minutes).
+Send a few XFY to the `feryx1…` address for gas (each status update and usage report is a
+transaction; budget roughly 0.02 XFY per transaction at the default gas price, a status update
+every 48 minutes).
 
 ### 3a. A hot key (recommended)
 
@@ -290,15 +295,15 @@ earnings still reach it; the hot key holds nothing.
 ```sh
 dvpnd keys add hot                                      # on the server; no backup needed
 dvpnd config set keyring.from hot
-dvpnd config set keyring.granter sent1…                 # the node account
+dvpnd config set keyring.granter feryx1…                # the node account
 dvpnd keys authz-commands                               # prints the grants to make
 ```
 
-Run the five commands it prints with the `sentinelhub` CLI from the wallet that holds the node
+Run the five commands it prints with the `feryxhub` CLI from the wallet that holds the node
 account: four authz grants (register, update details, update status, update session) and one
 fee allowance limited to `MsgExec`. They last a year by default (`--valid-for`) and the fee
-allowance is capped at 100 P2P (`--spend-limit`). The fee grant also creates the hot key's
-account on the chain. Keep a few P2P on the node account for the fees.
+allowance is capped at 100 XFY (`--spend-limit`). The fee grant also creates the hot key's
+account on the chain. Keep a few XFY on the node account for the fees.
 
 At start the node checks the grants and refuses to run while one is missing or expired,
 naming it. It warns in the log when a grant expires within 14 days or the fee allowance would
@@ -307,7 +312,7 @@ the operator; the node signs its handshake replies with the hot key, and a clien
 them looks up the grant on the chain (docs/protocols.md).
 
 **Moving an existing node to a hot key:** do the above (the installer does it with
-`--granter sent1…`), restart, and check `journalctl -u dvpnd` shows `Signing with a hot key`
+`--granter feryx1…`), restart, and check `journalctl -u dvpnd` shows `Signing with a hot key`
 and a successful status update. Then, holding the operator key's mnemonic somewhere safe, delete
 the key from the server with `dvpnd keys delete operator`, and delete any file that holds the
 mnemonic. The node address and its sessions are unchanged.
@@ -448,7 +453,7 @@ child process) and serves `https://<ip>:8585`. Check it:
 curl -sk https://127.0.0.1:8585/ | head -c 400            # {"success":true,"result":{"service_type":"wireguard",…}}
 ```
 
-On the chain, the node appears in `sentinel/node/v3/nodes/<sentnode1…>` with status
+On the chain, the node appears in `sentinel/node/v3/nodes/<feryxnode1…>` with status
 `active`. Node aggregators that client apps read re-probe active nodes every few minutes;
 once your `GET /` answers from the internet your node becomes visible in the apps.
 
@@ -667,7 +672,7 @@ in `-home`): copy the node's `tls.crt` to check a node on another host.
   no measurement was possible: every reachable speed test server was inside this host's
   network, or the speed test service was unreachable and nothing was cached. The node runs
   regardless; declare the link in `[bandwidth]` or restart once the service is back.
-- **Earnings** accrue to the operator `sent1…` address as sessions settle. With a hot key
+- **Earnings** accrue to the operator `feryx1…` address as sessions settle. With a hot key
   (§3a) that account is not on the server at all. Without one, sweep them to a wallet you
   hold offline; the key on the node is unencrypted, and so is any file holding its mnemonic.
 - **Upgrade:** on the host, re-run `scripts/install.sh` (it rebuilds the latest release and
@@ -678,7 +683,5 @@ in `-home`): copy the node's `tls.crt` to check a node on another host.
 - **Moving hosts:** copy `~/.dvpnd` (keyring, config, TLS, protocol file) to the new host and
   change `remote_url`; the next start sends `MsgUpdateNodeDetails` with the new address.
 - **Stopping for good:** `sudo systemctl disable --now dvpnd`. The chain marks the node
-  inactive after `status_timeout` (currently 1 h) without an update; to do it immediately run
+  inactive after the chain's node `status_timeout` without an update; to do it immediately run
   `go run ./tools/e2e -home /root/.dvpnd -deactivate` from the source tree.
-- **Upstream node data:** if this host ran the upstream node, its files are in
-  `~/.sentinelnode`; `dvpnd` never reads them but prints a hint when only that directory exists.

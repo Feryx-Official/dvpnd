@@ -66,10 +66,12 @@ gas_adjustment = {{ .Chain.GasAdjustment }}
 # Gas prices to determine the transaction fee
 gas_prices = {{ toml .Chain.GasPrices }}
 
-# The network chain ID
+# The chain ID of the Feryx network the node serves. There is no default: the node
+# does not start until it is set.
 id = {{ toml .Chain.ID }}
 
-# Comma separated Tendermint RPC addresses for the chain; https, or http on loopback only
+# Comma separated Tendermint RPC addresses for the chain; https, or http on loopback only.
+# There is no default: the node does not start until one is set.
 rpc_addresses = {{ toml .Chain.RPCAddresses }}
 
 # Timeout seconds for querying the data from the RPC server
@@ -134,7 +136,7 @@ backend = {{ toml .Keyring.Backend }}
 # Name of the key with which to sign
 from = {{ toml .Keyring.From }}
 
-# The node account, when the key above is a hot key: the address (sent1...) that granted
+# The node account, when the key above is a hot key: the address (feryx1...) that granted
 # it the right to send the node's messages (authz) and pays its fees (feegrant). The
 # operator key and the earnings then stay off this server. Empty: the key above is the
 # node account itself. "dvpnd keys authz-commands" prints the grants to make.
@@ -159,7 +161,7 @@ listen_on = {{ toml .Node.ListenOn }}
 # Name of the node
 moniker = {{ toml .Node.Moniker }}
 
-# Prices for one gigabyte of bandwidth provided. Either plain coins ("1000udvpn,5uatom")
+# Prices for one gigabyte of bandwidth provided. Either plain coins ("1000uxfy,5uatom")
 # or the chain's price form "denom:base_value,quote_value" separated by ";"
 # (a non-zero base_value lets the chain re-quote the price via its oracle)
 gigabyte_prices = {{ toml .Node.GigabytePrices }}
@@ -301,9 +303,11 @@ func loopbackHost(host string) bool {
 func (c *ChainConfig) WithDefaultValues() *ChainConfig {
 	c.Gas = 200_000
 	c.GasAdjustment = 1.05
-	c.GasPrices = "0.1udvpn"
-	c.ID = "sentinelhub-2"
-	c.RPCAddresses = "https://sentinel-rpc.publicnode.com:443,https://sentinel-rpc.polkachu.com:443,https://rpc-sentinel.busurnode.com:443,https://rpc.sentineldao.com:443"
+	c.GasPrices = "0.1uxfy"
+	// No chain ID or RPC address by default: the operator names the network, and a node
+	// configured for none never falls back to another one.
+	c.ID = ""
+	c.RPCAddresses = ""
 	c.RPCQueryTimeout = 10
 	c.RPCTxTimeout = 30
 	c.SimulateAndExecute = true
@@ -717,7 +721,7 @@ func ReadInConfig(v *viper.Viper) (*Config, error) {
 }
 
 // ParsePrices accepts either the chain's own price notation
-// ("udvpn:0.5,1000;uatom:0,20") or plain coins ("1000udvpn,20uatom"), the format
+// ("uxfy:0.5,1000;uatom:0,20") or plain coins ("1000uxfy,20uatom"), the format
 // upstream used before prices gained a base value. An empty string yields no prices.
 func ParsePrices(s string) (v1base.Prices, error) {
 	s = strings.TrimSpace(s)

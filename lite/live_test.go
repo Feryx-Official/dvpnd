@@ -16,7 +16,7 @@ import (
 
 // TestLiveChain talks to a real RPC endpoint and is skipped unless
 // DVPND_LIVE_RPC is set (comma-separated remotes). Optional DVPND_LIVE_NODE
-// (bech32 sentnode address), DVPND_LIVE_SESSION and DVPND_LIVE_SUBSCRIPTION
+// (bech32 feryxnode address), DVPND_LIVE_SESSION and DVPND_LIVE_SUBSCRIPTION
 // (ids) exercise the decode paths for the corresponding objects. Read-only;
 // no key, no transaction.
 func TestLiveChain(t *testing.T) {

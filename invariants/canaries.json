@@ -1598,11 +1598,11 @@
       "name": "[LIC-6] a wallet address is committed in a document",
       "file": "docs/invariants/provenance.md",
       "find": "**[LIC-6] No wallet or node address is committed.**",
-      "replace": "**[LIC-6] No wallet or node address is committed.** sent\u0031qurswpc8qurswpc8qurswpc8qurswpc8gg3ryw",
+      "replace": "**[LIC-6] No wallet or node address is committed.** feryx\u0031qurswpc8qurswpc8qurswpc8qurswpc8z6ghm2",
       "run": [
         "go test -count=1 -run '^TestNoOnChainAddresses$' ./test/static/"
       ],
-      "expect": "an on-chain address in a committed file \\(it links the repository to a wallet\\): docs/invariants/provenance\\.md: sent1"
+      "expect": "an on-chain address in a committed file \\(it links the repository to a wallet\\): docs/invariants/provenance\\.md: feryx1"
     },
     {
       "name": "[CH-11] a transaction taken at a used sequence is waited for, never built again",

@@ -37,7 +37,7 @@
 # iptables loads its modules itself; ProtectClock adds nothing, CAP_SYS_TIME
 # being outside the bounding set already.
 [Unit]
-Description=dvpnd - dVPN node for the Sentinel network
+Description=dvpnd - dVPN node for the Feryx network
 After=network-online.target
 Wants=network-online.target
 

@@ -92,7 +92,7 @@ func TestClearSessions(t *testing.T) {
 //
 // Rules: [PV-4].
 func TestDeletedSessionsLeaveNoTrace(t *testing.T) {
-	const address, key = "sent1tracemarkeraddress", "tracemarkerpeerkey"
+	const address, key = "feryx1tracemarkeraddress", "tracemarkerpeerkey"
 
 	// earlierRelease opens the file as releases before secure_delete did.
 	earlierRelease := func(path string) (*gorm.DB, error) {

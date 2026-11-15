@@ -282,7 +282,7 @@
     {
       "id": "rpc",
       "type": "external",
-      "label": "Sentinel RPC",
+      "label": "Feryx RPC",
       "sublabel": "CometBFT, gRPC",
       "pos": [
         1090,
@@ -292,7 +292,7 @@
         160,
         64
       ],
-      "tag": "sentinelhub-2"
+      "tag": "FeryxHub"
     }
   ],
   "boundaries": [
