@@ -51,3 +51,10 @@ signs transactions unattended, so its key lives on the server. IDs as in
   start; the installer and the Docker runner ask for both and refuse a malformed one
   before writing anything. The defaults named the Sentinel chain and its public RPCs, so
   a Feryx node left on them joined another network.
+- **[CH-13] The default gas margin covers well over the gas a transaction's state can
+  grow by between its simulation and its block.** Other transactions in between change
+  what it reads: on a four-validator test network a status update used 7.4% more gas
+  than simulated, because a session bought on the node landed first, and at the 5%
+  margin then in use it ran out of gas. On a fresh Feryx genesis the next status update
+  comes after the chain's status timeout, so one failed update deactivates the node. The
+  default is 30%.

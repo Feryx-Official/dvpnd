@@ -302,7 +302,7 @@ func loopbackHost(host string) bool {
 
 func (c *ChainConfig) WithDefaultValues() *ChainConfig {
 	c.Gas = 200_000
-	c.GasAdjustment = 1.05
+	c.GasAdjustment = 1.3
 	c.GasPrices = "0.1uxfy"
 	// No chain ID or RPC address by default: the operator names the network, and a node
 	// configured for none never falls back to another one.

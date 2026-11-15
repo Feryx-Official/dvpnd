@@ -50,15 +50,16 @@ func TestAuthzCommands(t *testing.T) {
 	}
 }
 
-// TestExpectedFees: the default node, at 0.1uxfy for 210000 gas a
-// transaction, sends a status update every 55 minutes and a session report
-// every 115 minutes; over 14 days that is 366 + 175 transactions.
+// TestExpectedFees: the default node, at 0.1uxfy for 260000 gas a
+// transaction (200000 at the 30% margin), sends a status update every 55
+// minutes and a session report every 115 minutes; over 14 days that is
+// 366 + 175 transactions.
 //
 // Rules: [CH-7].
 func TestExpectedFees(t *testing.T) {
 	config := types.NewConfig().WithDefaultValues()
 	got := expectedFees(config, 14*24*time.Hour)
-	if want := sdk.NewCoins(sdk.NewInt64Coin("uxfy", 541*21000)); !got.IsEqual(want) {
+	if want := sdk.NewCoins(sdk.NewInt64Coin("uxfy", 541*26000)); !got.IsEqual(want) {
 		t.Fatalf("expected fees %s, want %s", got, want)
 	}
 }

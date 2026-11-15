@@ -1623,6 +1623,16 @@
         "go test -count=1 -run '^(TestOneCallPaysForOneTransactionAtMost)$' ./lite/"
       ],
       "expect": "--- FAIL"
+    },
+    {
+      "name": "[CH-13] the default gas margin goes back to 5%",
+      "file": "types/config.go",
+      "find": "\tc.GasAdjustment = 1.3\n",
+      "replace": "\tc.GasAdjustment = 1.05\n",
+      "run": [
+        "go test -count=1 -run '^TestDefaultGasMarginCoversStateGrowth$' ./types/"
+      ],
+      "expect": "--- FAIL"
     }
   ]
 }

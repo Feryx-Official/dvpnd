@@ -249,6 +249,22 @@ func TestNoDefaultNetwork(t *testing.T) {
 	}
 }
 
+// TestDefaultGasMarginCoversStateGrowth: a transaction is simulated against
+// one block and runs in a later one, where other transactions may have grown
+// the state it reads. On a four-validator test network a status update used
+// 7.4% more gas than its simulation, because a session bought on the node
+// landed in between; at a 5% margin it ran out of gas. On a fresh Feryx
+// genesis the node's next status update comes after the chain's status
+// timeout, so one failed update deactivates the node.
+//
+// Rules: [CH-13].
+func TestDefaultGasMarginCoversStateGrowth(t *testing.T) {
+	const seen = 0.074 // gas used beyond the simulation, as a fraction of it
+	if margin := NewChainConfig().WithDefaultValues().GasAdjustment - 1; margin < 3*seen {
+		t.Fatalf("default gas margin %.0f%%, want at least three times the %.1f%% growth seen", margin*100, seen*100)
+	}
+}
+
 // Rules: [CH-3].
 func TestKeyringGranter(t *testing.T) {
 	c := NewKeyringConfig().WithDefaultValues()
