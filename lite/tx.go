@@ -237,7 +237,7 @@ func (c *Client) signedTx(messages ...sdk.Msg) ([]byte, uint64, error) {
 		return nil, 0, err
 	}
 
-	if err = tx.Sign(txf, c.FromName(), txb, true); err != nil {
+	if err = tx.Sign(context.Background(), txf, c.FromName(), txb, true); err != nil {
 		return nil, 0, err
 	}
 

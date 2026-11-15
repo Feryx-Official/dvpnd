@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"cosmossdk.io/x/feegrant"
 	abci "github.com/cometbft/cometbft/abci/types"
 	cmtbytes "github.com/cometbft/cometbft/libs/bytes"
 	cmtlog "github.com/cometbft/cometbft/libs/log"
@@ -32,7 +33,6 @@ import (
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	"github.com/cosmos/cosmos-sdk/x/feegrant"
 )
 
 // fakeChain is a CometBFT RPC endpoint in front of a small model of the
@@ -180,7 +180,7 @@ func (f *fakeChain) call(method string, params json.RawMessage) (any, error) {
 		if !ok {
 			return nil, fmt.Errorf("tx (%X) not found", p.Hash)
 		}
-		result := abci.ResponseDeliverTx{Code: inc.code}
+		result := abci.ExecTxResult{Code: inc.code}
 		if inc.code != 0 {
 			result.Codespace, result.Log = "sdk", "out of gas"
 		}

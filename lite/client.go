@@ -203,9 +203,10 @@ func (c *Client) WithTxConfig(v client.TxConfig) *Client {
 
 // SignBytes signs msg with the node's signing key the way the SDK signs
 // (secp256k1 ECDSA over SHA-256 of msg) and returns the signature with the
-// key's public half.
+// key's public half. A key held in the keyring signs msg itself whatever the
+// sign mode; the mode only tells a hardware key how to display it.
 func (c *Client) SignBytes(msg []byte) ([]byte, cryptotypes.PubKey, error) {
-	return c.ctx.Keyring.Sign(c.FromName(), msg)
+	return c.ctx.Keyring.Sign(c.FromName(), msg, c.txf.SignMode())
 }
 
 func (c *Client) FromAddress() sdk.AccAddress { return c.ctx.FromAddress }

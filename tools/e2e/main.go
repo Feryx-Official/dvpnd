@@ -43,6 +43,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	"github.com/spf13/viper"
 
 	"github.com/Feryx-Official/dvpnd/v9/lite"
@@ -211,7 +212,7 @@ func run(home, api, apiCert string, gigabytes int64, maxPriceStr string, session
 	if err != nil {
 		return err
 	}
-	sig, pubKey, err := kr.Sign(config.Keyring.From, append(sdk.Uint64ToBigEndian(sessionID), peerJSON...))
+	sig, pubKey, err := kr.Sign(config.Keyring.From, append(sdk.Uint64ToBigEndian(sessionID), peerJSON...), signing.SignMode_SIGN_MODE_DIRECT)
 	if err != nil {
 		return err
 	}

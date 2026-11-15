@@ -1,19 +1,19 @@
 # Dependency licence audit
 
-## Current graph — FeryxHub v12 (`7c76d1f0`) / cosmos-sdk v0.47.17 (2026-11-15)
+## Current graph — FeryxHub v12 (`4ea35f8c`) / cosmos-sdk v0.53.8 / CometBFT v0.38.26 (2026-11-15)
 
-Raw output: `dependency-licenses.csv` (133 modules, dvpnd itself left out), generated with `go-licenses v1.6.0`;
+Raw output: `dependency-licenses.csv` (171 modules, dvpnd itself left out), generated with `go-licenses v1.6.0`;
 re-run with `go run github.com/google/go-licenses@v1.6.0 report ./...`. The CI licence gate
 runs the matching `check` on every push.
 
 | Licence | Modules |
 |---|---|
-| MIT | 54 |
-| Apache-2.0 | 40 — cosmos-sdk, CometBFT (`Feryx-Official/cometbft`, the commit of the `sentinel-official/cometbft` fork), FeryxHub |
-| BSD-3-Clause | 25 |
-| BSD-2-Clause | 5 |
+| MIT | 65 |
+| Apache-2.0 | 56 — cosmos-sdk, official CometBFT, FeryxHub |
+| BSD-3-Clause | 34 |
+| MPL-2.0 | 6 — `hashicorp/go-immutable-radix`, `hashicorp/go-plugin`, `hashicorp/golang-lru` (v1 and v2), `hashicorp/yamux`, `pgregory.net/rapid`; file-level weak copyleft, unmodified |
 | ISC | 5 |
-| MPL-2.0 | 3 — `hashicorp/go-immutable-radix`, `hashicorp/golang-lru`, `pgregory.net/rapid`; file-level weak copyleft, unmodified |
+| BSD-2-Clause | 4 |
 | BSD-2-Clause-FreeBSD | 1 |
 
 **No GPL, LGPL or AGPL dependency. No dependency without a licence. No `Unknown`.**

@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
+	"cosmossdk.io/x/feegrant"
 	"github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkquery "github.com/cosmos/cosmos-sdk/types/query"
 	"github.com/cosmos/cosmos-sdk/x/authz"
-	"github.com/cosmos/cosmos-sdk/x/feegrant"
 
 	"github.com/Feryx-Official/dvpnd/v9/types"
 )

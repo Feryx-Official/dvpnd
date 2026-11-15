@@ -3,17 +3,18 @@
 package lite
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	"cosmossdk.io/x/feegrant"
 	v1base "github.com/Feryx-Official/feryxhub/v12/types/v1"
 	nodetypes "github.com/Feryx-Official/feryxhub/v12/x/node/types/v3"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/authz"
-	"github.com/cosmos/cosmos-sdk/x/feegrant"
 )
 
 // Rules: [CH-6].
@@ -128,11 +129,16 @@ func TestHotKeyTransactions(t *testing.T) {
 		t.Fatalf("with a granter: %v", got)
 	}
 	inner, err := exec.GetMessages()
-	if err != nil || len(inner) != 1 || !inner[0].GetSigners()[0].Equals(granter) {
-		t.Fatalf("inner message %v: %v; it must be signed for the granter", inner, err)
+	if err != nil || len(inner) != 1 {
+		t.Fatalf("inner messages %v: %v", inner, err)
 	}
-	if err := exec.ValidateBasic(); err != nil {
-		t.Fatal(err)
+	if signers, _, err := c.ctx.Codec.GetMsgV1Signers(inner[0]); err != nil || len(signers) != 1 || !bytes.Equal(signers[0], granter) {
+		t.Fatalf("inner message %v: signers %x (%v); it must be signed for the granter", inner, signers, err)
+	}
+	// What MsgExec.ValidateBasic checked on SDK 0.47, which SDK 0.53 leaves to
+	// the authz message server: a valid grantee and at least one message.
+	if _, err := sdk.AccAddressFromBech32(exec.Grantee); err != nil || len(exec.Msgs) == 0 {
+		t.Fatalf("grantee %q with %d messages: %v", exec.Grantee, len(exec.Msgs), err)
 	}
 
 	// The transaction carries the granter as fee granter and encodes.
@@ -140,8 +146,8 @@ func TestHotKeyTransactions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !txb.GetTx().FeeGranter().Equals(granter) {
-		t.Fatalf("fee granter %s", txb.GetTx().FeeGranter())
+	if !bytes.Equal(txb.GetTx().FeeGranter(), granter) {
+		t.Fatalf("fee granter %s", sdk.AccAddress(txb.GetTx().FeeGranter()))
 	}
 	if _, err := c.TxConfig().TxEncoder()(txb.GetTx()); err != nil {
 		t.Fatal(err)
@@ -167,7 +173,7 @@ func TestFeeAllowanceFoundPastTheFirstPage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if basic, ok := got.(*feegrant.BasicAllowance); !ok || !basic.SpendLimit.IsEqual(limit) {
+	if basic, ok := got.(*feegrant.BasicAllowance); !ok || !basic.SpendLimit.Equal(limit) {
 		t.Fatalf("the granter's allowance, listed after 1000 others, came back as %v", got)
 	}
 }

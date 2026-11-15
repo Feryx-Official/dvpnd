@@ -33,7 +33,7 @@ updates:
         update-types: ["minor", "patch"]
     ignore:
       # The chain stack is pinned to what FeryxHub v12 was built against; moving
-      # cosmos-sdk off v0.47 or CometBFT off v0.37 is a migration, not a routine
+      # cosmos-sdk off v0.53 or CometBFT off v0.38 is a migration, not a routine
       # bump (for v0.x modules the breaking bump is the minor one). Patch releases
       # still come through.
       - dependency-name: "github.com/Feryx-Official/*"

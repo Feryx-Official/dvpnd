@@ -7,11 +7,11 @@ import (
 	"slices"
 	"time"
 
+	"cosmossdk.io/x/feegrant"
 	nodetypes "github.com/Feryx-Official/feryxhub/v12/x/node/types/v3"
 	sessiontypes "github.com/Feryx-Official/feryxhub/v12/x/session/types/v3"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/authz"
-	"github.com/cosmos/cosmos-sdk/x/feegrant"
 )
 
 // NodeMsgTypeURLs are the messages a node sends, each of which a hot key

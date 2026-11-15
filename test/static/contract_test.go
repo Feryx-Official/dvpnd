@@ -21,7 +21,7 @@ import (
 // Phase 3 fixture holds it in the library go.mod requires (read from the
 // module cache with the network off). DVPND_CHAIN_CONTRACTS names another
 // copy of that fixture to check against instead, such as the one of a chain
-// built on a newer SDK while the node keeps this library.
+// release the node does not link.
 //
 // Rules: [CH-14].
 func TestTheChainContractCopyIsTheChains(t *testing.T) {

@@ -59,7 +59,7 @@ func TestAuthzCommands(t *testing.T) {
 func TestExpectedFees(t *testing.T) {
 	config := types.NewConfig().WithDefaultValues()
 	got := expectedFees(config, 14*24*time.Hour)
-	if want := sdk.NewCoins(sdk.NewInt64Coin("uxfy", 541*26000)); !got.IsEqual(want) {
+	if want := sdk.NewCoins(sdk.NewInt64Coin("uxfy", 541*26000)); !got.Equal(want) {
 		t.Fatalf("expected fees %s, want %s", got, want)
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/bech32"
@@ -49,16 +50,13 @@ func chainContract(t *testing.T) []contractEntry {
 	return c.Messages
 }
 
-// signers is GetSigners, or false where it panics, as it does for an address
-// under a prefix the message does not take.
-func signers(m sdk.Msg) (out []sdk.AccAddress, ok bool) {
-	defer func() {
-		if recover() != nil {
-			out, ok = nil, false
-		}
-	}()
+// signers are the message's signers as the node's codec resolves them, the
+// way the SDK resolves a transaction's signers, or false where it cannot, as
+// for an address under a prefix the message does not take.
+func signers(cdc codec.Codec, m sdk.Msg) ([][]byte, bool) {
+	got, _, err := cdc.GetMsgV1Signers(m)
 
-	return m.GetSigners(), true
+	return got, err == nil
 }
 
 // withFrom is a copy of m with its signer field set to from and, when
@@ -94,7 +92,8 @@ func withFrom(t *testing.T, m sdk.Msg, from string, alone bool) sdk.Msg {
 // Rules: [CH-14].
 func TestMessagesMatchTheChainContract(t *testing.T) {
 	entries := chainContract(t)
-	registry := lite.DefaultEncodingConfig().InterfaceRegistry
+	cfg := lite.DefaultEncodingConfig()
+	registry := cfg.InterfaceRegistry
 
 	var urls []string
 	for _, e := range entries {
@@ -125,7 +124,7 @@ func TestMessagesMatchTheChainContract(t *testing.T) {
 		if !ok || !e.Routed {
 			t.Fatalf("%s: the node builds no such message, or the chain routes none", e.TypeURL)
 		}
-		got, ok := signers(m)
+		got, ok := signers(cfg.Codec, m)
 		if !ok || len(got) != 1 || !bytes.Equal(got[0], signer) {
 			t.Fatalf("%s: signers %v, want the node account's", e.TypeURL, got)
 		}
@@ -149,7 +148,7 @@ func TestMessagesMatchTheChainContract(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				got, ok := signers(withFrom(t, m, addr, false))
+				got, ok := signers(cfg.Codec, withFrom(t, m, addr, false))
 				if accepted := ok && len(got) == 1 && bytes.Equal(got[0], signer); accepted != want {
 					t.Errorf("%s: signer under %s accepted %v, want %v", e.TypeURL, hrp, accepted, want)
 				}

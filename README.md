@@ -449,8 +449,8 @@ are in [the operator guide, section 7](docs/operator.md#7-run-with-docker-when-t
 ## Project status
 
 - dvpnd speaks the FeryxHub chain protocol: the `feryx.*` v3 message set
-  (node/session/subscription) on cosmos-sdk v0.47. The chain library it builds on is
-  FeryxHub, an Apache-2.0 fork of the Sentinel chain.
+  (node/session/subscription) on cosmos-sdk v0.53 with CometBFT 0.38. The chain library
+  it builds on is FeryxHub, an Apache-2.0 fork of the Sentinel chain.
 - On a four-validator Feryx test network, a node registered, kept its status and sold a
   session whose handshake verified.
 - Before this branch, on the Sentinel network this software was first written for, a public

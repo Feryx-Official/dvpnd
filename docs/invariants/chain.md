@@ -62,6 +62,6 @@ signs transactions unattended, so its key lives on the server. IDs as in
   `context/testdata/chain-contract.json` copies FeryxHub's frozen contract (its Phase 3
   fixture) for the four messages the node sends: type URL, wire bytes, signer bytes, and
   the address prefixes the chain takes and refuses. The messages the node builds match
-  every entry, and the copy matches the chain's fixture in the library the node links.
-  When the chain moves to a newer SDK while the node keeps this library (FeryxHub plan,
-  Phase 4d), the new chain's fixture must still match this copy.
+  every entry, with their signers as the node's codec resolves them, through the chain's
+  own signer extraction, and the copy matches the chain's fixture in the library the node
+  links. Since FeryxHub's Phase 4d the node builds on the chain's own SDK 0.53 library.

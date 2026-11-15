@@ -71,9 +71,10 @@ database zeroes deleted rows.
 CI runs govulncheck on every push and pull request (`scripts/govulncheck.sh`)
 and fails on any vulnerability the code reaches that is not explained here.
 
-govulncheck reports GO-2026-5932, `golang.org/x/crypto/openpgp`. The fix it
-names, an untagged `x/crypto` commit, deletes the `openpgp` packages, which
-cosmos-sdk's `crypto/armor.go` (key export and import) imports, so the node
-cannot build with it. Only the armor and errors packages are linked, and they
-are reached at package initialisation. Leaving it needs a cosmos-sdk newer
-than the v0.47 line the FeryxHub chain library (v12) is built on.
+govulncheck reports GO-2026-5932, `golang.org/x/crypto/openpgp`. `x/crypto`
+moved the `openpgp` packages into the deprecated module
+`golang.org/x/crypto/openpgp`, and cosmos-sdk's `crypto/armor.go` (key export
+and import) still imports them on the v0.53 line the FeryxHub chain library
+(v12) is built on, so no version of the node can leave them out. Only the
+armor and errors packages are linked, and they are reached at package
+initialisation; no OpenPGP signature or encryption is used.
