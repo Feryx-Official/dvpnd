@@ -1763,6 +1763,26 @@
         "go test -count=1 -run '^(TestARestartReportsTheOthersWhenTheChainRefusesOne)$' ./node/"
       ],
       "expect": "--- FAIL"
+    },
+    {
+      "name": "[CH-14] the node's copy of the chain contract drifts from the chain's",
+      "file": "context/testdata/chain-contract.json",
+      "find": "\"Wire\": \"0a3066657279786e6f6465317734656b327533717971737a716770717971737a716770717971737a71677071657537366a6b1a01302201302a00\",",
+      "replace": "\"Wire\": \"0a3066657279786e6f6465317734656b327533717971737a716770717971737a716770717971737a71677071657537366a6b1a01302201302a0100\",",
+      "run": [
+        "go test -count=1 -run '^(TestTheChainContractCopyIsTheChains)$' ./test/static/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[CH-14] a status update is built without the node's address",
+      "file": "context/tx.go",
+      "find": "nodetypes.NewMsgUpdateNodeStatusRequest(c.Address(), v1base.StatusActive)",
+      "replace": "nodetypes.NewMsgUpdateNodeStatusRequest(c.Address()[:0], v1base.StatusActive)",
+      "run": [
+        "go test -count=1 -run '^(TestMessagesMatchTheChainContract)$' ./context/"
+      ],
+      "expect": "--- FAIL"
     }
   ]
 }

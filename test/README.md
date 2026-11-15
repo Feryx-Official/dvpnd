@@ -45,7 +45,9 @@ not yet.
   import, the notice on every upstream file changed in substance, `LICENSE` as
   the fork point had it, the provenance script passing offline, no wallet or
   node address in any committed file, every dependency's licence (read from the
-  module cache with the network off; CI checks it again with go-licenses), no
+  module cache with the network off; CI checks it again with go-licenses), the
+  node's copy of FeryxHub's frozen wire and signer contract equal to the
+  chain's fixture in the library it links (read the same way), no
   link to the account's former name, every protocol in the integration suite,
   the start command stopping the service on every exit, the session database
   opened in one place (`node.OpenDatabase`), the RPC remotes looped over in

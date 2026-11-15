@@ -58,3 +58,10 @@ signs transactions unattended, so its key lives on the server. IDs as in
   margin then in use it ran out of gas. On a fresh Feryx genesis the next status update
   comes after the chain's status timeout, so one failed update deactivates the node. The
   default is 30%.
+- **[CH-14] The messages the node sends are the chain's frozen wire and signer contract.**
+  `context/testdata/chain-contract.json` copies FeryxHub's frozen contract (its Phase 3
+  fixture) for the four messages the node sends: type URL, wire bytes, signer bytes, and
+  the address prefixes the chain takes and refuses. The messages the node builds match
+  every entry, and the copy matches the chain's fixture in the library the node links.
+  When the chain moves to a newer SDK while the node keeps this library (FeryxHub plan,
+  Phase 4d), the new chain's fixture must still match this copy.
