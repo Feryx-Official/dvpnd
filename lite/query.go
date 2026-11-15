@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	base "github.com/Feryx-Official/feryxhub/v12/types"
 	nodetypes "github.com/Feryx-Official/feryxhub/v12/x/node/types/v3"
@@ -91,6 +92,24 @@ func (c *Client) QueryNode(nodeAddr base.NodeAddress) (result *nodetypes.Node, e
 		}
 
 		result = &resp.Node
+		return nil
+	})
+
+	return result, err
+}
+
+// QueryBlockTime returns the time of the latest block a remote holds. The
+// chain judges a report by the time of the block it lands in, which is never
+// earlier, so a bound taken at this time still holds when the report lands.
+func (c *Client) QueryBlockTime() (result time.Time, err error) {
+	c.log.Debug("Querying the latest block time")
+	err = c.query("block time", func(ctx client.Context) error {
+		status, err := ctx.Client.Status(context.TODO())
+		if err != nil {
+			return err
+		}
+
+		result = status.SyncInfo.LatestBlockTime
 		return nil
 	})
 

@@ -250,6 +250,9 @@
           "path": "node/jobs.go"
         },
         {
+          "path": "node/bounds.go"
+        },
+        {
           "path": "node/reconcile.go"
         }
       ]

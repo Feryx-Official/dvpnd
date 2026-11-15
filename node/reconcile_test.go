@@ -45,6 +45,8 @@ func TestSessionNeedsReport(t *testing.T) {
 			fakeSession{v1base.StatusActive, 10, 20}, true},
 		{"inactive is never reported", types.Session{Upload: 10, Download: 20},
 			fakeSession{v1base.StatusInactive, 0, 0}, false},
+		{"pending gets its final report", types.Session{Upload: 10, Download: 20},
+			fakeSession{v1base.StatusInactivePending, 0, 0}, true},
 	}
 	for _, c := range cases {
 		if got := sessionNeedsReport(c.local, c.chain); got != c.want {

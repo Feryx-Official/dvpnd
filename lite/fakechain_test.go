@@ -53,6 +53,7 @@ type fakeChain struct {
 	mempool     []pendingTx           // taken, not yet in a block
 	included    map[string]includedTx // by hash
 	height      int64
+	blockTime   time.Time // the latest block's
 	broadcasts  int
 	simulations int
 
@@ -185,6 +186,9 @@ func (f *fakeChain) call(method string, params json.RawMessage) (any, error) {
 		}
 
 		return &ctypes.ResultTx{Hash: p.Hash, Height: inc.height, TxResult: result, Tx: inc.tx}, nil
+
+	case "status":
+		return &ctypes.ResultStatus{SyncInfo: ctypes.SyncInfo{LatestBlockHeight: f.height, LatestBlockTime: f.blockTime}}, nil
 
 	case "block":
 		var p struct {

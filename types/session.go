@@ -42,6 +42,15 @@ type Session struct {
 	MaxDuration int64
 }
 
+// Report is what the node sends the chain for a session: cumulative totals,
+// as the chain refuses a report lower than the last one.
+type Report struct {
+	ID       uint64
+	Download int64
+	Upload   int64
+	Duration time.Duration
+}
+
 // ServedBytes is what this node process has moved for the session: the
 // reported totals minus what the chain already held when the peer was
 // admitted.

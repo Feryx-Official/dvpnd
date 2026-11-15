@@ -68,21 +68,21 @@ func (c *Context) UpdateNodeStatus() error {
 	return nil
 }
 
-func (c *Context) UpdateSessions(items ...types.Session) error {
+func (c *Context) UpdateSessions(reports ...types.Report) error {
 	c.Log().Info("Updating the sessions...")
 
-	messages := make([]sdk.Msg, 0, len(items))
-	for _, item := range items {
+	messages := make([]sdk.Msg, 0, len(reports))
+	for _, r := range reports {
 		// The proof signature is the client's and is only checked by the chain
 		// when its proof_verification_enabled parameter is on; the node has no
 		// client signature to attach, so it sends none (as upstream did).
 		messages = append(messages,
 			sessiontypes.NewMsgUpdateSessionRequest(
 				c.Address(),
-				item.ID,
-				sdkmath.NewInt(item.Download),
-				sdkmath.NewInt(item.Upload),
-				item.Duration(),
+				r.ID,
+				sdkmath.NewInt(r.Download),
+				sdkmath.NewInt(r.Upload),
+				r.Duration,
 				nil,
 			),
 		)

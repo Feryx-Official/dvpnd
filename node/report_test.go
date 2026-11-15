@@ -36,6 +36,8 @@ type fakeChain struct {
 	down     bool       // every call fails, as in an RPC outage
 	sent     [][]uint64 // the ids of every report attempted
 	accepted []uint64
+	reports  []types.Report // every report accepted
+	now      time.Time      // the latest block time; the wall clock when zero
 }
 
 func (f *fakeChain) QuerySession(id uint64) (sessiontypes.Session, error) {
@@ -59,7 +61,20 @@ func (f *fakeChain) QuerySubscription(uint64) (*subscriptiontypes.Subscription, 
 	return nil, nil
 }
 
-func (f *fakeChain) UpdateSessions(items ...types.Session) error {
+func (f *fakeChain) LatestBlockTime() (time.Time, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.down {
+		return time.Time{}, errors.New("connection refused")
+	}
+	if f.now.IsZero() {
+		return time.Now(), nil
+	}
+
+	return f.now, nil
+}
+
+func (f *fakeChain) UpdateSessions(items ...types.Report) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	var ids []uint64
@@ -76,6 +91,7 @@ func (f *fakeChain) UpdateSessions(items ...types.Session) error {
 		}
 	}
 	f.accepted = append(f.accepted, ids...)
+	f.reports = append(f.reports, items...)
 
 	return nil
 }
@@ -87,10 +103,10 @@ func testNode(chain *fakeChain) *Node {
 	return n
 }
 
-func sessions(ids ...uint64) []types.Session {
-	var items []types.Session
+func sessions(ids ...uint64) []types.Report {
+	var items []types.Report
 	for _, id := range ids {
-		items = append(items, types.Session{ID: id, Key: "k"})
+		items = append(items, types.Report{ID: id})
 	}
 
 	return items
@@ -141,7 +157,7 @@ type refusing struct {
 	refuse uint64
 }
 
-func (r *refusing) UpdateSessions(items ...types.Session) error {
+func (r *refusing) UpdateSessions(items ...types.Report) error {
 	for _, item := range items {
 		if item.ID == r.refuse {
 			r.mu.Lock()
@@ -176,7 +192,7 @@ func TestReportWaitsForABatchThatMayStillLand(t *testing.T) {
 // unconfirmed takes every report and never sees it in a block.
 type unconfirmed struct{ *fakeChain }
 
-func (u *unconfirmed) UpdateSessions(items ...types.Session) error {
+func (u *unconfirmed) UpdateSessions(items ...types.Report) error {
 	var ids []uint64
 	for _, item := range items {
 		ids = append(ids, item.ID)
@@ -209,7 +225,7 @@ func TestChainBytesPastInt64DoNotStopTheNode(t *testing.T) {
 				t.Fatalf("checking the session panicked: %v", r)
 			}
 		}()
-		if _, _, skip, err := n.checkSession(item); err != nil || skip {
+		if _, _, skip, _, err := n.checkSession(item, n.chainClock()); err != nil || skip {
 			t.Fatalf("skip %v, err %v: usage that differs from the chain's is reported", skip, err)
 		}
 		if !sessionNeedsReport(item, session) {
@@ -228,7 +244,7 @@ func TestAnIdleSessionLogsNothingAtInfo(t *testing.T) {
 		DownloadBytes: sdkmath.NewInt(20), UploadBytes: sdkmath.NewInt(10), MaxBytes: sdkmath.ZeroInt(),
 	}}}
 
-	_, _, skip, err := n.checkSession(types.Session{ID: 1, Key: "k", Upload: 10, Download: 20})
+	_, _, skip, _, err := n.checkSession(types.Session{ID: 1, Key: "k", Upload: 10, Download: 20}, n.chainClock())
 	if err != nil || !skip {
 		t.Fatalf("skip %v, err %v: an idle session is not reported", skip, err)
 	}

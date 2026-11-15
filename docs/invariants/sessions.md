@@ -33,7 +33,8 @@ reported, a report refused) or gives clients service nobody pays for. IDs as in
   its earlier peer, whatever session either serves: a node session, or a plan session
   on the same subscription or another.
 - **[SL-9] A connected peer the node holds no session for, or that has used its
-  allocation, is removed.**
+  allocation, is removed.** A plan session's allocation headroom is the max_bytes the
+  session query gives it, and zero means none is left, not no cap.
 - **[SL-10] A session the chain has ended loses its peer, and its row once the chain
   marks it inactive.** A session the chain cannot be asked about waits for the next
   pass; the rest of the pass goes on.
@@ -41,6 +42,7 @@ reported, a report refused) or gives clients service nobody pays for. IDs as in
   chain fails a whole transaction for one bad message (a session deleted between the
   query and the send), so the batch is checked again and resent without it, and then
   one session at a time. During an RPC outage the batch waits for the next pass instead.
+  The start sends its final reports ([SL-14]) the same way.
 - **[SL-12] A failed job pass never stops the node.** An RPC outage or a daemon that
   doesn't answer is logged and retried at the next tick; stopping would cut every
   client's tunnel and restart the node into the same outage. A job that panics hands an
@@ -51,8 +53,9 @@ reported, a report refused) or gives clients service nobody pays for. IDs as in
   80% of it.
 - **[SL-14] A restart doesn't strand clients.** Session rows left by the previous run
   point at peers that no longer exist and would make a reconnect fail with 409. At start
-  the node reports what those sessions moved that the chain doesn't have yet (if they
-  are still active), then clears the table.
+  the node reports what those sessions moved that the chain doesn't have yet (if the
+  chain still takes a report for them: active, or pending within their final-report
+  grace), each report bounded as in [SL-21], then clears the table.
 - **[SL-15] A usage update writes both columns, zero included.** A struct update skips
   zero values, which would leave an old figure in place.
 - **[SL-16] A removed peer is cut off at once and can't come back.** OpenVPN kills the
@@ -83,3 +86,21 @@ reported, a report refused) or gives clients service nobody pays for. IDs as in
   stores saturate there, and the counters a check adds up are added as the chain's
   integers: a wrapped sum went negative, which the chain refuses as a report and which
   left a peer far past its allocation connected.
+- **[SL-21] A report never claims more than the chain records for its session.** The
+  chain refuses a report past a session's limits, and with it every other report in the
+  transaction (FeryxHub FX-002, FX-010, WI-9). The total bytes stop at the session's byte
+  ceiling as the session query gives it, a direct session's purchased bytes or a plan
+  session's allocation headroom G − (U − S), and at the counter limit. An hourly direct
+  session's duration stops at its paid hours and at the service time the chain observed:
+  up to the latest block, which the block the report lands in never precedes, or, once
+  the session is pending, up to its cancellation, since the final-report grace is not
+  billable time. A cut report keeps what the chain holds and splits the rest by what
+  each direction moved; what the peer moved beyond the cut is service nobody pays for,
+  and is not claimed. The tests check reports against the chain library's own checks.
+- **[SL-22] A report is sent only when it adds bytes, or an hourly session's time, that
+  the chain does not hold; a refused report is tried again only while the chain keeps
+  the session.** A session at its ceiling, or whose peer idles, gets no report, so the
+  chain's idle timeout ends it: the node never keeps a session alive with reports that
+  add nothing. A report the chain refuses, over its quota when another session used the
+  allocation in between, is tried on the next passes, each with a fresh bound, and stops
+  once the chain ends the session ([SL-10]).

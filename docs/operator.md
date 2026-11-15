@@ -469,6 +469,14 @@ the next start. A client that reconnects keeps its on-chain session, and the nod
 reporting that session's totals on top of what the chain already holds (the chain refuses a
 report lower than the last one, and one refused report fails the whole batch).
 
+A report never claims more than the chain records for its session: a direct session's
+purchased bytes, a plan session's remaining allocation, and for an hourly session its paid
+hours and the time the chain has seen it run, up to its cancellation once the client
+cancels. Traffic a client moves past those limits, in the seconds before the node cuts it
+off, is not claimed and not paid; the log line "Cutting a report to what the chain records
+for the session" shows when a report was cut. A session with nothing new to report gets no
+report, and the chain ends it after its `status_timeout`.
+
 If the protocol daemon (xray, v2ray, Hysteria or OpenVPN) exits on its own, or OpenVPN's
 management channel or Hysteria's authentication hook stops, the node logs `Stopping: the
 protocol daemon exited`, stops its service and exits with an error; systemd (`Restart=always`)

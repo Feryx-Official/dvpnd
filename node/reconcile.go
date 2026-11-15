@@ -43,28 +43,40 @@ func (n *Node) ReconcileSessions() error {
 
 	n.Log().Info("Reconciling sessions left by a previous run", "count", len(items))
 
-	// Report sessions that are still active on the chain and have moved data
+	// Report sessions the chain still takes a report for that have moved data
 	// since the chain last saw them, so the operator is paid for traffic served
-	// before the restart. A chain-query or broadcast failure must not stop the
-	// node from starting: the tunnels are dead regardless, so log and go on to
-	// clear the table.
-	var report []types.Session
+	// before the restart; each report is cut to what the chain records for its
+	// session (boundReport). A chain-query or broadcast failure must not stop
+	// the node from starting: the tunnels are dead regardless, so log and go on
+	// to clear the table.
+	var (
+		clock  = n.chainClock()
+		report []types.Report
+	)
 	for i := range items {
-		session, err := n.Client().QuerySession(items[i].ID)
+		session, err := n.chain.QuerySession(items[i].ID)
 		if err != nil {
 			n.Log().Error("could not query a session while reconciling; skipping its final report",
 				"id", items[i].ID, "error", err)
 			continue
 		}
-		if session == nil {
+		if session == nil || !sessionNeedsReport(items[i], session) {
 			continue
 		}
-		if sessionNeedsReport(items[i], session) {
-			report = append(report, items[i])
+		r, send, err := boundReport(items[i], session, clock)
+		if err != nil {
+			n.Log().Error("could not bound a session's final report while reconciling; skipping it",
+				"id", items[i].ID, "error", err)
+			continue
+		}
+		if send {
+			report = append(report, r)
 		}
 	}
 	if len(report) > 0 {
-		if err := n.UpdateSessions(report...); err != nil {
+		// As the usage job sends them: one session the chain refuses, a pending
+		// one whose grace ran out, does not hold back the others' final reports.
+		if err := n.reportSessions(report); err != nil {
 			n.Log().Error("could not report sessions while reconciling; clearing them anyway", "error", err)
 		}
 	}
@@ -78,10 +90,11 @@ func (n *Node) ReconcileSessions() error {
 }
 
 // sessionNeedsReport reports whether a stored session should get a final
-// MsgUpdateSession before it is cleared: it must still be active on the chain
-// and carry usage the chain has not already recorded.
+// MsgUpdateSession before it is cleared: the chain must still take a report
+// for it, active or pending within its final-report grace, and it must carry
+// usage the chain has not already recorded.
 func sessionNeedsReport(local types.Session, onChain chainSessionView) bool {
-	if !onChain.GetStatus().Equal(v1base.StatusActive) {
+	if !onChain.GetStatus().Equal(v1base.StatusActive) && !onChain.GetStatus().Equal(v1base.StatusInactivePending) {
 		return false
 	}
 	return !onChain.GetUploadBytes().Equal(sdkmath.NewInt(local.Upload)) ||

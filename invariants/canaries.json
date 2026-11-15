@@ -200,8 +200,8 @@
     {
       "name": "[SL-10] a session the chain deleted keeps its row",
       "file": "node/jobs.go",
-      "find": "\t\treturn true, true, true, nil",
-      "replace": "\t\treturn true, false, true, nil",
+      "find": "\t\treturn true, true, true, report, nil",
+      "replace": "\t\treturn true, false, true, report, nil",
       "run": [
         "go test -count=1 -run '^(TestUpdateSessionsPass)$' ./node/"
       ],
@@ -220,7 +220,7 @@
     {
       "name": "[SL-14] a restart reports sessions the chain no longer holds active",
       "file": "node/reconcile.go",
-      "find": "\tif !onChain.GetStatus().Equal(v1base.StatusActive) {",
+      "find": "\tif !onChain.GetStatus().Equal(v1base.StatusActive) && !onChain.GetStatus().Equal(v1base.StatusInactivePending) {",
       "replace": "\tif false {",
       "run": [
         "go test -count=1 -run '^(TestSessionNeedsReport)$' ./node/"
@@ -1651,6 +1651,116 @@
       "replace": "sdkmath.NewInt(peers[i].Upload + peers[i].Download)",
       "run": [
         "go test -count=1 -run '^TestSetSessionsAddsCountersWithoutWrapping$' ./node/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-21] a report passes the session's byte ceiling",
+      "file": "node/bounds.go",
+      "find": "\tif download.Add(upload).GT(ceiling) {",
+      "replace": "\tif false && download.Add(upload).GT(ceiling) {",
+      "run": [
+        "go test -count=1 -run '^(TestBoundReportMatchesTheChain)$' ./node/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-21] a plan session with no headroom left reads as no cap",
+      "file": "node/bounds.go",
+      "find": "\t\tceiling = sdkmath.MinInt(ceiling, headroom)",
+      "replace": "\t\tif headroom.IsPositive() {\n\t\t\tceiling = sdkmath.MinInt(ceiling, headroom)\n\t\t}",
+      "run": [
+        "go test -count=1 -run '^(TestBoundReportMatchesTheChain|TestNothingNewWithinTheLimitsIsNotReported)$' ./node/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-21] an hourly report claims time the chain did not observe",
+      "file": "node/bounds.go",
+      "find": "\t\t\tlimit = max(observed, 0)",
+      "replace": "\t\t\tlimit = max(limit, 0)",
+      "run": [
+        "go test -count=1 -run '^(TestBoundReportMatchesTheChain)$' ./node/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-21] a pending hourly session is billed past its cancellation",
+      "file": "node/bounds.go",
+      "find": "\t\tend := hourly.StatusAt\n",
+      "replace": "\t\tend := time.Now()\n",
+      "run": [
+        "go test -count=1 -run '^(TestAPendingHourlySessionIsBilledToItsCancellation)$' ./node/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-21] an hourly report is bounded at the node's clock",
+      "file": "node/bounds.go",
+      "find": "\t\t\tif end, err = chainTime(); err != nil {",
+      "replace": "\t\t\tif end, err = time.Now(), error(nil); err != nil {",
+      "run": [
+        "go test -count=1 -run '^(TestAnHourlyReportWaitsForTheChainTime)$' ./node/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-21] the cut gives one direction all the headroom",
+      "file": "node/bounds.go",
+      "find": "\tshare := room.Mul(movedDownload).Quo(moved)",
+      "replace": "\tshare := room",
+      "run": [
+        "go test -count=1 -run '^(TestBoundReportSplitsTheCutByWhatMoved)$' ./node/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-21] the start reports a session uncut",
+      "file": "node/reconcile.go",
+      "find": "\t\t\treport = append(report, r)",
+      "replace": "\t\t\treport = append(report, types.Report{ID: r.ID, Download: items[i].Download, Upload: items[i].Upload, Duration: r.Duration})",
+      "run": [
+        "go test -count=1 -run '^(TestARestartReportsAPendingSession)$' ./node/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-22] a report that adds nothing is sent",
+      "file": "node/bounds.go",
+      "find": "\tsend = !download.Equal(heldDownload) || !upload.Equal(heldUpload) ||",
+      "replace": "\tsend = true || !download.Equal(heldDownload) || !upload.Equal(heldUpload) ||",
+      "run": [
+        "go test -count=1 -run '^(TestNothingNewWithinTheLimitsIsNotReported)$' ./node/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-9] a plan session's zero headroom keeps its peer",
+      "file": "node/jobs.go",
+      "find": "max.IsPositive() || (plan && !max.IsNil())",
+      "replace": "max.IsPositive() || (plan && max.IsPositive())",
+      "run": [
+        "go test -count=1 -run '^(TestAPlanSessionWithoutHeadroomLosesItsPeer)$' ./node/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-14] the start drops a pending session's final report",
+      "file": "node/reconcile.go",
+      "find": "!onChain.GetStatus().Equal(v1base.StatusActive) && !onChain.GetStatus().Equal(v1base.StatusInactivePending)",
+      "replace": "!onChain.GetStatus().Equal(v1base.StatusActive)",
+      "run": [
+        "go test -count=1 -run '^(TestSessionNeedsReport|TestARestartReportsAPendingSession)$' ./node/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-11] the start sends its final reports as one batch only",
+      "file": "node/reconcile.go",
+      "find": "\t\tif err := n.reportSessions(report); err != nil {",
+      "replace": "\t\tif err := n.chain.UpdateSessions(report...); err != nil {",
+      "run": [
+        "go test -count=1 -run '^(TestARestartReportsTheOthersWhenTheChainRefusesOne)$' ./node/"
       ],
       "expect": "--- FAIL"
     }

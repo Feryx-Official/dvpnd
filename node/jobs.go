@@ -126,10 +126,11 @@ func (n *Node) LastUsagePass() {
 
 // updateSessions reconciles the local session table with the chain (v3):
 // sessions the chain has dropped or deactivated lose their peer; sessions that
-// moved data since the last pass are reported with MsgUpdateSession. A session
-// that has not moved data is left alone and the chain expires it after its
-// status_timeout, which is the protocol's idle timeout. A session the chain
-// cannot be asked about is left for the next pass.
+// moved data since the last pass are reported with MsgUpdateSession, each
+// report cut to what the chain records for its session (boundReport). A
+// session with nothing new to report is left alone and the chain expires it
+// after its status_timeout, which is the protocol's idle timeout. A session the
+// chain cannot be asked about is left for the next pass.
 func (n *Node) updateSessions() error {
 	var items []types.Session
 	if err := n.Database().Model(&types.Session{}).Find(&items).Error; err != nil {
@@ -139,27 +140,31 @@ func (n *Node) updateSessions() error {
 	count := len(items)
 	n.Log().Info("Validating the sessions", "count", count)
 
-	var errs []error
-	for i := count - 1; i >= 0; i-- {
-		removePeer, removeSession, skipUpdate, err := n.checkSession(items[i])
+	var (
+		clock   = n.chainClock()
+		reports []types.Report
+		errs    []error
+	)
+	for _, item := range items {
+		removePeer, removeSession, skipUpdate, report, err := n.checkSession(item, clock)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("session %d: %w", items[i].ID, err))
+			errs = append(errs, fmt.Errorf("session %d: %w", item.ID, err))
 			skipUpdate = true
 		}
 
 		if removePeer || removeSession {
-			if err = n.retire(items[i], removePeer, removeSession); err != nil {
+			if err = n.retire(item, removePeer, removeSession); err != nil {
 				errs = append(errs, err)
 			}
 		}
 
-		if skipUpdate {
-			items = append(items[:i], items[i+1:]...)
+		if !skipUpdate {
+			reports = append(reports, report)
 		}
 	}
 
-	if len(items) > 0 {
-		if err := n.reportSessions(items); err != nil {
+	if len(reports) > 0 {
+		if err := n.reportSessions(reports); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -167,23 +172,52 @@ func (n *Node) updateSessions() error {
 	return errors.Join(errs...)
 }
 
+// chainClock is the latest block time for one pass: asked of the chain the
+// first time a report needs it, and then kept.
+func (n *Node) chainClock() func() (time.Time, error) {
+	var (
+		at    time.Time
+		err   error
+		asked bool
+	)
+
+	return func() (time.Time, error) {
+		if !asked {
+			at, err = n.chain.LatestBlockTime()
+			asked = true
+		}
+
+		return at, err
+	}
+}
+
 // checkSession says what to do with a stored session given what the chain
-// holds for it.
-func (n *Node) checkSession(item types.Session) (removePeer, removeSession, skipUpdate bool, err error) {
+// holds for it, and what to report for it unless skipUpdate.
+func (n *Node) checkSession(item types.Session, clock func() (time.Time, error)) (removePeer, removeSession, skipUpdate bool, report types.Report, err error) {
 	session, err := n.chain.QuerySession(item.ID)
 	if err != nil {
-		return false, false, true, err
+		return false, false, true, report, err
 	}
 
 	if session == nil {
 		n.Log().Info("Session no longer exists on the chain", "key", types.KeyTag(item.Key), "id", item.ID)
-		return true, true, true, nil
+		return true, true, true, report, nil
+	}
+
+	report, send, err := boundReport(item, session, clock)
+	if err != nil {
+		skipUpdate = true
+	} else if !send {
+		skipUpdate = true
+	} else if report.Download != item.Download || report.Upload != item.Upload || report.Duration != item.Duration() {
+		n.Log().Info("Cutting a report to what the chain records for the session", "key", types.KeyTag(item.Key),
+			"id", item.ID, "download", item.Download, "upload", item.Upload, "duration", item.Duration(),
+			"reported_download", report.Download, "reported_upload", report.Upload, "reported_duration", report.Duration)
 	}
 
 	// Compared as the chain's integers: a value past int64 would panic.
 	if session.GetUploadBytes().Equal(sdkmath.NewInt(item.Upload)) &&
 		session.GetDownloadBytes().Equal(sdkmath.NewInt(item.Download)) {
-		skipUpdate = true
 		if item.CreatedAt.Before(session.GetStatusAt()) {
 			removePeer = true
 		}
@@ -200,7 +234,10 @@ func (n *Node) checkSession(item types.Session) (removePeer, removeSession, skip
 		n.Log().Info("Invalid session status", "key", types.KeyTag(item.Key),
 			"id", session.GetID(), "status", session.GetStatus())
 	}
-	if max := session.GetMaxBytes(); max.IsPositive() {
+	// A plan session's max_bytes is its allocation's headroom, and zero means
+	// none is left; a direct session without max_bytes is an hourly one.
+	_, plan := session.(*subscriptiontypes.Session)
+	if max := session.GetMaxBytes(); max.IsPositive() || (plan && !max.IsNil()) {
 		used := sdkmath.NewInt(item.Upload).Add(sdkmath.NewInt(item.Download))
 		if used.GTE(max) {
 			removePeer = true
@@ -216,9 +253,9 @@ func (n *Node) checkSession(item types.Session) (removePeer, removeSession, skip
 			"id", session.GetID(), "max_duration", max, "duration", item.Duration())
 	}
 	if s, ok := session.(*subscriptiontypes.Session); ok {
-		subscription, err := n.chain.QuerySubscription(s.SubscriptionID)
-		if err != nil {
-			return removePeer, removeSession, true, err
+		subscription, qerr := n.chain.QuerySubscription(s.SubscriptionID)
+		if qerr != nil {
+			return removePeer, removeSession, true, report, qerr
 		}
 		if subscription == nil || !subscription.Status.Equal(v1base.StatusActive) {
 			removePeer = true
@@ -231,7 +268,7 @@ func (n *Node) checkSession(item types.Session) (removePeer, removeSession, skip
 		}
 	}
 
-	return removePeer, removeSession, skipUpdate, nil
+	return removePeer, removeSession, skipUpdate, report, err
 }
 
 // retire removes a session's peer, its row, or both, under the admission
@@ -254,7 +291,7 @@ func (n *Node) retire(item types.Session, removePeer, removeSession bool) error 
 	return nil
 }
 
-// reportSessions sends MsgUpdateSession for the sessions in one transaction.
+// reportSessions sends MsgUpdateSession for the reports in one transaction.
 // One message the chain refuses fails them all: a session the chain deleted
 // or ended between the query and the send ("session not found") would
 // otherwise hold back every other report on every pass. So when the batch
@@ -262,7 +299,7 @@ func (n *Node) retire(item types.Session, removePeer, removeSession bool) error 
 // dropped and the rest sent again; if that fails too, each goes on its own.
 // When the chain cannot be asked at all (an RPC outage) the batch is left
 // for the next pass.
-func (n *Node) reportSessions(items []types.Session) error {
+func (n *Node) reportSessions(items []types.Report) error {
 	err := n.chain.UpdateSessions(items...)
 	if err == nil {
 		return nil
@@ -275,7 +312,7 @@ func (n *Node) reportSessions(items []types.Session) error {
 	n.Log().Info("Session report failed; checking each session again", "count", len(items), "error", err)
 
 	var (
-		still   []types.Session
+		still   []types.Report
 		queried int
 	)
 	for _, item := range items {
@@ -286,7 +323,7 @@ func (n *Node) reportSessions(items []types.Session) error {
 		}
 		queried++
 		if session == nil || session.GetStatus().Equal(v1base.StatusInactive) {
-			n.Log().Info("Not reporting a session the chain has ended", "key", types.KeyTag(item.Key), "id", item.ID)
+			n.Log().Info("Not reporting a session the chain has ended", "id", item.ID)
 			continue
 		}
 		still = append(still, item)

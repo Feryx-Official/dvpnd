@@ -4,6 +4,8 @@
 package node
 
 import (
+	"time"
+
 	sessiontypes "github.com/Feryx-Official/feryxhub/v12/x/session/types/v3"
 	subscriptiontypes "github.com/Feryx-Official/feryxhub/v12/x/subscription/types/v3"
 
@@ -16,7 +18,8 @@ import (
 type chain interface {
 	QuerySession(id uint64) (sessiontypes.Session, error)
 	QuerySubscription(id uint64) (*subscriptiontypes.Subscription, error)
-	UpdateSessions(items ...types.Session) error
+	LatestBlockTime() (time.Time, error)
+	UpdateSessions(reports ...types.Report) error
 }
 
 // contextChain is the node's own chain client behind the chain interface.
@@ -28,6 +31,10 @@ func (c contextChain) QuerySession(id uint64) (sessiontypes.Session, error) {
 
 func (c contextChain) QuerySubscription(id uint64) (*subscriptiontypes.Subscription, error) {
 	return c.Client().QuerySubscription(id)
+}
+
+func (c contextChain) LatestBlockTime() (time.Time, error) {
+	return c.Client().QueryBlockTime()
 }
 
 type Node struct {
