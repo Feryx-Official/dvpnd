@@ -297,8 +297,8 @@ func TestJobPanicEndsTheNodeCleanly(t *testing.T) {
 	}
 }
 
-// TestAFailedPassIsTriedAgain: a pass that fails is logged and run again at
-// the next tick; the job carries on rather than ending, and so does the node.
+// TestAFailedPassIsTriedAgain: a pass that fails is logged and run again; the
+// job carries on rather than ending, and so does the node.
 //
 // Rules: [SL-12].
 func TestAFailedPassIsTriedAgain(t *testing.T) {
@@ -321,6 +321,62 @@ func TestAFailedPassIsTriedAgain(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatalf("the job stopped after %d passes; a failed pass must be tried again", passes.Load())
+	}
+}
+
+// TestAFailedPassIsTriedAgainSoon: a failed pass is tried again after the
+// retry delay, not a whole interval later. With an interval near the chain's
+// status_timeout, waiting for the next tick after one failed status update
+// leaves the node without an update for two intervals, and the chain
+// deactivates it, ending its leases and plan links.
+//
+// Rules: [SL-12].
+func TestAFailedPassIsTriedAgainSoon(t *testing.T) {
+	n := testNode(&fakeChain{})
+	n.retryAfter = time.Millisecond
+	errCh := make(chan error, 1)
+	var passes atomic.Int32
+	pass := func() error {
+		if passes.Add(1) < 3 {
+			return errors.New("connection refused")
+		}
+		panic("third pass")
+	}
+
+	go n.runJob("retry", time.Hour, pass, errCh)
+
+	select {
+	case err := <-errCh:
+		if !strings.Contains(err.Error(), "job retry panicked: third pass") {
+			t.Fatalf("err = %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatalf("%d passes in 5s with an hourly interval: a failed pass waited for the next tick", passes.Load())
+	}
+}
+
+// TestAPassThatSucceedsWaitsForTheInterval: only a failed pass is tried
+// again early; one that succeeds waits for its interval.
+//
+// Rules: [SL-12].
+func TestAPassThatSucceedsWaitsForTheInterval(t *testing.T) {
+	n := testNode(&fakeChain{})
+	n.retryAfter = time.Millisecond
+	errCh := make(chan error, 1)
+	var passes atomic.Int32
+	pass := func() error {
+		if passes.Add(1) > 1 {
+			panic("second pass")
+		}
+		return nil
+	}
+
+	go n.runJob("steady", time.Hour, pass, errCh)
+
+	select {
+	case err := <-errCh:
+		t.Fatalf("a pass that succeeded was run again before its interval: %v", err)
+	case <-time.After(200 * time.Millisecond):
 	}
 }
 

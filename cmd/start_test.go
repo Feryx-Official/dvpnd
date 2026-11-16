@@ -44,7 +44,8 @@ func TestAPIPort(t *testing.T) {
 
 // TestFitInterval: the chain deactivates a node, and ends a session, whose
 // last update is older than its status_timeout; whatever the operator set,
-// the node updates at least every 80% of it.
+// the node updates at least every third of it, so one failed or late update
+// and the next one still land inside it.
 //
 // Rules: [SL-13].
 func TestFitInterval(t *testing.T) {
@@ -52,9 +53,11 @@ func TestFitInterval(t *testing.T) {
 		configured, timeout, want time.Duration
 		lower                     bool
 	}{
-		{2 * time.Hour, time.Hour, 48 * time.Minute, true},
-		{48 * time.Minute, time.Hour, 48 * time.Minute, false},
-		{30 * time.Minute, time.Hour, 30 * time.Minute, false},
+		{2 * time.Hour, time.Hour, 20 * time.Minute, true},
+		{48 * time.Minute, time.Hour, 20 * time.Minute, true},
+		{20 * time.Minute, time.Hour, 20 * time.Minute, false},
+		{10 * time.Minute, time.Hour, 10 * time.Minute, false},
+		{55 * time.Minute, 30 * time.Second, 10 * time.Second, true},
 		{2 * time.Hour, 0, 2 * time.Hour, false}, // no timeout known: as configured
 	} {
 		got, lower := fitInterval(c.configured, c.timeout)

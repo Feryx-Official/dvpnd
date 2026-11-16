@@ -530,7 +530,7 @@
     {
       "name": "[SL-13] the update intervals may reach the chain's whole status_timeout",
       "file": "cmd/start.go",
-      "find": "\tif limit = statusTimeout * 4 / 5; limit > 0 && configured > limit {",
+      "find": "\tif limit = statusTimeout / 3; limit > 0 && configured > limit {",
       "replace": "\tif limit = statusTimeout; limit > 0 && configured > limit {",
       "run": [
         "go test -count=1 -run '^(TestFitInterval)$' ./cmd/"
@@ -653,10 +653,20 @@
     {
       "name": "[SL-12] a failed job pass ends the job",
       "file": "node/jobs.go",
-      "find": "\t\t\tn.Log().Error(name+\" pass failed; retrying at the next tick\", \"error\", err)",
+      "find": "\t\t\tn.Log().Error(name+\" pass failed; retrying soon\", \"in\", retry, \"error\", err)",
       "replace": "\t\t\treturn",
       "run": [
         "go test -count=1 -run '^(TestAFailedPassIsTriedAgain)$' ./node/"
+      ],
+      "expect": "--- FAIL"
+    },
+    {
+      "name": "[SL-12] a failed job pass waits a whole interval before it is tried again",
+      "file": "node/jobs.go",
+      "find": "\t\t\tnext = retry",
+      "replace": "\t\t\tnext = interval",
+      "run": [
+        "go test -count=1 -run '^(TestAFailedPassIsTriedAgainSoon)$' ./node/"
       ],
       "expect": "--- FAIL"
     },

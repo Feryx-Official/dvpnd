@@ -457,7 +457,7 @@
       "items": [
         "lite/ is the only chain client: queries and signed txs over RPC",
         "With [keyring] granter a hot key signs through authz; the node account stays off the server",
-        "Update intervals never exceed 80% of the chain status_timeout"
+        "Update intervals never exceed a third of the chain status_timeout"
       ]
     },
     {

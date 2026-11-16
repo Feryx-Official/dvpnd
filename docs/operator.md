@@ -458,9 +458,11 @@ On the chain, the node appears in `feryx/node/v3/nodes/<feryxnode1…>` with sta
 once your `GET /` answers from the internet your node becomes visible in the apps.
 
 The node adapts its cadence to the chain: it never lets `interval_update_status` or
-`interval_update_sessions` exceed 80% of the chain's `status_timeout` parameters (a silent
-node is deactivated by the chain after that timeout; a session that reports nothing is
-cancelled).
+`interval_update_sessions` exceed a third of the chain's `status_timeout` parameters, so one
+failed update and the next one still land in time, and a failed update is tried again after
+15 seconds (a silent node is deactivated by the chain after that timeout, which ends its
+leases and plan links; a session that reports nothing is cancelled). The node reads these
+parameters when it starts: after a governance change to a `status_timeout`, restart it.
 
 `systemctl stop` or `restart` sends SIGTERM; the node stops its service first (tunnel down
 and NAT rules removed, or the proxy child exited) and exits. Connected peers are dropped

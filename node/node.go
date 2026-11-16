@@ -40,10 +40,12 @@ func (c contextChain) LatestBlockTime() (time.Time, error) {
 type Node struct {
 	*context.Context
 	chain chain
+	// retryAfter is how soon a failed job pass is tried again (RetryAfter).
+	retryAfter time.Duration
 }
 
 func NewNode(ctx *context.Context) *Node {
-	return &Node{Context: ctx, chain: contextChain{ctx}}
+	return &Node{Context: ctx, chain: contextChain{ctx}, retryAfter: RetryAfter}
 }
 
 func (n *Node) Initialize() error {

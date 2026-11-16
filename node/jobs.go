@@ -17,14 +17,21 @@ import (
 	"github.com/Feryx-Official/dvpnd/v9/types"
 )
 
-// runJob runs a job's pass at once and then at every tick, for the life of
+// RetryAfter is how soon a failed job pass is tried again, or the job's interval
+// if that is shorter.
+const RetryAfter = 15 * time.Second
+
+// runJob runs a job's pass at once and then every interval, for the life of
 // the node; the first pass does not wait, because a freshly registered node
 // is inactive until its first status update.
 //
 // A failed pass never stops the node: an RPC outage, a proxy API that does
 // not answer, or a session the chain dropped mid-pass is logged and tried
-// again at the next tick. Stopping instead would cut every client's tunnel
-// and restart the node into the same outage. A panic is a bug, and ends the
+// again after RetryAfter, not a whole interval later, since one failed status
+// update would otherwise leave the node without one for two intervals, and the
+// chain deactivates a node, ending its leases and plan links, as soon as its
+// last update is older than its status_timeout. Stopping instead would cut
+// every client's tunnel and restart the node into the same outage. A panic is a bug, and ends the
 // node the way a failed API server does, so the VPN service is still stopped
 // on the way out.
 func (n *Node) runJob(name string, interval time.Duration, pass func() error, errCh chan<- error) {
@@ -36,12 +43,18 @@ func (n *Node) runJob(name string, interval time.Duration, pass func() error, er
 
 	n.Log().Info("Starting a job", "name", name, "interval", interval)
 
-	t := time.NewTicker(interval)
+	retry := min(interval, n.retryAfter)
+	t := time.NewTimer(0)
 	defer t.Stop()
-	for ; ; <-t.C {
+	for {
+		<-t.C
+		start := time.Now()
+		next := interval
 		if err := pass(); err != nil {
-			n.Log().Error(name+" pass failed; retrying at the next tick", "error", err)
+			next = retry
+			n.Log().Error(name+" pass failed; retrying soon", "in", retry, "error", err)
 		}
+		t.Reset(max(next-time.Since(start), 0))
 	}
 }
 

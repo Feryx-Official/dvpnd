@@ -43,14 +43,20 @@ reported, a report refused) or gives clients service nobody pays for. IDs as in
   query and the send), so the batch is checked again and resent without it, and then
   one session at a time. During an RPC outage the batch waits for the next pass instead.
   The start sends its final reports ([SL-14]) the same way.
-- **[SL-12] A failed job pass never stops the node.** An RPC outage or a daemon that
-  doesn't answer is logged and retried at the next tick; stopping would cut every
-  client's tunnel and restart the node into the same outage. A job that panics hands an
-  error to the node, which then stops the service cleanly (see [RT-2]).
-- **[SL-13] The node reports at least as often as the chain requires.** The chain
-  deactivates a node, and ends a session, whose last update is older than its
-  `status_timeout`; whatever the operator configured, the update intervals never exceed
-  80% of it.
+- **[SL-12] A failed job pass never stops the node, and is tried again soon.** An RPC
+  outage or a daemon that doesn't answer is logged and the pass run again after 15
+  seconds (or its interval, if shorter), not a whole interval later: one failed status
+  update would otherwise leave the node without one for two intervals. A pass that
+  succeeds waits for its interval. Stopping would cut every client's tunnel and restart
+  the node into the same outage. A job that panics hands an error to the node, which
+  then stops the service cleanly (see [RT-2]).
+- **[SL-13] The node reports at least as often as the chain requires, with room for a
+  failed update.** The chain deactivates a node (ending its leases and plan links), and
+  ends a session, whose last update is older than its `status_timeout`; whatever the
+  operator configured, the update intervals never exceed a third of it, so one failed
+  or late update and the next one still land inside it, and a new session's first
+  report comes before its first deadline. At 80%, one missed update was already too
+  late.
 - **[SL-14] A restart doesn't strand clients.** Session rows left by the previous run
   point at peers that no longer exist and would make a reconnect fail with 409. At start
   the node reports what those sessions moved that the chain doesn't have yet (if the

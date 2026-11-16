@@ -96,11 +96,12 @@ func expectedFees(config *types.Config, d time.Duration) sdk.Coins {
 }
 
 // fitInterval is the interval to use for a job the chain times out after
-// statusTimeout: the configured one, unless it exceeds 80% of the timeout,
-// which leaves a missed tick room before the chain deactivates the node or
-// ends the session. lower says whether it was lowered.
+// statusTimeout: the configured one, unless it exceeds a third of the timeout,
+// which leaves room for one failed or late update and the next one before the
+// chain deactivates the node or ends the session. lower says whether it was
+// lowered.
 func fitInterval(configured, statusTimeout time.Duration) (limit time.Duration, lower bool) {
-	if limit = statusTimeout * 4 / 5; limit > 0 && configured > limit {
+	if limit = statusTimeout / 3; limit > 0 && configured > limit {
 		return limit, true
 	}
 
@@ -276,7 +277,7 @@ func StartCmd() *cobra.Command {
 
 			// The chain deactivates a node, and cancels a session, whose last update
 			// is older than the respective status_timeout parameter. Whatever the
-			// operator configured, never update less often than 80% of that.
+			// operator configured, never update less often than a third of that.
 			if params, err := client.QueryNodeParams(); err != nil {
 				return err
 			} else if limit, lower := fitInterval(config.Node.IntervalUpdateStatus, params.StatusTimeout); lower {
