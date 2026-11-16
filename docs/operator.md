@@ -281,7 +281,7 @@ dvpnd keys list                        # shows the feryx1… operator and feryxn
 
 Send a few XFY to the `feryx1…` address for gas (each status update and usage report is a
 transaction; budget roughly 0.02 XFY per transaction at the default gas price, a status update
-every 48 minutes).
+every third of the chain's node `status_timeout`: every 10 minutes with Feryx's 30 minutes).
 
 ### 3a. A hot key (recommended)
 
@@ -682,6 +682,15 @@ in `-home`): copy the node's `tls.crt` to check a node on another host.
   no measurement was possible: every reachable speed test server was inside this host's
   network, or the speed test service was unreachable and nothing was cached. The node runs
   regardless; declare the link in `[bandwidth]` or restart once the service is back.
+- **The node's key is the node's while it runs.** Every status update and usage report is a
+  transaction from that account (with a hot key, from the hot key). A transaction you send by
+  hand from the same key at the same time takes the account sequence the node expects next,
+  and one of the two is refused. Send manual transactions from another key, or stop the node
+  first.
+- **One peer per client account.** An account holds one peer on this node at a time: a new
+  handshake by the same account replaces its earlier peer. The earlier peer's traffic up to
+  then is still reported; after that its session gets no reports, and the chain ends it after
+  its `status_timeout`.
 - **Earnings** accrue to the operator `feryx1…` address as sessions settle. With a hot key
   (§3a) that account is not on the server at all. Without one, sweep them to a wallet you
   hold offline; the key on the node is unencrypted, and so is any file holding its mnemonic.
