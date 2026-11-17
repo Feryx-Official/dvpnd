@@ -13,7 +13,7 @@ filippo.io/edwards25519,https://github.com/FiloSottile/edwards25519/blob/v1.1.1/
 github.com/99designs/keyring,https://github.com/cosmos/keyring/blob/v1.2.0/LICENSE,MIT
 github.com/DataDog/datadog-go/statsd,https://github.com/DataDog/datadog-go/blob/v4.8.3/LICENSE.txt,MIT
 github.com/DataDog/zstd,https://github.com/DataDog/zstd/blob/v1.5.7/LICENSE,BSD-3-Clause
-github.com/Feryx-Official/feryxhub/v12,https://github.com/Feryx-Official/feryxhub/blob/4ea35f8c60c5/LICENSE,Apache-2.0
+github.com/Feryx-Official/feryxhub/v12,https://github.com/Feryx-Official/feryxhub/blob/4f524bfc75f9/LICENSE,Apache-2.0
 github.com/adrg/xdg,https://github.com/adrg/xdg/blob/v0.5.3/LICENSE,MIT
 github.com/beorn7/perks/quantile,https://github.com/beorn7/perks/blob/v1.0.1/LICENSE,MIT
 github.com/bgentry/speakeasy,https://github.com/bgentry/speakeasy/blob/v0.2.0/LICENSE,MIT

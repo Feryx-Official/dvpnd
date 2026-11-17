@@ -1,6 +1,6 @@
 # Dependency licence audit
 
-## Current graph — FeryxHub v12 (`4ea35f8c`) / cosmos-sdk v0.53.8 / CometBFT v0.38.26 (2026-11-15)
+## Current graph — FeryxHub v12 (`4f524bfc`) / cosmos-sdk v0.53.8 / CometBFT v0.38.26 (2026-11-17)
 
 Raw output: `dependency-licenses.csv` (171 modules, dvpnd itself left out), generated with `go-licenses v1.6.0`;
 re-run with `go run github.com/google/go-licenses@v1.6.0 report ./...`. The CI licence gate

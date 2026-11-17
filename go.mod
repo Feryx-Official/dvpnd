@@ -107,7 +107,7 @@ require (
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
 	github.com/99designs/keyring v1.2.2 // indirect
 	github.com/DataDog/zstd v1.5.7 // indirect
-	github.com/Feryx-Official/feryxhub/v12 v12.0.2-feryx.1.0.20261115111620-4ea35f8c60c5
+	github.com/Feryx-Official/feryxhub/v12 v12.0.2-feryx.1.0.20261117105338-4f524bfc75f9
 	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bgentry/speakeasy v0.2.0 // indirect
