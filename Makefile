@@ -21,7 +21,7 @@ check-architecture:
 	@bash scripts/check-architecture-doc.sh
 
 # The regression gate (test/README.md): every change passes it before it is
-# committed. The rule registry (every rule in docs/invariants/ pinned by a test
+# committed, on any branch. The rule registry (every rule in docs/invariants/ pinned by a test
 # or excused in invariants/status.json), formatting, vet (the integration
 # tests included), every unit test with the race detector, SPDX headers, the
 # licence rule and the provenance record. No root, no Docker; the provenance
@@ -54,7 +54,8 @@ check-integration:
 check-canaries:
 	@python3 invariants/canaries.py
 
-# What every commit passes: the gate, then the canaries.
+# What every change passes before it lands on main or development, or is
+# pushed: the gate, then the canaries.
 .PHONY: verify
 verify: check check-canaries
 

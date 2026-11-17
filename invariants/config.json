@@ -20,5 +20,7 @@
   "citesOnly": ["invariants/canaries.json"],
   "status": "invariants/status.json",
   "minimums": { "testFiles": 80, "rules": 101, "pinned": 101 },
-  "verify": "make verify"
+  "verify": "make verify",
+  "verifyCommit": "make check",
+  "mainBranches": ["main", "development"]
 }

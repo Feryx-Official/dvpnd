@@ -18,6 +18,7 @@ Python 3.8+, standard library only.
     --config PATH / --root PATH                  # as in registry.py
     -h, --help                                   # this text; any other argument exits 2, running nothing
 """
+import glob
 import hashlib
 import json
 import os
@@ -111,6 +112,21 @@ def privatize(copy, rel):
             for e in os.listdir(real):
                 os.symlink(os.path.join(real, e), os.path.join(p, e))
         cur = p
+
+
+def cores():
+    """The workers to run when the config names no number: one per physical core this process
+    may use. Canary commands are CPU-bound, and a core's second hardware thread adds little.
+    Where the system does not say which CPUs share a core (not Linux), half the CPUs."""
+    usable = len(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else os.cpu_count() or 2
+    physical = set()
+    for cpu in glob.glob('/sys/devices/system/cpu/cpu[0-9]*/topology'):
+        try:
+            with open(os.path.join(cpu, 'physical_package_id')) as pkg, open(os.path.join(cpu, 'core_id')) as core:
+                physical.add((pkg.read().strip(), core.read().strip()))
+        except OSError:
+            pass
+    return max(1, min(len(physical), usable) if physical else usable // 2)
 
 
 def digest(path):
@@ -241,7 +257,7 @@ def main(argv):
     links = cfg.get('link', [])
     targets = {c['file'] for c in canaries if os.path.exists(os.path.join(root, c['file']))}
     before = {f: digest(os.path.join(root, f)) for f in targets}
-    workers = cfg.get('concurrency') or max(1, (os.cpu_count() or 2) // 2)
+    workers = cfg.get('concurrency') or cores()
     slots = queue.Queue()
     for s in range(workers):
         slots.put(s)

@@ -8,16 +8,21 @@ not yet.
 
 | Gate | Command | Needs | Time |
 |---|---|---|---|
-| Fast | `make check` | Go, Python 3 | about two minutes |
-| Canaries | `make check-canaries` | Go, Python 3 | seconds once the build cache is warm; two minutes the first time |
-| Both | `make verify` | | what every commit passes |
+| Fast | `make check` | Go, Python 3 | about a minute |
+| Canaries | `make check-canaries` | Go, Python 3 | about four minutes on six cores |
+| Both | `make verify` | | what every change passes before it lands |
 | Integration | `make check-integration` | Go, Docker, the internet | about ten minutes, most of it the first image build |
 
 `make check-all` runs all of them.
 
 ## When to run what
 
-- **Every change** passes `make verify` before it is committed.
+- **Every change** passes `make check` before it is committed, on any branch.
+- **Before a change lands** it passes `make verify`, the canaries included: a
+  commit made on `main` or `development`, a merge into either, a push. The
+  canaries test the tests, and they are four fifths of the time, so they run
+  once per branch, on its finished tree, not once per commit. While working on
+  a rule, run its own canaries (`invariants/canaries.py --only SL-2`, seconds).
 - **A change to a service, the egress policy, the runtime directory or the
   proxy account, the Dockerfile, `scripts/runner.sh` or `scripts/dvpnd.service`**
   also passes `make check-integration`, as does every release.
